@@ -440,6 +440,8 @@ struct ssl_method_st
 	int (*ssl_version)(void);
 	long (*ssl_callback_ctrl)(SSL *s, int cb_id, void (*fp)(void));
 	long (*ssl_ctx_callback_ctrl)(SSL_CTX *s, int cb_id, void (*fp)(void));
+        int (*ssl_read_slice)(SSL *s,void *buf,int len,SSL_SLICE *slice);
+        int (*ssl_write_slice)(SSL *s,const void *buf,int len,SSL_SLICE *slice);
 	};
 
 /* Lets make this into an ASN.1 type structure as follows
@@ -1117,6 +1119,13 @@ const char *SSL_get_psk_identity(const SSL *s);
 #define SSL_MAC_FLAG_WRITE_MAC_STREAM 2
 
 #ifndef OPENSSL_NO_SSL_INTERN
+
+struct ssl_slice_st
+        {
+        /* Contains the details of specify a
+         * slice seperate encryption of slices 
+         * of a tls stream. */
+        };
 
 struct ssl_st
 	{
@@ -1865,6 +1874,8 @@ long	SSL_ctrl(SSL *ssl,int cmd, long larg, void *parg);
 long	SSL_callback_ctrl(SSL *, int, void (*)(void));
 long	SSL_CTX_ctrl(SSL_CTX *ctx,int cmd, long larg, void *parg);
 long	SSL_CTX_callback_ctrl(SSL_CTX *, int, void (*)(void));
+int 	SSL_read_slice(SSL *ssl,void *buf,int num,SSL_SLICE *slice);
+int 	SSL_write_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice);
 
 int	SSL_get_error(const SSL *s,int ret_code);
 const char *SSL_get_version(const SSL *s);

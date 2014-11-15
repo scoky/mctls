@@ -4241,6 +4241,11 @@ int ssl3_write(SSL *s, const void *buf, int len)
 
 	return(ret);
 	}
+int ssl3_write_slice(SSL *s, const void *buf, int len, SSL_SLICE *slice)
+	{
+        /* TODO */
+        return 0;
+        }
 
 static int ssl3_read_internal(SSL *s, void *buf, int len, int peek)
 	{
@@ -4270,6 +4275,11 @@ static int ssl3_read_internal(SSL *s, void *buf, int len, int peek)
 int ssl3_read(SSL *s, void *buf, int len)
 	{
 	return ssl3_read_internal(s, buf, len, 0);
+	}
+int ssl3_read_slice(SSL *s, void *buf, int len, SSL_SLICE *slice)
+	{
+        /* TODO */
+	return 0;
 	}
 
 int ssl3_peek(SSL *s, void *buf, int len)

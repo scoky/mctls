@@ -658,6 +658,8 @@ const SSL_METHOD *func_name(void)  \
 		ssl_undefined_void_function, \
 		ssl3_callback_ctrl, \
 		ssl3_ctx_callback_ctrl, \
+                ssl3_read_slice, \
+                ssl3_write_slice, \
 	}; \
 	return &func_name##_data; \
 	}
@@ -945,6 +947,8 @@ long	ssl3_ctx_ctrl(SSL_CTX *s,int cmd, long larg, void *parg);
 long	ssl3_callback_ctrl(SSL *s,int cmd, void (*fp)(void));
 long	ssl3_ctx_callback_ctrl(SSL_CTX *s,int cmd, void (*fp)(void));
 int	ssl3_pending(const SSL *s);
+int	ssl3_read_slice(SSL *s, void *buf, int len, SSL_SLICE *slice);
+int	ssl3_write_slice(SSL *s, const void *buf, int len, SSL_SLICE *slice);
 
 void ssl3_record_sequence_update(unsigned char *seq);
 int ssl3_do_change_cipher_spec(SSL *ssl);
