@@ -322,6 +322,10 @@ extern "C" {
 #define SSL3_VERSION			0x0300
 #define SSL3_VERSION_MAJOR		0x03
 #define SSL3_VERSION_MINOR		0x00
+    
+#define SPP_VERSION                     0x0400
+#define SPP_VERSION_MAJOR		0x04
+#define SPP_VERSION_MINOR		0x00
 
 #define SSL3_RT_CHANGE_CIPHER_SPEC	20
 #define SSL3_RT_ALERT			21
@@ -360,6 +364,7 @@ typedef struct ssl3_record_st
 /*r */	unsigned char *comp;    /* only used with decompression - malloc()ed */
 /*r */  unsigned long epoch;    /* epoch number, needed by DTLS1 */
 /*r */  unsigned char seq_num[8]; /* sequence number, needed by DTLS1 */
+/*rw*/  int slice;
 	} SSL3_RECORD;
 
 typedef struct ssl3_buffer_st

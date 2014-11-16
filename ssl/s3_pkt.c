@@ -332,6 +332,10 @@ again:
 		ssl_major= *(p++);
 		ssl_minor= *(p++);
 		version=(ssl_major<<8)|ssl_minor;
+                if (ssl_major == SPP_VERSION_MAJOR) 
+                {
+                    rr->slice = *(p++);
+                }
 		n2s(p,rr->length);
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);

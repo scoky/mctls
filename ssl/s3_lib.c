@@ -4175,7 +4175,7 @@ int ssl3_shutdown(SSL *s)
 	else if (!(s->shutdown & SSL_RECEIVED_SHUTDOWN))
 		{
 		/* If we are waiting for a close from our peer, we are closed */
-		s->method->ssl_read_bytes(s,0,NULL,0,0);
+		s->method->ssl_read_bytes(s,0,NULL,0,0,NULL);
 		if(!(s->shutdown & SSL_RECEIVED_SHUTDOWN))
 			{
 			return(-1);	/* return WANT_READ */
@@ -4247,14 +4247,14 @@ int ssl3_write_slice(SSL *s, const void *buf, int len, SSL_SLICE *slice)
         return 0;
         }
 
-static int ssl3_read_internal(SSL *s, void *buf, int len, int peek)
+static int ssl3_read_internal(SSL *s, void *buf, int len, int peek, SSL_SLICE *slice)
 	{
 	int ret;
 	
 	clear_sys_error();
 	if (s->s3->renegotiate) ssl3_renegotiate_check(s);
 	s->s3->in_read_app_data=1;
-	ret=s->method->ssl_read_bytes(s,SSL3_RT_APPLICATION_DATA,buf,len,peek);
+	ret=s->method->ssl_read_bytes(s,SSL3_RT_APPLICATION_DATA,buf,len,peek,slice);
 	if ((ret == -1) && (s->s3->in_read_app_data == 2))
 		{
 		/* ssl3_read_bytes decided to call s->handshake_func, which
@@ -4263,7 +4263,7 @@ static int ssl3_read_internal(SSL *s, void *buf, int len, int peek)
 		 * and thinks that application data makes sense here; so disable
 		 * handshake processing and try to read application data again. */
 		s->in_handshake++;
-		ret=s->method->ssl_read_bytes(s,SSL3_RT_APPLICATION_DATA,buf,len,peek);
+		ret=s->method->ssl_read_bytes(s,SSL3_RT_APPLICATION_DATA,buf,len,peek,slice);
 		s->in_handshake--;
 		}
 	else
@@ -4274,17 +4274,16 @@ static int ssl3_read_internal(SSL *s, void *buf, int len, int peek)
 
 int ssl3_read(SSL *s, void *buf, int len)
 	{
-	return ssl3_read_internal(s, buf, len, 0);
+	return ssl3_read_internal(s, buf, len, 0, NULL);
 	}
 int ssl3_read_slice(SSL *s, void *buf, int len, SSL_SLICE *slice)
 	{
-        /* TODO */
-	return 0;
+        return ssl3_read_internal(s, buf, len, 0, slice);
 	}
 
 int ssl3_peek(SSL *s, void *buf, int len)
 	{
-	return ssl3_read_internal(s, buf, len, 1);
+	return ssl3_read_internal(s, buf, len, 1, NULL);
 	}
 
 int ssl3_renegotiate(SSL *s)

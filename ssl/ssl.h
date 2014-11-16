@@ -424,7 +424,7 @@ struct ssl_method_st
 	long (*ssl_get_message)(SSL *s, int st1, int stn, int mt, long
 		max, int *ok);
 	int (*ssl_read_bytes)(SSL *s, int type, unsigned char *buf, int len, 
-		int peek);
+		int peek, SSL_SLICE *slice);
 	int (*ssl_write_bytes)(SSL *s, int type, const void *buf_, int len);
 	int (*ssl_dispatch_alert)(SSL *s);
 	long (*ssl_ctrl)(SSL *s,int cmd,long larg,void *parg);
@@ -1377,6 +1377,9 @@ struct ssl_st
 #ifndef OPENSSL_NO_SRP
 	SRP_CTX srp_ctx; /* ctx for SRP authentication */
 #endif
+        
+        SSL_SLICE *slices;
+        int slices_len;
 	};
 
 #endif
