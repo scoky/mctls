@@ -1127,6 +1127,9 @@ struct ssl_slice_st
          * each read or write. */
         EVP_CIPHER_CTX *enc_read_ctx;
         EVP_CIPHER_CTX *enc_write_ctx;
+        /* Indicates whether this context contains the material 
+         * need to encrypt/decrypt. */
+        int have_material;
         };
 
 struct ssl_st

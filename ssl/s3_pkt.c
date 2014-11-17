@@ -332,10 +332,6 @@ again:
 		ssl_major= *(p++);
 		ssl_minor= *(p++);
 		version=(ssl_major<<8)|ssl_minor;
-                if (ssl_major == SPP_VERSION_MAJOR) 
-                {
-                    rr->slice_id = *(p++);
-                }
 		n2s(p,rr->length);
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -410,14 +406,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 
 	/* decrypt in place in 'rr->input' */
 	rr->data=rr->input;
-
-        /* Get slice from id. */
-        if (rr->slice_id >= s->slices_len) {
-            SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
-            goto f_err;
-        }
-        s->cur_slice = &s->slices[rr->slice_id];
-	enc_err = s->method->ssl3_enc->enc(s,0);
+        enc_err = s->method->ssl3_enc->enc(s,0);
 	/* enc_err is:
 	 *    0: (in non-constant time) if the record is publically invalid.
 	 *    1: if the padding is valid
@@ -683,8 +672,19 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 
 	/* decrypt in place in 'rr->input' */
 	rr->data=rr->input;
-
-	enc_err = s->method->ssl3_enc->enc(s,0);
+        /* Get slice from id. */
+        if (rr->slice_id >= s->slices_len) {
+            SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
+            goto f_err;
+        }
+        s->cur_slice = &s->slices[rr->slice_id];
+        /* We can decrypt this slice. */
+        if (s->cur_slice->have_material == 1) {
+            enc_err = s->method->ssl3_enc->enc(s,0);
+        } else {
+            /* Cannot decrypt, just return the still encrypted data. */
+            goto done;
+        }
 	/* enc_err is:
 	 *    0: (in non-constant time) if the record is publically invalid.
 	 *    1: if the padding is valid
@@ -823,6 +823,7 @@ printf("\n");
 fprintf(stderr, "Ultimate Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
 
+done:
 	return(1);
 
 f_err:
