@@ -306,6 +306,7 @@ extern "C" {
 #define SSL_TXT_TLSV1		"TLSv1"
 #define SSL_TXT_TLSV1_1		"TLSv1.1"
 #define SSL_TXT_TLSV1_2		"TLSv1.2"
+#define SSL_TXT_SPP             "SPP"
 
 #define SSL_TXT_EXP		"EXP"
 #define SSL_TXT_EXPORT		"EXPORT"
@@ -424,7 +425,7 @@ struct ssl_method_st
 	long (*ssl_get_message)(SSL *s, int st1, int stn, int mt, long
 		max, int *ok);
 	int (*ssl_read_bytes)(SSL *s, int type, unsigned char *buf, int len, 
-		int peek, SSL_SLICE *slice);
+		int peek);
 	int (*ssl_write_bytes)(SSL *s, int type, const void *buf_, int len);
 	int (*ssl_dispatch_alert)(SSL *s);
 	long (*ssl_ctrl)(SSL *s,int cmd,long larg,void *parg);
@@ -440,8 +441,6 @@ struct ssl_method_st
 	int (*ssl_version)(void);
 	long (*ssl_callback_ctrl)(SSL *s, int cb_id, void (*fp)(void));
 	long (*ssl_ctx_callback_ctrl)(SSL_CTX *s, int cb_id, void (*fp)(void));
-        int (*ssl_read_slice)(SSL *s,void *buf,int len,SSL_SLICE *slice);
-        int (*ssl_write_slice)(SSL *s,const void *buf,int len,SSL_SLICE *slice);
 	};
 
 /* Lets make this into an ASN.1 type structure as follows
@@ -1122,9 +1121,12 @@ const char *SSL_get_psk_identity(const SSL *s);
 
 struct ssl_slice_st
         {
-        /* Contains the details of specify a
-         * slice seperate encryption of slices 
-         * of a tls stream. */
+        /* Contains the details of a slices encryption and 
+         * decryption methods. These values should be copied 
+         * over to SSL.enc_read_ctx and SSL.enc_write_ctx before 
+         * each read or write. */
+        EVP_CIPHER_CTX *enc_read_ctx;
+        EVP_CIPHER_CTX *enc_write_ctx;
         };
 
 struct ssl_st
@@ -1377,8 +1379,14 @@ struct ssl_st
 #ifndef OPENSSL_NO_SRP
 	SRP_CTX srp_ctx; /* ctx for SRP authentication */
 #endif
-        
+        /* The slice used by the most recent operation (read/write) 
+           Set this value before writing data to specify the slice 
+           used to encrypt the data. Get this value after reading data 
+           to determine which slice was read. */
+        SSL_SLICE *cur_slice;
+        /* Slices defined for this session. */
         SSL_SLICE *slices;
+        /* Number of slices defined. */
         int slices_len;
 	};
 
@@ -1877,8 +1885,6 @@ long	SSL_ctrl(SSL *ssl,int cmd, long larg, void *parg);
 long	SSL_callback_ctrl(SSL *, int, void (*)(void));
 long	SSL_CTX_ctrl(SSL_CTX *ctx,int cmd, long larg, void *parg);
 long	SSL_CTX_callback_ctrl(SSL_CTX *, int, void (*)(void));
-int 	SSL_read_slice(SSL *ssl,void *buf,int num,SSL_SLICE *slice);
-int 	SSL_write_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice);
 
 int	SSL_get_error(const SSL *s,int ret_code);
 const char *SSL_get_version(const SSL *s);
@@ -2612,6 +2618,7 @@ void ERR_load_SSL_strings(void);
 #define SSL_R_WRONG_VERSION_NUMBER			 267
 #define SSL_R_X509_LIB					 268
 #define SSL_R_X509_VERIFICATION_SETUP_PROBLEMS		 269
+#define SPP_R_INVALID_SLICE_ID                           601
 
 #ifdef  __cplusplus
 }
