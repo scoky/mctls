@@ -1921,6 +1921,9 @@ const SSL_METHOD *TLSv1_2_method(void);		/* TLSv1.2 */
 const SSL_METHOD *TLSv1_2_server_method(void);	/* TLSv1.2 */
 const SSL_METHOD *TLSv1_2_client_method(void);	/* TLSv1.2 */
 
+const SSL_METHOD *SPP_method(void);		/* TLSv1.2 */
+const SSL_METHOD *SPP_server_method(void);	/* TLSv1.2 */
+const SSL_METHOD *SPP_client_method(void);	/* TLSv1.2 */
 
 const SSL_METHOD *DTLSv1_method(void);		/* DTLSv1.0 */
 const SSL_METHOD *DTLSv1_server_method(void);	/* DTLSv1.0 */

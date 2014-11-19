@@ -11,11 +11,11 @@
 #include <openssl/des.h>
 #endif
 
-int tls1_enc(SSL *s, int send) {
+int spp_enc(SSL *s, int send) {
     /* Pick the right slice, and encrypt with it. */
     if (s->cur_slice) {
         s->enc_write_ctx = s->cur_slice->enc_write_ctx;
         s->enc_read_ctx = s->cur_slice->enc_read_ctx;
     }
-    tls1_enc(s, send);
+    return tls1_enc(s, send);
 }

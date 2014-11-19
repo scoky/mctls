@@ -288,7 +288,7 @@ err:
 	return(ret);
 	}
 
-int ssp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
+int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 	{
 	int al,i,j,ret;
 	unsigned int n;
@@ -352,7 +352,7 @@ start:
 	/* get new packet if necessary */
 	if ((rr->length == 0) || (s->rstate == SSL_ST_READ_BODY))
 		{
-                ret=ssp_get_record(s);
+                ret=spp_get_record(s);
 		if (ret <= 0) return(ret);
 		}
 

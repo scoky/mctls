@@ -624,6 +624,46 @@ extern SSL3_ENC_METHOD DTLSv1_enc_data;
 
 #define SSL_IS_DTLS(s) (s->method->version == DTLS1_VERSION)
 
+/* SPP methods declaration. Will need to expand with many new methods. */
+#define IMPLEMENT_spp_meth_func(version, func_name, s_accept, s_connect, \
+				s_get_meth) \
+const SSL_METHOD *func_name(void)  \
+	{ \
+	static const SSL_METHOD func_name##_data= { \
+		version, \
+		tls1_new, \
+		tls1_clear, \
+		tls1_free, \
+		s_accept, \
+		s_connect, \
+		ssl3_read, \
+		ssl3_peek, \
+		ssl3_write, \
+		ssl3_shutdown, \
+		ssl3_renegotiate, \
+		ssl3_renegotiate_check, \
+		ssl3_get_message, \
+		spp_read_bytes, \
+		spp_write_bytes, \
+		ssl3_dispatch_alert, \
+		ssl3_ctrl, \
+		ssl3_ctx_ctrl, \
+		ssl3_get_cipher_by_char, \
+		ssl3_put_cipher_by_char, \
+		ssl3_pending, \
+		ssl3_num_ciphers, \
+		ssl3_get_cipher, \
+		s_get_meth, \
+		tls1_default_timeout, \
+		&TLSv1_enc_data, \
+		ssl_undefined_void_function, \
+		ssl3_callback_ctrl, \
+		ssl3_ctx_callback_ctrl, \
+	}; \
+	return &func_name##_data; \
+	}
+
+
 #define IMPLEMENT_tls_meth_func(version, func_name, s_accept, s_connect, \
 				s_get_meth) \
 const SSL_METHOD *func_name(void)  \
@@ -1094,10 +1134,10 @@ int tls1_alert_code(int code);
 int ssl3_alert_code(int code);
 int ssl_ok(SSL *s);
 
-/* SSP methods */
-int ssp_enc(SSL *s, int send);
-int ssp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
-int ssp_write_bytes(SSL *s, int type, const void *buf, int len);
+/* SPP methods */
+int spp_enc(SSL *s, int send);
+int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
+int spp_write_bytes(SSL *s, int type, const void *buf, int len);
 
 #ifndef OPENSSL_NO_ECDH
 int ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s);
