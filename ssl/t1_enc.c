@@ -688,12 +688,6 @@ int tls1_enc(SSL *s, int send)
 	unsigned long l;
 	int bs,i,j,k,pad=0,ret,mac_size=0;
 	const EVP_CIPHER *enc;
-        
-        if (s->cur_slice)
-            {
-            s->enc_write_ctx = s->cur_slice->enc_write_ctx;
-            s->enc_read_ctx = s->cur_slice->enc_read_ctx;
-            }
 
 	if (send)
 		{

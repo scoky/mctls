@@ -1094,6 +1094,11 @@ int tls1_alert_code(int code);
 int ssl3_alert_code(int code);
 int ssl_ok(SSL *s);
 
+/* SSP methods */
+int ssp_enc(SSL *s, int send);
+int ssp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
+int ssp_write_bytes(SSL *s, int type, const void *buf, int len);
+
 #ifndef OPENSSL_NO_ECDH
 int ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s);
 #endif
