@@ -15,7 +15,11 @@ static const SSL_METHOD *spp_get_server_method(int ver)
 	}
 
 IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_server_method,
-			ssl3_accept,
+			spp_accept,
 			ssl_undefined_function,
 			spp_get_server_method)
-        /* TODO: replace with new accept method */
+        
+int spp_accept(SSL *s) {
+    /* TODO: replace with new accept method */
+    return 0;
+}

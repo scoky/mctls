@@ -15,6 +15,10 @@ static const SSL_METHOD *spp_get_client_method(int ver)
 
 IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_client_method,
 			ssl_undefined_function,
-			ssl3_connect,
+			spp_connect,
 			spp_get_client_method)
-        /* TODO: Replace with new connect method */
+
+int spp_connect(SSL *s) {
+    /* TODO: Method for client to connect */
+    return 0;
+}
