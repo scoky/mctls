@@ -1140,6 +1140,7 @@ int	spp_connect(SSL *s);
 int spp_enc(SSL *s, int send);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
 int spp_write_bytes(SSL *s, int type, const void *buf, int len);
+/* TODO: add other needed SPP methods here. */
 
 #ifndef OPENSSL_NO_ECDH
 int ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s);
