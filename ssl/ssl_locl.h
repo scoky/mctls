@@ -618,6 +618,7 @@ OPENSSL_EXTERN SSL_CIPHER ssl3_ciphers[];
 
 SSL_METHOD *ssl_bad_method(int ver);
 
+extern SSL3_ENC_METHOD SPP_enc_data;
 extern SSL3_ENC_METHOD TLSv1_enc_data;
 extern SSL3_ENC_METHOD SSLv3_enc_data;
 extern SSL3_ENC_METHOD DTLSv1_enc_data;
@@ -655,7 +656,7 @@ const SSL_METHOD *func_name(void)  \
 		ssl3_get_cipher, \
 		s_get_meth, \
 		tls1_default_timeout, \
-		&TLSv1_enc_data, \
+		&SPP_enc_data, \
 		ssl_undefined_void_function, \
 		ssl3_callback_ctrl, \
 		ssl3_ctx_callback_ctrl, \

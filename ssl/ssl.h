@@ -1130,6 +1130,7 @@ struct ssl_slice_st
         /* Indicates whether this context contains the material 
          * need to encrypt/decrypt. */
         int have_material;
+        int slice_id;
         };
 
 struct ssl_st
@@ -2625,7 +2626,10 @@ void ERR_load_SSL_strings(void);
 #define SSL_R_WRONG_VERSION_NUMBER			 267
 #define SSL_R_X509_LIB					 268
 #define SSL_R_X509_VERIFICATION_SETUP_PROBLEMS		 269
+
 #define SPP_R_INVALID_SLICE_ID                           601
+#define SPP_R_MISSING_SLICE                              602
+#define SSL_F_SPP_ENC                                    603
 
 #ifdef  __cplusplus
 }

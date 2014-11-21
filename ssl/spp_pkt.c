@@ -8,6 +8,8 @@
 #include <openssl/rand.h>
 
 #define MAX_EMPTY_RECORDS 10 /* Might not be needed */
+/* Read record from the underlying communication medium 
+ * This method attempts to read and decrypt the . */
 static int spp_get_record(SSL *s)
 	{
 	int ssl_major,ssl_minor,al;
@@ -776,3 +778,271 @@ f_err:
 err:
 	return(-1);
 	}
+
+static int do_spp_write(SSL *s, int type, const unsigned char *buf,
+			 unsigned int len, int create_empty_fragment) {
+    unsigned char *p,*plen;
+    int i,mac_size,clear=0;
+    int prefix_len=0;
+    int eivlen;
+    long align=0;
+    SSL3_RECORD *wr;
+    SSL3_BUFFER *wb=&(s->s3->wbuf);
+    SSL_SESSION *sess;
+
+    /* first check if there is a SSL3_BUFFER still being written
+     * out.  This will happen with non blocking IO */
+    if (wb->left != 0)
+        return(ssl3_write_pending(s,type,buf,len));
+    /* Above does not need to change since format of outgoing 
+     * record already set. */
+
+    /* If we have an alert to send, lets send it */
+    if (s->s3->alert_dispatch) {
+        i=s->method->ssl_dispatch_alert(s);
+        if (i <= 0)
+            return(i);
+        /* if it went, fall through and send more stuff */
+    }
+
+    if (wb->buf == NULL)
+        if (!ssl3_setup_write_buffer(s))
+            return -1;
+
+    if (len == 0 && !create_empty_fragment)
+        return 0;
+
+    wr = &(s->s3->wrec);
+    sess = s->session;
+
+    if ((sess == NULL) ||
+        (s->cur_slice->enc_write_ctx == NULL) ||
+        (EVP_MD_CTX_md(s->write_hash) == NULL)) {
+        /* No idea what this means... */
+#if 1
+            clear=s->cur_slice->enc_write_ctx?0:1;	/* must be AEAD cipher */
+#else
+            clear=1;
+#endif
+            mac_size=0;
+    } else {
+        /* TODO: MAC size or method of determining hash may become variable. */
+        mac_size=EVP_MD_CTX_size(s->write_hash);
+        if (mac_size < 0)
+            goto err;
+    }
+
+    /* 'create_empty_fragment' is true only when this function calls itself */
+    if (!clear && !create_empty_fragment && !s->s3->empty_fragment_done) {
+        /* countermeasure against known-IV weakness in CBC ciphersuites
+         * (see http://www.openssl.org/~bodo/tls-cbc.txt) */
+
+        if (s->s3->need_empty_fragments && type == SSL3_RT_APPLICATION_DATA) {
+            /* recursive function call with 'create_empty_fragment' set;
+             * this prepares and buffers the data for an empty fragment
+             * (these 'prefix_len' bytes are sent out later
+             * together with the actual payload) */
+            prefix_len = do_spp_write(s, type, buf, 0, 1);
+            if (prefix_len <= 0)
+                    goto err;
+
+            if (prefix_len > (SPP_RT_HEADER_LENGTH + 
+                SSL3_RT_SEND_MAX_ENCRYPTED_OVERHEAD)) {
+                    /* insufficient space */
+                    SSLerr(SSL_F_DO_SSL3_WRITE, ERR_R_INTERNAL_ERROR);
+                    goto err;
+            }
+        }
+
+        s->s3->empty_fragment_done = 1;
+    }
+
+    if (create_empty_fragment) {
+#if defined(SSL3_ALIGN_PAYLOAD) && SSL3_ALIGN_PAYLOAD!=0
+        /* extra fragment would be couple of cipher blocks,
+         * which would be multiple of SSL3_ALIGN_PAYLOAD, so
+         * if we want to align the real payload, then we can
+         * just pretent we simply have two headers. */
+        align = (long)wb->buf + 2*SPP_RT_HEADER_LENGTH;
+        align = (-align)&(SSL3_ALIGN_PAYLOAD-1);
+#endif
+        p = wb->buf + align;
+        wb->offset  = align;
+    } else if (prefix_len) {
+        p = wb->buf + wb->offset + prefix_len;
+    } else {
+#if defined(SSL3_ALIGN_PAYLOAD) && SSL3_ALIGN_PAYLOAD!=0
+        align = (long)wb->buf + SPP_RT_HEADER_LENGTH;
+        align = (-align)&(SSL3_ALIGN_PAYLOAD-1);
+#endif
+        p = wb->buf + align;
+        wb->offset  = align;
+    }
+
+    /* write the header */
+
+    *(p++)=type&0xff;
+    wr->type=type;
+
+    *(p++)=(s->version>>8);
+    *(p++)=s->version&0xff;
+    
+    /* Write the slide ID as the 4th byte of the header. */
+    *(p++)=s->cur_slice->slice_id;
+    wr->slice_id = s->cur_slice->slice_id;
+
+    /* field where we are to write out packet length */
+    plen=p; 
+    p+=2;
+    /* Explicit IV length, block ciphers and TLS version 1.1 or later */
+    if (s->enc_write_ctx && s->version >= TLS1_1_VERSION) {
+        int mode = EVP_CIPHER_CTX_mode(s->enc_write_ctx);
+        if (mode == EVP_CIPH_CBC_MODE) {
+            eivlen = EVP_CIPHER_CTX_iv_length(s->enc_write_ctx);
+            if (eivlen <= 1)
+                eivlen = 0;
+        }
+        /* Need explicit part of IV for GCM mode */
+        else if (mode == EVP_CIPH_GCM_MODE)
+            eivlen = EVP_GCM_TLS_EXPLICIT_IV_LEN;
+        else
+            eivlen = 0;
+    } else {
+        eivlen = 0;
+    }
+
+    /* lets setup the record stuff. */
+    wr->data=p + eivlen;
+    wr->length=(int)len;
+    wr->input=(unsigned char *)buf;
+
+    /* we now 'read' from wr->input, wr->length bytes into
+     * wr->data */
+
+    /* first we compress */
+    if (s->compress != NULL) {
+        if (!ssl3_do_compress(s)) {
+            SSLerr(SSL_F_DO_SSL3_WRITE,SSL_R_COMPRESSION_FAILURE);
+            goto err;
+        }
+    } else {
+        memcpy(wr->data,wr->input,wr->length);
+        wr->input=wr->data;
+    }
+
+    /* we should still have the output to wr->data and the input
+     * from wr->input.  Length should be wr->length.
+     * wr->data still points in the wb->buf */
+    if (mac_size != 0) {
+        if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
+            goto err;
+        wr->length+=mac_size;
+    }
+
+    wr->input=p;
+    wr->data=p;
+
+    if (eivlen) {
+/*	if (RAND_pseudo_bytes(p, eivlen) <= 0)
+                goto err; */
+        wr->length += eivlen;
+    }
+
+    /* ssl3_enc can only have an error on read */
+    /* This is a call to spp_enc which will encrypt or not 
+     * depending upon whether we have the encryption material. */
+    s->method->ssl3_enc->enc(s,1);
+
+    /* record length after mac and block padding */
+    s2n(wr->length,plen);
+
+    /* we should now have
+     * wr->data pointing to the encrypted data, which is
+     * wr->length long */
+    wr->type=type; /* not needed but helps for debugging */
+    wr->length+=SPP_RT_HEADER_LENGTH;
+
+    if (create_empty_fragment) {
+        /* we are in a recursive call;
+         * just return the length, don't write out anything here
+         */
+        return wr->length;
+    }
+
+    /* now let's set up wb */
+    wb->left = prefix_len + wr->length;
+
+    /* memorize arguments so that ssl3_write_pending can detect bad write retries later */
+    s->s3->wpend_tot=len;
+    s->s3->wpend_buf=buf;
+    s->s3->wpend_type=type;
+    s->s3->wpend_ret=len;
+
+    /* we now just need to write the buffer */
+    return ssl3_write_pending(s,type,buf,len);
+err:
+    return -1;
+}
+
+/* This function is not actually changed from ssl3_write_bytes, 
+ * but we need to change do_write, so we copy this here as well. */
+int spp_write_bytes(SSL *s, int type, const void *buf_, int len) {
+    const unsigned char *buf=buf_;
+    unsigned int n,nw;
+    int i,tot;
+
+    s->rwstate=SSL_NOTHING;
+    OPENSSL_assert(s->s3->wnum <= INT_MAX);
+    tot=s->s3->wnum;
+    s->s3->wnum=0;
+
+    if (SSL_in_init(s) && !s->in_handshake) {
+	i=s->handshake_func(s);
+	if (i < 0) return(i);
+	if (i == 0) {
+            SSLerr(SSL_F_SSL3_WRITE_BYTES,SSL_R_SSL_HANDSHAKE_FAILURE);
+            return -1;
+	}
+    }
+
+    /* ensure that if we end up with a smaller value of data to write 
+     * out than the the original len from a write which didn't complete 
+     * for non-blocking I/O and also somehow ended up avoiding 
+     * the check for this in ssl3_write_pending/SSL_R_BAD_WRITE_RETRY as
+     * it must never be possible to end up with (len-tot) as a large
+     * number that will then promptly send beyond the end of the users
+     * buffer ... so we trap and report the error in a way the user
+     * will notice
+     */
+    if (len < tot) {
+        SSLerr(SSL_F_SSL3_WRITE_BYTES,SSL_R_BAD_LENGTH);
+        return(-1);
+    }
+
+
+    n=(len-tot);
+    for (;;) {
+	if (n > s->max_send_fragment)
+            nw=s->max_send_fragment;
+        else
+            nw=n;
+
+        i=do_spp_write(s, type, &(buf[tot]), nw, 0);
+	if (i <= 0) {
+            s->s3->wnum=tot;
+            return i;
+	}
+
+	if ((i == (int)n) ||
+            (type == SSL3_RT_APPLICATION_DATA &&
+            (s->mode & SSL_MODE_ENABLE_PARTIAL_WRITE))) {
+		/* next chunk of data should get another prepended empty fragment
+		 * in ciphersuites with known-IV weakness: */
+		s->s3->empty_fragment_done = 0;
+		return tot+i;
+	}
+
+	n-=i;
+	tot+=i;
+    }
+}
