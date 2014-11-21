@@ -1124,12 +1124,16 @@ struct ssl_slice_st
         /* Contains the details of a slices encryption and 
          * decryption methods. These values should be copied 
          * over to SSL.enc_read_ctx and SSL.enc_write_ctx before 
-         * each read or write. */
+         * each encrypt or decrypt operation. */
         EVP_CIPHER_CTX *enc_read_ctx;
         EVP_CIPHER_CTX *enc_write_ctx;
         /* Indicates whether this context contains the material 
-         * need to encrypt/decrypt. */
+         * need to encrypt/decrypt. basically, whether enc_read_ctx 
+         * and enc_write_ctx are valid or not. */
         int have_material;
+        /* Id assigned to this slice during handshake. The id of the 
+         * slice used for encryption will be 
+         * included in each record header on the wire. */
         int slice_id;
         };
 
@@ -1387,11 +1391,13 @@ struct ssl_st
            Set this value before writing data to specify the slice 
            used to encrypt the data. Get this value after reading data 
            to determine which slice was read. */
-        SSL_SLICE *cur_slice;
+        SSL_SLICE *write_slice;
+        SSL_SLICE *read_slice;
         /* Slices defined for this session. */
         SSL_SLICE *slices;
         /* Number of slices defined. */
         int slices_len;
+        SSL_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
 	};
 
 #endif

@@ -121,14 +121,14 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
+    s->read_slice = s->get_slice_by_id(s, rr->slice_id);
     /* Get slice from id if it can be found. Probably shouldn't be an index... */
-    if (rr->slice_id >= s->slices_len) {
+    if (!s->read_slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
         goto f_err;
-    }
-    s->cur_slice = &s->slices[rr->slice_id];
+    }     
     /* We can decrypt this slice. */
-    if (s->cur_slice->have_material == 1) {
+    if (s->read_slice->have_material == 1) {
         enc_err = s->method->ssl3_enc->enc(s,0);
     } else {
         /* Cannot decrypt, just return the still encrypted data. */
@@ -790,11 +790,11 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     sess = s->session;
 
     if ((sess == NULL) ||
-        (s->cur_slice->enc_write_ctx == NULL) ||
+        (s->write_slice->enc_write_ctx == NULL) ||
         (EVP_MD_CTX_md(s->write_hash) == NULL)) {
         /* No idea what this means... */
 #if 1
-            clear=s->cur_slice->enc_write_ctx?0:1;	/* must be AEAD cipher */
+            clear=s->write_slice->enc_write_ctx?0:1;	/* must be AEAD cipher */
 #else
             clear=1;
 #endif
@@ -862,8 +862,8 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     *(p++)=s->version&0xff;
     
     /* Write the slide ID as the 4th byte of the header. */
-    *(p++)=s->cur_slice->slice_id;
-    wr->slice_id = s->cur_slice->slice_id;
+    *(p++)=s->write_slice->slice_id;
+    wr->slice_id = s->write_slice->slice_id;
 
     /* field where we are to write out packet length */
     plen=p; 
