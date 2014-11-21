@@ -18,4 +18,6 @@ IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_proxy_method,
 			spp_connect,
 			spp_get_proxy_method)
 
-/* TODO: Maybe needs it's own accept and connect methods? */    
+/* TODO: Maybe needs it's own accept and connect methods?
+ * spp_proxy_accept()
+ * app_proxy_connect() */    

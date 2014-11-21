@@ -21,5 +21,6 @@ IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_server_method,
         
 int spp_accept(SSL *s) {
     /* TODO: replace with new accept method */
+    /* Set the slices information. */
     return 0;
 }

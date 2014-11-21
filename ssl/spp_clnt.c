@@ -20,5 +20,6 @@ IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_client_method,
 
 int spp_connect(SSL *s) {
     /* TODO: Method for client to connect */
+    /* Set the slices information. */
     return 0;
 }
