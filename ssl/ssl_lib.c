@@ -953,7 +953,11 @@ long SSL_get_default_timeout(const SSL *s)
 	{
 	return(s->method->get_timeout());
 	}
-
+int SSL_read_slice(SSL *s,void *buf,int num,SSL_SLICE **slice) {
+    int c = SSL_read(s,buf,num);
+    *slice = s->read_slice;
+    return c;
+}
 int SSL_read(SSL *s,void *buf,int num)
 	{
 	if (s->handshake_func == 0)
@@ -984,7 +988,10 @@ int SSL_peek(SSL *s,void *buf,int num)
 		}
 	return(s->method->ssl_peek(s,buf,num));
 	}
-
+int SSL_write_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice) {
+    s->write_slice = slice;
+    return SSL_write(s,buf,num);
+}
 int SSL_write(SSL *s,const void *buf,int num)
 	{
 	if (s->handshake_func == 0)

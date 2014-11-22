@@ -260,7 +260,7 @@ printf("\n");
 #endif
 
 done:
-return(1);
+    return(1);
 
 f_err:
     ssl3_send_alert(s,SSL3_AL_FATAL,al);
