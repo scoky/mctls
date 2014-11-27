@@ -992,7 +992,7 @@ int SSL_write_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice) {
     s->write_slice = slice;
     return SSL_write(s,buf,num);
 }
-int SSL_forward_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice,int modified) {
+int SSL_forward_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice,int modified) {
     /* TODO: handle MAC somehow? */
     return SSL_write_slice(s,buf,num,slice);
 }
