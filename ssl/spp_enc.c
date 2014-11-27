@@ -42,3 +42,7 @@ int spp_enc(SSL *s, int send) {
 
 /* TODO: If MAC needs to be passed all the way, must reimplement MAC function 
  * as well. */
+int spp_mac(SSL *ssl, unsigned char *md, int send) {
+    /* SPP make is actually likely to be 2 MACs, one for the hop-to-hop, the 
+     * other for client-to-server. */
+}

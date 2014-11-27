@@ -1893,6 +1893,7 @@ int 	SSL_read_slice(SSL *ssl,void *buf,int num,SSL_SLICE **slice);
 int 	SSL_peek(SSL *ssl,void *buf,int num);
 int 	SSL_write(SSL *ssl,const void *buf,int num);
 int 	SSL_write_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice);
+int 	SSL_forward_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice,int modified);
 long	SSL_ctrl(SSL *ssl,int cmd, long larg, void *parg);
 long	SSL_callback_ctrl(SSL *, int, void (*)(void));
 long	SSL_CTX_ctrl(SSL_CTX *ctx,int cmd, long larg, void *parg);
