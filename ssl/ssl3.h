@@ -685,6 +685,8 @@ typedef struct ssl3_state_st
 #endif
 #define DTLS1_MT_HELLO_VERIFY_REQUEST    3
 
+#define SPP_MT_PROXY_KEY_MATERIAL               40
+
 
 #define SSL3_MT_CCS				1
 
