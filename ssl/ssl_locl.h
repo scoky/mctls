@@ -1138,6 +1138,7 @@ int ssl_ok(SSL *s);
 /* SPP methods */
 int	spp_accept(SSL *s);
 int	spp_connect(SSL *s);
+int	spp_proxy_accept(SSL *s);
 int spp_enc(SSL *s, int send);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
 int spp_write_bytes(SSL *s, int type, const void *buf, int len);
