@@ -255,7 +255,7 @@ extern "C" {
 #define SSL3_RANDOM_SIZE			32
 #define SSL3_SESSION_ID_SIZE			32
 #define SSL3_RT_HEADER_LENGTH			5
-#define SPP_RT_HEADER_LENGTH			6
+#define SPP_RT_HEADER_LENGTH			7
 
 #ifndef SSL3_ALIGN_PAYLOAD
  /* Some will argue that this increases memory footprint, but it's
@@ -366,6 +366,7 @@ typedef struct ssl3_record_st
 /*r */  unsigned long epoch;    /* epoch number, needed by DTLS1 */
 /*r */  unsigned char seq_num[8]; /* sequence number, needed by DTLS1 */
 /*rw*/  int slice_id;
+/*rw*/  int proxy_id;
 	} SSL3_RECORD;
 
 typedef struct ssl3_buffer_st

@@ -1136,6 +1136,13 @@ struct ssl_slice_st
          * included in each record header on the wire. */
         int slice_id;
         };
+        
+struct ssl_mac_st
+        {
+        unsigned char *buffer;
+        int length;
+        int proxy_id;
+        };
 
 struct ssl_st
 	{
@@ -1398,6 +1405,9 @@ struct ssl_st
         /* Number of slices defined. */
         int slices_len;
         SSL_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
+        SSL_MAC *read_mac;
+        SSL_MAC *write_mac;
+        int proxy_id;
 	};
 
 #endif
@@ -1889,11 +1899,11 @@ void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
 int 	SSL_read(SSL *ssl,void *buf,int num);
-int 	SSL_read_slice(SSL *ssl,void *buf,int num,SSL_SLICE **slice);
+int 	SSL_read_slice(SSL *ssl,void *buf,int num,SSL_SLICE **slice,SSL_MAC **mac);
 int 	SSL_peek(SSL *ssl,void *buf,int num);
 int 	SSL_write(SSL *ssl,const void *buf,int num);
 int 	SSL_write_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice);
-int 	SSL_forward_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice,int modified);
+int 	SSL_forward_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice,SSL_MAC *mac,int modified);
 long	SSL_ctrl(SSL *ssl,int cmd, long larg, void *parg);
 long	SSL_callback_ctrl(SSL *, int, void (*)(void));
 long	SSL_CTX_ctrl(SSL_CTX *ctx,int cmd, long larg, void *parg);

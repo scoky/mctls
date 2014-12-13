@@ -53,6 +53,7 @@ again:
             version=(ssl_major<<8)|ssl_minor;
             /* New header field: slice_id */
             rr->slice_id = *(p++);
+            rr->proxy_id = *(p++);
             n2s(p,rr->length);
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -122,7 +123,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
     s->read_slice = s->get_slice_by_id(s, rr->slice_id);
-    /* Get slice from id if it can be found. Probably shouldn't be an index... */
+    /* Get slice from id if it can be found. */
     if (!s->read_slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
         goto f_err;
@@ -157,9 +158,15 @@ printf("\n");
             /* s->read_hash != NULL => mac_size != -1 */
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE];
+            SSL_MAC read_mac;
             mac_size=EVP_MD_CTX_size(s->read_hash);
             OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
-
+            /* Store the mac value from the record so that it may be passed on unmodified by proxies. */
+            s->read_mac = &read_mac;
+            s->read_mac->buffer = mac_tmp;
+            s->read_mac->length = mac_size;
+            s->read_mac->proxy_id = rr->proxy_id;
+                    
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
 
@@ -194,6 +201,7 @@ printf("\n");
                 mac = &rr->data[rr->length];
             }
 
+            /* TODO: Change context for mac generation to the one specified by proxy_id */
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                 enc_err = -1;
@@ -800,8 +808,12 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
 #endif
             mac_size=0;
     } else {
-        /* TODO: MAC size or method of determining hash may become variable. */
-        mac_size=EVP_MD_CTX_size(s->write_hash);
+        if (s->write_mac) {
+            mac_size = s->write_mac->length;
+        } else {
+            mac_size=EVP_MD_CTX_size(s->write_hash);
+        }
+        
         if (mac_size < 0)
             goto err;
     }
@@ -862,9 +874,12 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     *(p++)=s->version&0xff;
     
     /* Write the slide ID as the 4th byte of the header. */
-    *(p++)=s->write_slice->slice_id;
     wr->slice_id = s->write_slice->slice_id;
-
+    *(p++)=wr->slice_id;
+    
+    wr->proxy_id = (s->write_mac ? s->write_mac->proxy_id : s->proxy_id);
+    *(p++)=wr->proxy_id;
+    
     /* field where we are to write out packet length */
     plen=p; 
     p+=2;
@@ -908,8 +923,13 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
      * from wr->input.  Length should be wr->length.
      * wr->data still points in the wb->buf */
     if (mac_size != 0) {
-        if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
-            goto err;
+        if (s->write_mac) {
+            /* Copy mac into the record */
+            memcpy(s->write_mac->buffer, &(p[wr->length]), mac_size);
+        } else {
+            if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
+                goto err;
+        }
         wr->length+=mac_size;
     }
 
