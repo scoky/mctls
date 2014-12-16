@@ -1139,15 +1139,18 @@ struct ssl_slice_st
         
 struct ssl_mac_st
         {
-        unsigned char *buffer;
-        int length;
         int proxy_id;
+        unsigned char *buffer;
+        size_t length;        
         };
         
 struct ssl_proxy_st 
         {
+        int proxy_id;    
+        char *address;
         EVP_MD_CTX *read_hash;
-        int proxy_id;
+        int *slice_ids;
+        size_t slice_ids_len;
         };
 
 struct ssl_st
@@ -1192,7 +1195,7 @@ struct ssl_st
 	 * test instead of an "init" member.
 	 */
 
-	int server;	/* are we the server side? - mostly used by SSL_clear*/
+	int server;	/* are we the server side? - mostly used by SSL_clear*/        
 
 	int new_session;/* Generate a new session or reuse an old one.
 	                 * NB: For servers, the 'new' session may actually be a previously
@@ -1400,6 +1403,8 @@ struct ssl_st
 #ifndef OPENSSL_NO_SRP
 	SRP_CTX srp_ctx; /* ctx for SRP authentication */
 #endif
+        
+        
         /* The slice used by the most recent operation (read/write) 
            Set this value before writing data to specify the slice 
            used to encrypt the data. Get this value after reading data 
@@ -1409,7 +1414,7 @@ struct ssl_st
         /* Slices defined for this session. */
         SSL_SLICE *slices;
         /* Number of slices defined. */
-        int slices_len;
+        size_t slices_len;
         SSL_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
         
         /* Contains the raw MAC for reading and writing when not modifying content. */
@@ -1418,11 +1423,12 @@ struct ssl_st
         
         /* State for each proxy for reading MACs from any of them. */
         SSL_PROXY *proxies;
-        int proxies_len;
+        size_t proxies_len;
         EVP_MD_CTX* (*get_md_by_proxyid)(SSL *s, int proxy_id);
         
         /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
+        int proxy;      /* are we a proxy? */
 	};
 
 #endif

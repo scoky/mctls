@@ -383,6 +383,18 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
 
 	if (ret>=limit) return NULL; /* this really never occurs, but ... */
 
+        if (s->proxies != NULL && s->slices != NULL) {
+            unsigned long pl_length = 0;
+            unsigned char *len_pt;
+            
+            s2n(TLSEXT_TYPE_proxy_list, ret);
+            len_pt = ret; /* Save the position to write the length of the ext. */
+            ret += 2;
+            
+            *(ret++)=s->slices_len&0xff;
+            /* TODO: continue adding extension */
+        }
+        
  	if (s->tlsext_hostname != NULL)
 		{ 
 		/* Add TLS extension servername to the Client Hello message */
