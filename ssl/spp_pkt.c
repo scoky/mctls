@@ -51,7 +51,7 @@ again:
             ssl_major= *(p++);
             ssl_minor= *(p++);
             version=(ssl_major<<8)|ssl_minor;
-            /* New header field: slice_id */
+            /* New header fields: slice_id, proxy_id */
             rr->slice_id = *(p++);
             rr->proxy_id = *(p++);
             n2s(p,rr->length);
@@ -128,13 +128,9 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
         goto f_err;
     }     
-    /* We can decrypt this slice. */
-    if (s->read_slice->have_material == 1) {
-        enc_err = s->method->ssl3_enc->enc(s,0);
-    } else {
-        /* Cannot decrypt, just return the still encrypted data. */
-        goto done;
-    }
+    /* Send to ssp_enc for decryption. */
+    enc_err = s->method->ssl3_enc->enc(s,0);
+    
     /* enc_err is:
      *    0: (in non-constant time) if the record is publically invalid.
      *    1: if the padding is valid
@@ -150,6 +146,9 @@ printf("dec %d\n",rr->length);
 { unsigned int z; for (z=0; z<rr->length; z++) printf("%02X%c",rr->data[z],((z+1)%16)?' ':'\n'); }
 printf("\n");
 #endif
+
+    /* Get the context for checking the  */
+    s->read_hash = s->get_md_by_proxyid(s, rr->proxy_id);
 
     /* r->length is now the compressed data plus mac */
     if ((sess != NULL) &&
@@ -201,7 +200,6 @@ printf("\n");
                 mac = &rr->data[rr->length];
             }
 
-            /* TODO: Change context for mac generation to the one specified by proxy_id */
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                 enc_err = -1;

@@ -26,12 +26,15 @@ int spp_enc(SSL *s, int send) {
     }
     
     /* If we do not possess the encryption material for this slice, 
-     * do not attempt to decrypt. */
-    if (!slice->have_material) {
-        return 0;
-    }
+     * do not attempt to decrypt. Not Needed, see below. */
+    //if (!slice->have_material) {
+        /* Copy the still encrypted content to the correct location. */
+    //    return 1;
+    //}
     
     /* Pick the right slice, and encrypt with it. */
+    /* If we do not have the encryption material, slice->enc_XXX_ctx should be null. 
+     * In that case, tls1 applies the null cipher. */
     if (send) {
         s->enc_write_ctx = slice->enc_write_ctx;
     } else if (!send) {

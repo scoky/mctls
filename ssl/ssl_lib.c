@@ -956,7 +956,9 @@ long SSL_get_default_timeout(const SSL *s)
 int SSL_read_slice(SSL *s,void *buf,int num,SSL_SLICE **slice,SSL_MAC **mac) {
     int c = SSL_read(s,buf,num);
     *slice = s->read_slice;
-    *mac = s->read_mac;
+    *mac = s->read_mac;    
+    s->read_slice = NULL;
+    s->read_mac = NULL;
     return c;
 }
 int SSL_read(SSL *s,void *buf,int num)
@@ -990,18 +992,25 @@ int SSL_peek(SSL *s,void *buf,int num)
 	return(s->method->ssl_peek(s,buf,num));
 	}
 int SSL_write_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice) {
+    int ret;
     s->write_slice = slice;
     s->write_mac = NULL;
-    return SSL_write(s,buf,num);
+    ret = SSL_write(s,buf,num);
+    s->write_slice = NULL;
+    return ret;
 }
 int SSL_forward_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice,SSL_MAC *mac,int modified) {
+    int ret;
     s->write_slice = slice;
     if (modified) {
         s->write_mac = mac;
     } else {
         s->write_mac = NULL;
     }
-    return SSL_write(s,buf,num);
+    ret = SSL_write(s,buf,num);
+    s->write_mac = NULL;
+    s->write_slice = NULL;
+    return ret;
 }
 int SSL_write(SSL *s,const void *buf,int num)
 	{

@@ -1143,6 +1143,12 @@ struct ssl_mac_st
         int length;
         int proxy_id;
         };
+        
+struct ssl_proxy_st 
+        {
+        EVP_MD_CTX *read_hash;
+        int proxy_id;
+        };
 
 struct ssl_st
 	{
@@ -1405,8 +1411,17 @@ struct ssl_st
         /* Number of slices defined. */
         int slices_len;
         SSL_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
+        
+        /* Contains the raw MAC for reading and writing when not modifying content. */
         SSL_MAC *read_mac;
         SSL_MAC *write_mac;
+        
+        /* State for each proxy for reading MACs from any of them. */
+        SSL_PROXY *proxies;
+        int proxies_len;
+        EVP_MD_CTX* (*get_md_by_proxyid)(SSL *s, int proxy_id);
+        
+        /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
 	};
 
