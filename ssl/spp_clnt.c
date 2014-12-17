@@ -102,6 +102,7 @@ int spp_connect(SSL *s) {
                 s->state=SSL3_ST_CW_CLNT_HELLO_A;
                 s->ctx->stats.sess_connect++;
                 s->init_num=0;
+
                 break;
 
             case SSL3_ST_CW_CLNT_HELLO_A:
@@ -113,14 +114,14 @@ int spp_connect(SSL *s) {
                 s->state=SSL3_ST_CR_SRVR_HELLO_A;
                 s->init_num=0;
 
-			/* turn on buffering for the next lot of output */
-			if (s->bbio != s->wbio)
-				s->wbio=BIO_push(s->bbio,s->wbio);
+                /* turn on buffering for the next lot of output */
+                if (s->bbio != s->wbio)
+                    s->wbio=BIO_push(s->bbio,s->wbio);
 
-			break;
+                break;
 
-		case SSL3_ST_CR_SRVR_HELLO_A:
-		case SSL3_ST_CR_SRVR_HELLO_B:
+            case SSL3_ST_CR_SRVR_HELLO_A:
+            case SSL3_ST_CR_SRVR_HELLO_B:
 			ret=ssl3_get_server_hello(s);
 			if (ret <= 0) goto end;
 

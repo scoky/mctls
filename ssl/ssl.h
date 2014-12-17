@@ -1135,6 +1135,7 @@ struct ssl_slice_st
          * slice used for encryption will be 
          * included in each record header on the wire. */
         int slice_id;
+        char *purpose;
         };
         
 struct ssl_mac_st

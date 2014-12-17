@@ -383,16 +383,55 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
 
 	if (ret>=limit) return NULL; /* this really never occurs, but ... */
 
+        /* Write the SPP proxy list extension to a client hello */
         if (s->proxies != NULL && s->slices != NULL) {
-            unsigned long pl_length = 0;
             unsigned char *len_pt;
+            SSL_SLICE *cslice;
+            SSL_PROXY *cproxy;
+            int i,char_len,n;
+            int *cid;
             
             s2n(TLSEXT_TYPE_proxy_list, ret);
             len_pt = ret; /* Save the position to write the length of the ext. */
-            ret += 2;
-            
+            ret += 2; /* Then skip it */
+                       
+            /* Write all of the slice IDs. */
             *(ret++)=s->slices_len&0xff;
-            /* TODO: continue adding extension */
+            cslice = s->slices;
+            for (i = 0; i < s->slices_len; i++) {
+                *(ret++)=cslice->slice_id&0xff;
+                
+                char_len=strlen(cslice->purpose);
+                *(ret++)=char_len&0xff;
+                memcpy(ret, cslice->purpose, char_len);
+                ret+=char_len;
+                
+                cslice++;
+            }
+            /* Now write all of the proxies. */
+            *(ret++)=s->proxies_len&0xff;
+            cproxy = s->proxies;
+            for (i = 0; i < s->proxies_len; i++) {
+                char_len=strlen(cproxy->address);
+                *(ret++)=char_len&0xff;
+                memcpy(ret, cproxy->address, char_len);
+                ret+=char_len;
+                
+                *(ret++)=cproxy->proxy_id&0xff;
+                
+                *(ret++)=cproxy->slice_ids_len&0xff;
+                
+                cid = cproxy->slice_ids;
+                for (n = 0; n < cproxy->slice_ids_len; n++) {
+                    *(ret++)=(*cid)&0xff;
+                    cid++;
+                }
+                
+                cproxy++;
+            }
+            
+            /* Now go back and fill in length */
+            s2n(ret-len_pt-2, len_pt);
         }
         
  	if (s->tlsext_hostname != NULL)
