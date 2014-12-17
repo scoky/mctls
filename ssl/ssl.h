@@ -1430,6 +1430,7 @@ struct ssl_st
         /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
         int proxy;      /* are we a proxy? */
+        int proxies_complete;
 	};
 
 #endif

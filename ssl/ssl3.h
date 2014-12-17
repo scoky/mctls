@@ -589,6 +589,17 @@ typedef struct ssl3_state_st
 #define SSL3_ST_CR_CERT_REQ_B		(0x151|SSL_ST_CONNECT)
 #define SSL3_ST_CR_SRVR_DONE_A		(0x160|SSL_ST_CONNECT)
 #define SSL3_ST_CR_SRVR_DONE_B		(0x161|SSL_ST_CONNECT)
+
+/* SPP handshake states */
+#define SPP_ST_CR_PRXY_CERT_A           (0x660|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_CERT_B           (0x661|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_KEY_EXCH_A       (0x662|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_KEY_EXCH_B       (0x663|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_DONE_A           (0x664|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_DONE_B           (0x665|SSL_ST_CONNECT)        
+#define SPP_ST_CR_PRXY_MAT_A            (0x666|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_MAT_B            (0x667|SSL_ST_CONNECT)
+
 /* write to server */
 #define SSL3_ST_CW_CERT_A		(0x170|SSL_ST_CONNECT)
 #define SSL3_ST_CW_CERT_B		(0x171|SSL_ST_CONNECT)
