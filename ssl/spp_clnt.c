@@ -254,161 +254,150 @@ int spp_connect(SSL *s) {
                 break;
 
 #if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
-		case SSL3_ST_CW_NEXT_PROTO_A:
-		case SSL3_ST_CW_NEXT_PROTO_B:
-			ret=ssl3_send_next_proto(s);
-			if (ret <= 0) goto end;
-			s->state=SSL3_ST_CW_FINISHED_A;
-			break;
+            case SSL3_ST_CW_NEXT_PROTO_A:
+            case SSL3_ST_CW_NEXT_PROTO_B:
+                ret=ssl3_send_next_proto(s);
+                if (ret <= 0) goto end;
+                s->state=SSL3_ST_CW_FINISHED_A;
+                break;
 #endif
 
-		case SSL3_ST_CW_FINISHED_A:
-		case SSL3_ST_CW_FINISHED_B:
-			ret=ssl3_send_finished(s,
-				SSL3_ST_CW_FINISHED_A,SSL3_ST_CW_FINISHED_B,
-				s->method->ssl3_enc->client_finished_label,
-				s->method->ssl3_enc->client_finished_label_len);
-			if (ret <= 0) goto end;
-			s->s3->flags |= SSL3_FLAGS_CCS_OK;
-			s->state=SSL3_ST_CW_FLUSH;
+            case SSL3_ST_CW_FINISHED_A:
+            case SSL3_ST_CW_FINISHED_B:
+                ret=ssl3_send_finished(s,
+                    SSL3_ST_CW_FINISHED_A,SSL3_ST_CW_FINISHED_B,
+                    s->method->ssl3_enc->client_finished_label,
+                    s->method->ssl3_enc->client_finished_label_len);
+                if (ret <= 0) goto end;
+                s->s3->flags |= SSL3_FLAGS_CCS_OK;
+                s->state=SSL3_ST_CW_FLUSH;
 
-			/* clear flags */
-			s->s3->flags&= ~SSL3_FLAGS_POP_BUFFER;
-			if (s->hit)
-				{
-				s->s3->tmp.next_state=SSL_ST_OK;
-				if (s->s3->flags & SSL3_FLAGS_DELAY_CLIENT_FINISHED)
-					{
-					s->state=SSL_ST_OK;
-					s->s3->flags|=SSL3_FLAGS_POP_BUFFER;
-					s->s3->delay_buf_pop_ret=0;
-					}
-				}
-			else
-				{
+                /* clear flags */
+                s->s3->flags&= ~SSL3_FLAGS_POP_BUFFER;
+                if (s->hit) {
+                    s->s3->tmp.next_state=SSL_ST_OK;
+                    if (s->s3->flags & SSL3_FLAGS_DELAY_CLIENT_FINISHED) {
+                        s->state=SSL_ST_OK;
+                        s->s3->flags|=SSL3_FLAGS_POP_BUFFER;
+                        s->s3->delay_buf_pop_ret=0;
+                    }
+                } else {
 #ifndef OPENSSL_NO_TLSEXT
-				/* Allow NewSessionTicket if ticket expected */
-				if (s->tlsext_ticket_expected)
-					s->s3->tmp.next_state=SSL3_ST_CR_SESSION_TICKET_A;
-				else
+                    /* Allow NewSessionTicket if ticket expected */
+                    if (s->tlsext_ticket_expected)
+                        s->s3->tmp.next_state=SSL3_ST_CR_SESSION_TICKET_A;
+                    else
 #endif
-				
-				s->s3->tmp.next_state=SSL3_ST_CR_FINISHED_A;
-				}
-			s->init_num=0;
-			break;
+                        s->s3->tmp.next_state=SSL3_ST_CR_FINISHED_A;
+                }
+                s->init_num=0;
+                break;
 
 #ifndef OPENSSL_NO_TLSEXT
-		case SSL3_ST_CR_SESSION_TICKET_A:
-		case SSL3_ST_CR_SESSION_TICKET_B:
-			ret=ssl3_get_new_session_ticket(s);
-			if (ret <= 0) goto end;
-			s->state=SSL3_ST_CR_FINISHED_A;
-			s->init_num=0;
-		break;
+            case SSL3_ST_CR_SESSION_TICKET_A:
+            case SSL3_ST_CR_SESSION_TICKET_B:
+                ret=ssl3_get_new_session_ticket(s);
+                if (ret <= 0) goto end;
+                s->state=SSL3_ST_CR_FINISHED_A;
+                s->init_num=0;
+                break;
 
-		case SSL3_ST_CR_CERT_STATUS_A:
-		case SSL3_ST_CR_CERT_STATUS_B:
-			ret=ssl3_get_cert_status(s);
-			if (ret <= 0) goto end;
-			s->state=SSL3_ST_CR_KEY_EXCH_A;
-			s->init_num=0;
+            case SSL3_ST_CR_CERT_STATUS_A:
+            case SSL3_ST_CR_CERT_STATUS_B:
+                ret=ssl3_get_cert_status(s);
+                if (ret <= 0) goto end;
+                s->state=SSL3_ST_CR_KEY_EXCH_A;
+                s->init_num=0;
 		break;
 #endif
 
-		case SSL3_ST_CR_FINISHED_A:
-		case SSL3_ST_CR_FINISHED_B:
+            case SSL3_ST_CR_FINISHED_A:
+            case SSL3_ST_CR_FINISHED_B:
+                s->s3->flags |= SSL3_FLAGS_CCS_OK;
+                ret=ssl3_get_finished(s,SSL3_ST_CR_FINISHED_A,
+                    SSL3_ST_CR_FINISHED_B);
+                if (ret <= 0) goto end;
 
-			s->s3->flags |= SSL3_FLAGS_CCS_OK;
-			ret=ssl3_get_finished(s,SSL3_ST_CR_FINISHED_A,
-				SSL3_ST_CR_FINISHED_B);
-			if (ret <= 0) goto end;
+                if (s->hit)
+                    s->state=SSL3_ST_CW_CHANGE_A;
+                else
+                    s->state=SSL_ST_OK;
+                s->init_num=0;
+                break;
 
-			if (s->hit)
-				s->state=SSL3_ST_CW_CHANGE_A;
-			else
-				s->state=SSL_ST_OK;
-			s->init_num=0;
-			break;
+            case SSL3_ST_CW_FLUSH:
+                s->rwstate=SSL_WRITING;
+                if (BIO_flush(s->wbio) <= 0) {
+                    ret= -1;
+                    goto end;
+                }
+                s->rwstate=SSL_NOTHING;
+                s->state=s->s3->tmp.next_state;
+                break;
 
-		case SSL3_ST_CW_FLUSH:
-			s->rwstate=SSL_WRITING;
-			if (BIO_flush(s->wbio) <= 0)
-				{
-				ret= -1;
-				goto end;
-				}
-			s->rwstate=SSL_NOTHING;
-			s->state=s->s3->tmp.next_state;
-			break;
+            case SSL_ST_OK:
+                /* clean a few things up */
+                ssl3_cleanup_key_block(s);
 
-		case SSL_ST_OK:
-			/* clean a few things up */
-			ssl3_cleanup_key_block(s);
+                if (s->init_buf != NULL) {
+                    BUF_MEM_free(s->init_buf);
+                    s->init_buf=NULL;
+                }
 
-			if (s->init_buf != NULL)
-				{
-				BUF_MEM_free(s->init_buf);
-				s->init_buf=NULL;
-				}
+                /* If we are not 'joining' the last two packets,
+                 * remove the buffering now */
+                if (!(s->s3->flags & SSL3_FLAGS_POP_BUFFER))
+                    ssl_free_wbio_buffer(s);
+                /* else do it later in ssl3_write */
 
-			/* If we are not 'joining' the last two packets,
-			 * remove the buffering now */
-			if (!(s->s3->flags & SSL3_FLAGS_POP_BUFFER))
-				ssl_free_wbio_buffer(s);
-			/* else do it later in ssl3_write */
+                s->init_num=0;
+                s->renegotiate=0;
+                s->new_session=0;
 
-			s->init_num=0;
-			s->renegotiate=0;
-			s->new_session=0;
+                ssl_update_cache(s,SSL_SESS_CACHE_CLIENT);
+                if (s->hit) s->ctx->stats.sess_hit++;
 
-			ssl_update_cache(s,SSL_SESS_CACHE_CLIENT);
-			if (s->hit) s->ctx->stats.sess_hit++;
+                ret=1;
+                /* s->server=0; */
+                s->handshake_func=ssl3_connect;
+                s->ctx->stats.sess_connect_good++;
 
-			ret=1;
-			/* s->server=0; */
-			s->handshake_func=ssl3_connect;
-			s->ctx->stats.sess_connect_good++;
+                if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_DONE,1);
 
-			if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_DONE,1);
-
-			goto end;
-			/* break; */
+                goto end;
+                /* break; */
 			
-		default:
-			SSLerr(SSL_F_SSL3_CONNECT,SSL_R_UNKNOWN_STATE);
-			ret= -1;
-			goto end;
-			/* break; */
-			}
+            default:
+                SSLerr(SSL_F_SSL3_CONNECT,SSL_R_UNKNOWN_STATE);
+                ret= -1;
+                goto end;
+                /* break; */
+        }
 
-		/* did we do anything */
-		if (!s->s3->tmp.reuse_message && !skip)
-			{
-			if (s->debug)
-				{
-				if ((ret=BIO_flush(s->wbio)) <= 0)
-					goto end;
-				}
+        /* did we do anything */
+        if (!s->s3->tmp.reuse_message && !skip) {
+            if (s->debug) {
+                if ((ret=BIO_flush(s->wbio)) <= 0)
+                    goto end;
+            }
 
-			if ((cb != NULL) && (s->state != state))
-				{
-				new_state=s->state;
-				s->state=state;
-				cb(s,SSL_CB_CONNECT_LOOP,1);
-				s->state=new_state;
-				}
-			}
-		skip=0;
-		}
+            if ((cb != NULL) && (s->state != state)) {
+                new_state=s->state;
+                s->state=state;
+                cb(s,SSL_CB_CONNECT_LOOP,1);
+                s->state=new_state;
+            }
+        }
+        skip=0;
+    }
 end:
-	s->in_handshake--;
-	if (buf != NULL)
-		BUF_MEM_free(buf);
-	if (cb != NULL)
-		cb(s,SSL_CB_CONNECT_EXIT,ret);
-	return(ret);
-	}
+    s->in_handshake--;
+    if (buf != NULL)
+        BUF_MEM_free(buf);
+    if (cb != NULL)
+        cb(s,SSL_CB_CONNECT_EXIT,ret);
+    return(ret);
+}
         
 int spp_send_proxy_key_material(SSL *s) {
 	unsigned char *p,*d;
