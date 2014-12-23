@@ -1119,7 +1119,7 @@ const char *SSL_get_psk_identity(const SSL *s);
 
 #ifndef OPENSSL_NO_SSL_INTERN
 
-struct ssl_slice_st
+struct spp_slice_st
         {
         /* Contains the details of a slices encryption and 
          * decryption methods. These values should be copied 
@@ -1127,10 +1127,21 @@ struct ssl_slice_st
          * each encrypt or decrypt operation. */
         EVP_CIPHER_CTX *enc_read_ctx;
         EVP_CIPHER_CTX *enc_write_ctx;
+        /* Context for the read access MAC */
+        EVP_MD_CTX *read_r_hash;
+        EVP_MD_CTX *write_r_hash;
+        /* Context for the write access MAC */
+        EVP_MD_CTX *read_w_hash;
+        EVP_MD_CTX *write_w_hash;
+        /* Context for the end-to-end integrity MAC */
+        EVP_MD_CTX *read_i_hash;
+        EVP_MD_CTX *write_i_hash;
         /* Indicates whether this context contains the material 
          * need to encrypt/decrypt. basically, whether enc_read_ctx 
          * and enc_write_ctx are valid or not. */
-        int have_material;
+        int have_material; /* Should use read_access and write_access instead */
+        int read_access;
+        int write_access;
         /* Id assigned to this slice during handshake. The id of the 
          * slice used for encryption will be 
          * included in each record header on the wire. */
@@ -1138,21 +1149,32 @@ struct ssl_slice_st
         char *purpose;
         };
         
-struct ssl_mac_st
+struct spp_mac_st
         {
         int proxy_id;
         unsigned char *buffer;
         size_t length;        
         };
         
-struct ssl_proxy_st 
+struct spp_proxy_st 
         {
         int proxy_id;    
         char *address;
-        EVP_MD_CTX *read_hash;
-        int *slice_ids;
-        size_t slice_ids_len;
+        int *read_slice_ids;
+        size_t read_slice_ids_len;
+        int *write_slice_ids;
+        size_t write_slice_ids_len;
         };
+        
+struct spp_read_st 
+{
+    unsigned char *record;
+    size_t record_length;
+    unsigned char *integrity_mac;
+    unsigned char *read_mac;
+    unsigned char *write_mac;
+    size_t mac_length;
+};
 
 struct ssl_st
 	{
@@ -1410,22 +1432,21 @@ struct ssl_st
            Set this value before writing data to specify the slice 
            used to encrypt the data. Get this value after reading data 
            to determine which slice was read. */
-        SSL_SLICE *write_slice;
-        SSL_SLICE *read_slice;
+        SPP_SLICE *write_slice;
+        SPP_SLICE *read_slice;
         /* Slices defined for this session. */
-        SSL_SLICE *slices;
+        SPP_SLICE *slices;
         /* Number of slices defined. */
         size_t slices_len;
-        SSL_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
+        SPP_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
         
         /* Contains the raw MAC for reading and writing when not modifying content. */
-        SSL_MAC *read_mac;
-        SSL_MAC *write_mac;
+        SPP_CTX *spp_write_ctx;
+        SPP_CTX *spp_read_ctx;
         
         /* State for each proxy for reading MACs from any of them. */
-        SSL_PROXY *proxies;
+        SPP_PROXY *proxies;
         size_t proxies_len;
-        EVP_MD_CTX* (*get_md_by_proxyid)(SSL *s, int proxy_id);
         
         /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
@@ -1921,12 +1942,13 @@ char *SSL_get_srp_userinfo(SSL *s);
 void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
+int     SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies, int proxies_len);
 int 	SSL_read(SSL *ssl,void *buf,int num);
-int 	SSL_read_slice(SSL *ssl,void *buf,int num,SSL_SLICE **slice,SSL_MAC **mac);
+int 	SPP_read_record(SSL *ssl,void *buf,int num,SPP_SLICE **slice,SPP_CTX **ctx);
 int 	SSL_peek(SSL *ssl,void *buf,int num);
 int 	SSL_write(SSL *ssl,const void *buf,int num);
-int 	SSL_write_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice);
-int 	SSL_forward_slice(SSL *ssl,const void *buf,int num,SSL_SLICE *slice,SSL_MAC *mac,int modified);
+int 	SPP_write_record(SSL *ssl,const void *buf,int num,SPP_SLICE *slice);
+int 	SPP_forward_record(SSL *ssl,const void *buf,int num,SPP_SLICE *slice,SPP_CTX *ctx,int modified);
 long	SSL_ctrl(SSL *ssl,int cmd, long larg, void *parg);
 long	SSL_callback_ctrl(SSL *, int, void (*)(void));
 long	SSL_CTX_ctrl(SSL_CTX *ctx,int cmd, long larg, void *parg);

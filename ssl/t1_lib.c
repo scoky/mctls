@@ -386,8 +386,8 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
         /* Write the SPP proxy list extension to a client hello */
         if (s->proxies != NULL && s->slices != NULL) {
             unsigned char *len_pt;
-            SSL_SLICE *cslice;
-            SSL_PROXY *cproxy;
+            SPP_SLICE *cslice;
+            SPP_PROXY *cproxy;
             int i,char_len,n;
             int *cid;
             
@@ -419,10 +419,16 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
                 
                 *(ret++)=cproxy->proxy_id&0xff;
                 
-                *(ret++)=cproxy->slice_ids_len&0xff;
+                *(ret++)=cproxy->read_slice_ids_len&0xff;                
+                cid = cproxy->read_slice_ids;
+                for (n = 0; n < cproxy->read_slice_ids_len; n++) {
+                    *(ret++)=(*cid)&0xff;
+                    cid++;
+                }
                 
-                cid = cproxy->slice_ids;
-                for (n = 0; n < cproxy->slice_ids_len; n++) {
+                *(ret++)=cproxy->write_slice_ids_len&0xff;                
+                cid = cproxy->write_slice_ids;
+                for (n = 0; n < cproxy->write_slice_ids_len; n++) {
                     *(ret++)=(*cid)&0xff;
                     cid++;
                 }

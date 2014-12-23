@@ -12,7 +12,7 @@
 #endif
 
 int spp_enc(SSL *s, int send) {
-    SSL_SLICE *slice;
+    SPP_SLICE *slice;
     
     if (send) {
         slice = s->write_slice;

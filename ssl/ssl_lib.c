@@ -948,17 +948,24 @@ int SSL_connect(SSL *s)
 
 	return(s->method->ssl_connect(s));
 	}
+int SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies, int proxies_len) {
+    ssl->slices = slices;
+    ssl->slices_len = slices_len;
+    ssl->proxies = proxies;
+    ssl->proxies_len = proxies_len;
+    return(SSL_connect(ssl));
+}
 
 long SSL_get_default_timeout(const SSL *s)
 	{
 	return(s->method->get_timeout());
 	}
-int SSL_read_slice(SSL *s,void *buf,int num,SSL_SLICE **slice,SSL_MAC **mac) {
+int SPP_read_record(SSL *s,void *buf,int num,SPP_SLICE **slice,SPP_CTX **ctx) {
     int c = SSL_read(s,buf,num);
     *slice = s->read_slice;
-    *mac = s->read_mac;    
+    *ctx = s->spp_read_ctx;
     s->read_slice = NULL;
-    s->read_mac = NULL;
+    s->spp_read_ctx = NULL;
     return c;
 }
 int SSL_read(SSL *s,void *buf,int num)
@@ -991,24 +998,24 @@ int SSL_peek(SSL *s,void *buf,int num)
 		}
 	return(s->method->ssl_peek(s,buf,num));
 	}
-int SSL_write_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice) {
+int SPP_write_record(SSL *s,const void *buf,int num,SPP_SLICE *slice) {
     int ret;
     s->write_slice = slice;
-    s->write_mac = NULL;
+    s->spp_write_ctx = NULL;
     ret = SSL_write(s,buf,num);
     s->write_slice = NULL;
     return ret;
 }
-int SSL_forward_slice(SSL *s,const void *buf,int num,SSL_SLICE *slice,SSL_MAC *mac,int modified) {
+int SPP_forward_record(SSL *s,const void *buf,int num,SPP_SLICE *slice,SPP_CTX *ctx,int modified) {
     int ret;
     s->write_slice = slice;
     if (modified) {
-        s->write_mac = mac;
+        s->spp_write_ctx = ctx;
     } else {
-        s->write_mac = NULL;
+        s->spp_write_ctx = NULL;
     }
     ret = SSL_write(s,buf,num);
-    s->write_mac = NULL;
+    s->spp_write_ctx = NULL;
     s->write_slice = NULL;
     return ret;
 }
