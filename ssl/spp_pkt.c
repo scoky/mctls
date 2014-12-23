@@ -16,8 +16,7 @@ static int spp_get_record(SSL *s) {
     SSL3_RECORD *rr;
     SSL_SESSION *sess;
     SPP_SLICE *slice;
-    SPP_CTX spp_ctx2;
-    SPP_CTX *spp_ctx = &spp_ctx2;
+    SPP_CTX *spp_ctx;
     unsigned char *p;
     unsigned char md[EVP_MAX_MD_SIZE];
     short version;
@@ -25,6 +24,8 @@ static int spp_get_record(SSL *s) {
     size_t extra;
     unsigned empty_record_count = 0;
 
+    spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
+    
     rr= &(s->s3->rrec);
     sess=s->session;
 
@@ -48,7 +49,6 @@ again:
             s->rstate=SSL_ST_READ_BODY;
 
             p=s->packet;
-            spp_ctx->record = p;            
             /* Pull apart the header into the SSL3_RECORD */
             rr->type= *(p++);
             ssl_major= *(p++);
@@ -57,7 +57,6 @@ again:
             /* New header fields: slice_id, proxy_id */
             rr->slice_id = *(p++);
             n2s(p,rr->length);
-            spp_ctx->record_length = SPP_RT_HEADER_LENGTH+rr->length;
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
@@ -202,9 +201,11 @@ printf("\n");
                 mac = &rr->data[rr->length];
             }
             /* Save the locations of the MACs into context. */
-            spp_ctx->read_mac = mac;
-            spp_ctx->write_mac = &(mac[spp_ctx->mac_length]);
-            spp_ctx->integrity_mac = &(mac[(spp_ctx->mac_length*2)]);
+            /* We are creating a copy here that must be freed when writing the record out again. */
+            spp_ctx->read_mac = (unsigned char*)malloc(mac_size);
+            memcpy(spp_ctx->read_mac, mac, mac_size);
+            spp_ctx->write_mac = &(spp_ctx->read_mac[spp_ctx->mac_length]);
+            spp_ctx->integrity_mac = &(spp_ctx->write_mac[spp_ctx->mac_length]);
 
             /* Compute the read mac, the only one we must be able to verify. */
             mac_size = spp_ctx->mac_length;
@@ -214,23 +215,22 @@ printf("\n");
             if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
                 enc_err = -1;
             
+            
+            /* Compare the write mac to see if there have been any illegal writes. */
             if (enc_err >= 0 && EVP_MD_CTX_md(slice->read_w_hash) != NULL) {
                 s->read_hash = slice->read_w_hash;
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
-                    enc_err = -1;
-                if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
-                    enc_err = -1;    
+                    enc_err = -1; 
             }
+            /* Compare the end-to-end integrity mac to see if there have been any writes at all */
             if (enc_err >= 0 && EVP_MD_CTX_md(slice->read_i_hash) != NULL) {
                 s->read_hash = slice->read_i_hash;
                 mac = spp_ctx->integrity_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
-                    enc_err = -1;
-                if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
-                    enc_err = -1;    
+                    enc_err = 0;    /* This is not a fatal error. Just important information to know. Expose it somehow to the application */
             }
     }
 
@@ -975,6 +975,9 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
         wr->length+=(mac_size*3);
     }
     /* If we do not have read access, then the MACs were interpreted as part of the payload. */
+    if (spp_ctx != NULL) {
+        free(spp_ctx);
+    }
 
     wr->input=p;
     wr->data=p;

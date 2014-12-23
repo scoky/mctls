@@ -1003,17 +1003,14 @@ int SPP_write_record(SSL *s,const void *buf,int num,SPP_SLICE *slice) {
     s->write_slice = slice;
     s->spp_write_ctx = NULL;
     ret = SSL_write(s,buf,num);
+    s->spp_write_ctx = NULL;
     s->write_slice = NULL;
     return ret;
 }
 int SPP_forward_record(SSL *s,const void *buf,int num,SPP_SLICE *slice,SPP_CTX *ctx,int modified) {
     int ret;
     s->write_slice = slice;
-    if (modified) {
-        s->spp_write_ctx = ctx;
-    } else {
-        s->spp_write_ctx = NULL;
-    }
+    s->spp_write_ctx = ctx;
     ret = SSL_write(s,buf,num);
     s->spp_write_ctx = NULL;
     s->write_slice = NULL;

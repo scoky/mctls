@@ -1149,13 +1149,6 @@ struct spp_slice_st
         char *purpose;
         };
         
-struct spp_mac_st
-        {
-        int proxy_id;
-        unsigned char *buffer;
-        size_t length;        
-        };
-        
 struct spp_proxy_st 
         {
         int proxy_id;    
@@ -1168,8 +1161,6 @@ struct spp_proxy_st
         
 struct spp_read_st 
 {
-    unsigned char *record;
-    size_t record_length;
     unsigned char *integrity_mac;
     unsigned char *read_mac;
     unsigned char *write_mac;
