@@ -2,23 +2,22 @@ Simple example to work
 1) crawl top 100 from Alexa  - DONE (with issues)
 2) s_server serving some content - DONE
 3) s_client getting some content - DONE
-    3a) how to measure performance -- ??
-4) plot some statistics (check https paper for some basic ones) - TO DO     
+    3a) performance measurements with <<ssldum>> -- ONGOING
+4) plot some statistics (check https paper for some basic ones) -- ONGOING
 
 
 * get microbenchmarks going for regular openssl
-1) find code - DONE + check for that tool 
+1) find code - DONE + check for tool discussed 
 2) read related work - TO DO 
 
 * start writing description of methodology and results - ONGOING
 
-* port s_client and s_server
-1) discuss with Kyle about APIs and how to po
-2) go through the code, undersand and comment
-
-* extend measurement to work with our library -- TO DO 
+* port <<s_client.c>>, <<s_server.c>> and <<speed.c>>
+1) discuss with Kyle about APIs and how to po -- TO DO 
+2) go through the code, undersand and comment -- TO DO 
+3) extend measurement to work with our library -- TO DO 
 
 *  openssl and planetlab 
-1) compile our own version  
-2) compile new version with ALPN support and integrate with crawler 
-3) alternative is focus on subset with empire or other more recent machine? (time is a problem, even a week is not enough ~1000hrs...)  
+1) compile our own version  -- TO DO 
+2) compile new version with ALPN support and integrate with crawler -- TO DO (if above is succesfull, it is then trivial)
+3) alternative is focus on subset with empire or other more recent machine? (time is a problem, even a week is not enough ~1000hrs...)  -- TO DO 
