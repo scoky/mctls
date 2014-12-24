@@ -1,0 +1,19 @@
+WARNING: can't open config file: ././ssl/openssl.cnf
+Doing md4 for 3s on 16 size blocks: 8414676 md4's in 2.99s
+Doing md4 for 3s on 64 size blocks: 6738740 md4's in 3.00s
+Doing md4 for 3s on 256 size blocks: 4594771 md4's in 2.99s
+Doing md4 for 3s on 1024 size blocks: 2024925 md4's in 3.00s
+Doing md4 for 3s on 8192 size blocks: 320865 md4's in 2.99s
+Doing sha1 for 3s on 16 size blocks: 7153530 sha1's in 3.00s
+Doing sha1 for 3s on 64 size blocks: 5877383 sha1's in 2.99s
+Doing sha1 for 3s on 256 size blocks: 3621488 sha1's in 3.00s
+Doing sha1 for 3s on 1024 size blocks: 1415229 sha1's in 2.99s
+Doing sha1 for 3s on 8192 size blocks: 214469 sha1's in 3.00s
+OpenSSL 1.0.1j 15 Oct 2014
+built on: Mon Dec 22 09:22:18 CET 2014
+options:bn(64,64) rc4(16x,int) des(idx,cisc,16,int) aes(partial) idea(int) blowfish(idx) 
+compiler: gcc -DOPENSSL_THREADS -D_REENTRANT -DDSO_DLFCN -DHAVE_DLFCN_H -Wa,--noexecstack -m64 -DL_ENDIAN -DTERMIO -O3 -Wall -DOPENSSL_IA32_SSE2 -DOPENSSL_BN_ASM_MONT -DOPENSSL_BN_ASM_MONT5 -DOPENSSL_BN_ASM_GF2m -DSHA1_ASM -DSHA256_ASM -DSHA512_ASM -DMD5_ASM -DAES_ASM -DVPAES_ASM -DBSAES_ASM -DWHIRLPOOL_ASM -DGHASH_ASM
+The 'numbers' are in 1000s of bytes per second processed.
+type             16 bytes     64 bytes    256 bytes   1024 bytes   8192 bytes
+md4              45028.37k   143759.79k   393398.45k   691174.40k   879105.71k
+sha1             38152.16k   125803.52k   309033.64k   484680.43k   585643.35k
