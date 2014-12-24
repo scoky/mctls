@@ -175,9 +175,9 @@ typedef struct st_ERR_FNS ERR_FNS;
 typedef struct engine_st ENGINE;
 typedef struct ssl_st SSL;
 typedef struct ssl_ctx_st SSL_CTX;
-typedef struct ssl_slice_st SSL_SLICE;
-typedef struct ssl_mac_st SSL_MAC;
-typedef struct ssl_proxy_st SSL_PROXY;
+typedef struct spp_slice_st SPP_SLICE;
+typedef struct spp_read_st SPP_CTX;
+typedef struct spp_proxy_st SPP_PROXY;
 
 typedef struct X509_POLICY_NODE_st X509_POLICY_NODE;
 typedef struct X509_POLICY_LEVEL_st X509_POLICY_LEVEL;

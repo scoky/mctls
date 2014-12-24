@@ -15,6 +15,9 @@ static int spp_get_record(SSL *s) {
     int enc_err,n,i,ret= -1;
     SSL3_RECORD *rr;
     SSL_SESSION *sess;
+    SPP_SLICE *slice;
+    SPP_CTX spp_ctx2;
+    SPP_CTX *spp_ctx = &spp_ctx2;
     unsigned char *p;
     unsigned char md[EVP_MAX_MD_SIZE];
     short version;
@@ -45,7 +48,7 @@ again:
             s->rstate=SSL_ST_READ_BODY;
 
             p=s->packet;
-
+            spp_ctx->record = p;            
             /* Pull apart the header into the SSL3_RECORD */
             rr->type= *(p++);
             ssl_major= *(p++);
@@ -53,8 +56,8 @@ again:
             version=(ssl_major<<8)|ssl_minor;
             /* New header fields: slice_id, proxy_id */
             rr->slice_id = *(p++);
-            rr->proxy_id = *(p++);
             n2s(p,rr->length);
+            spp_ctx->record_length = SPP_RT_HEADER_LENGTH+rr->length;
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
@@ -122,12 +125,13 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
-    s->read_slice = s->get_slice_by_id(s, rr->slice_id);
+    slice = s->get_slice_by_id(s, rr->slice_id);    
     /* Get slice from id if it can be found. */
-    if (!s->read_slice) {
+    if (!slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
         goto f_err;
     }     
+    s->read_slice = slice;
     /* Send to ssp_enc for decryption. */
     enc_err = s->method->ssl3_enc->enc(s,0);
     
@@ -146,25 +150,23 @@ printf("dec %d\n",rr->length);
 { unsigned int z; for (z=0; z<rr->length; z++) printf("%02X%c",rr->data[z],((z+1)%16)?' ':'\n'); }
 printf("\n");
 #endif
-
-    /* Get the context for checking the  */
-    s->read_hash = s->get_md_by_proxyid(s, rr->proxy_id);
-
+    
+    s->spp_read_ctx = spp_ctx;
     /* r->length is now the compressed data plus mac */
+    /* We can read this record */
     if ((sess != NULL) &&
         (s->enc_read_ctx != NULL) &&
-        (EVP_MD_CTX_md(s->read_hash) != NULL)) {
+        (EVP_MD_CTX_md(slice->read_r_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE];
-            SSL_MAC read_mac;
+            
+            s->read_hash = slice->read_r_hash;
             mac_size=EVP_MD_CTX_size(s->read_hash);
+            spp_ctx->mac_length = mac_size;
+            /* Going to fetch all three MACs at once */
+            mac_size = mac_size*3;
             OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
-            /* Store the mac value from the record so that it may be passed on unmodified by proxies. */
-            s->read_mac = &read_mac;
-            s->read_mac->buffer = mac_tmp;
-            s->read_mac->length = mac_size;
-            s->read_mac->proxy_id = rr->proxy_id;
                     
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
@@ -199,12 +201,37 @@ printf("\n");
                 rr->length -= mac_size;
                 mac = &rr->data[rr->length];
             }
+            /* Save the locations of the MACs into context. */
+            spp_ctx->read_mac = mac;
+            spp_ctx->write_mac = &(mac[spp_ctx->mac_length]);
+            spp_ctx->integrity_mac = &(mac[(spp_ctx->mac_length*2)]);
 
+            /* Compute the read mac, the only one we must be able to verify. */
+            mac_size = spp_ctx->mac_length;
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                 enc_err = -1;
             if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
                 enc_err = -1;
+            
+            if (enc_err >= 0 && EVP_MD_CTX_md(slice->read_w_hash) != NULL) {
+                s->read_hash = slice->read_w_hash;
+                mac = spp_ctx->write_mac;
+                i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
+                if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
+                    enc_err = -1;
+                if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
+                    enc_err = -1;    
+            }
+            if (enc_err >= 0 && EVP_MD_CTX_md(slice->read_i_hash) != NULL) {
+                s->read_hash = slice->read_i_hash;
+                mac = spp_ctx->integrity_mac;
+                i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
+                if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
+                    enc_err = -1;
+                if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
+                    enc_err = -1;    
+            }
     }
 
     if (enc_err < 0) {
@@ -769,6 +796,8 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     SSL3_RECORD *wr;
     SSL3_BUFFER *wb=&(s->s3->wbuf);
     SSL_SESSION *sess;
+    SPP_CTX *spp_ctx = s->spp_write_ctx;
+    SPP_SLICE *slice = s->write_slice;
 
     /* first check if there is a SSL3_BUFFER still being written
      * out.  This will happen with non blocking IO */
@@ -795,8 +824,10 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     wr = &(s->s3->wrec);
     sess = s->session;
 
+    s->enc_write_ctx = slice->enc_write_ctx;
+    s->write_hash = slice->write_r_hash;
     if ((sess == NULL) ||
-        (s->write_slice->enc_write_ctx == NULL) ||
+        (s->enc_write_ctx == NULL) ||
         (EVP_MD_CTX_md(s->write_hash) == NULL)) {
         /* No idea what this means... */
 #if 1
@@ -806,8 +837,8 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
 #endif
             mac_size=0;
     } else {
-        if (s->write_mac) {
-            mac_size = s->write_mac->length;
+        if (spp_ctx != NULL) {
+            mac_size = spp_ctx->mac_length;
         } else {
             mac_size=EVP_MD_CTX_size(s->write_hash);
         }
@@ -817,29 +848,29 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     }
 
     /* 'create_empty_fragment' is true only when this function calls itself */
-    if (!clear && !create_empty_fragment && !s->s3->empty_fragment_done) {
+    /*if (!clear && !create_empty_fragment && !s->s3->empty_fragment_done) {
         /* countermeasure against known-IV weakness in CBC ciphersuites
          * (see http://www.openssl.org/~bodo/tls-cbc.txt) */
 
-        if (s->s3->need_empty_fragments && type == SSL3_RT_APPLICATION_DATA) {
+        /*if (s->s3->need_empty_fragments && type == SSL3_RT_APPLICATION_DATA) {
             /* recursive function call with 'create_empty_fragment' set;
              * this prepares and buffers the data for an empty fragment
              * (these 'prefix_len' bytes are sent out later
              * together with the actual payload) */
-            prefix_len = do_spp_write(s, type, buf, 0, 1);
+            /*prefix_len = do_spp_write(s, type, buf, 0, 1);
             if (prefix_len <= 0)
                     goto err;
 
             if (prefix_len > (SPP_RT_HEADER_LENGTH + 
                 SSL3_RT_SEND_MAX_ENCRYPTED_OVERHEAD)) {
                     /* insufficient space */
-                    SSLerr(SSL_F_DO_SSL3_WRITE, ERR_R_INTERNAL_ERROR);
+                    /*SSLerr(SSL_F_DO_SSL3_WRITE, ERR_R_INTERNAL_ERROR);
                     goto err;
             }
         }
 
         s->s3->empty_fragment_done = 1;
-    }
+    }*/
 
     if (create_empty_fragment) {
 #if defined(SSL3_ALIGN_PAYLOAD) && SSL3_ALIGN_PAYLOAD!=0
@@ -871,12 +902,9 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     *(p++)=(s->version>>8);
     *(p++)=s->version&0xff;
     
-    /* Write the slide ID as the 4th byte of the header. */
+    /* Write the slice ID as the 4th byte of the header. */
     wr->slice_id = s->write_slice->slice_id;
-    *(p++)=wr->slice_id;
-    
-    wr->proxy_id = (s->write_mac ? s->write_mac->proxy_id : s->proxy_id);
-    *(p++)=wr->proxy_id;
+    *(p++)=wr->slice_id;    
     
     /* field where we are to write out packet length */
     plen=p; 
@@ -921,15 +949,32 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
      * from wr->input.  Length should be wr->length.
      * wr->data still points in the wb->buf */
     if (mac_size != 0) {
-        if (s->write_mac) {
-            /* Copy mac into the record */
-            memcpy(s->write_mac->buffer, &(p[wr->length]), mac_size);
-        } else {
-            if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
+        /* Must have read access, so write the read MAC. */
+        s->write_hash = slice->write_r_hash;
+        if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
                 goto err;
+        
+        /* Compute the write hash. */
+        if (slice->write_w_hash != NULL) {
+            s->write_hash = slice->write_w_hash;
+            if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + mac_size]),1) < 0)
+                goto err;
+        } else {
+            /* Copy from the previous record. */
+            memcpy(spp_ctx->write_mac, &(p[wr->length + eivlen + mac_size]), mac_size);
         }
-        wr->length+=mac_size;
+        /* Must be an end point, write the integrity hash. */
+        if (slice->write_i_hash != NULL) {
+            s->write_hash = slice->write_i_hash;
+            if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + (mac_size*2)]),1) < 0)
+                goto err;            
+        } else {
+            /* Copy from the previous record. */
+            memcpy(spp_ctx->integrity_mac, &(p[wr->length + eivlen + (mac_size*2)]), mac_size);
+        }        
+        wr->length+=(mac_size*3);
     }
+    /* If we do not have read access, then the MACs were interpreted as part of the payload. */
 
     wr->input=p;
     wr->data=p;
@@ -970,6 +1015,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     s->s3->wpend_type=type;
     s->s3->wpend_ret=len;
 
+done:
     /* we now just need to write the buffer */
     return ssl3_write_pending(s,type,buf,len);
     /* Does not need changing since above function simply writes buffer to 
