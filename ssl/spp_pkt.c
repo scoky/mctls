@@ -154,12 +154,12 @@ printf("\n");
     /* We can read this record */
     if ((sess != NULL) &&
         (s->enc_read_ctx != NULL) &&
-        (EVP_MD_CTX_md(slice->read_r_hash) != NULL)) {
+        (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE];
             
-            s->read_hash = slice->read_r_hash;
+            spp_copy_mac_state(s, slice->read_mac, 0);
             mac_size=EVP_MD_CTX_size(s->read_hash);
             spp_ctx->mac_length = mac_size;
             /* Going to fetch all three MACs at once */
@@ -216,16 +216,16 @@ printf("\n");
             
             
             /* Compare the write mac to see if there have been any illegal writes. */
-            if (enc_err >= 0 && EVP_MD_CTX_md(slice->read_w_hash) != NULL) {
-                s->read_hash = slice->read_w_hash;
+            if (enc_err >= 0 && EVP_MD_CTX_md(slice->write_mac->read_hash) != NULL) {
+                spp_copy_mac_state(s, slice->write_mac, 0);
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                     enc_err = -1; 
             }
             /* Compare the end-to-end integrity mac to see if there have been any writes at all */
-            if (enc_err >= 0 && EVP_MD_CTX_md(slice->read_i_hash) != NULL) {
-                s->read_hash = slice->read_i_hash;
+            if (enc_err >= 0 && s->read_i_hash != NULL && EVP_MD_CTX_md(s->read_i_hash->read_hash) != NULL) {
+                spp_copy_mac_state(s, s->read_i_hash, 0);
                 mac = spp_ctx->integrity_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
@@ -824,7 +824,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     sess = s->session;
 
     s->enc_write_ctx = slice->enc_write_ctx;
-    s->write_hash = slice->write_r_hash;
+    spp_copy_mac_state(s, slice->read_mac, 1);
     if ((sess == NULL) ||
         (s->enc_write_ctx == NULL) ||
         (EVP_MD_CTX_md(s->write_hash) == NULL)) {
@@ -949,13 +949,13 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
      * wr->data still points in the wb->buf */
     if (mac_size != 0) {
         /* Must have read access, so write the read MAC. */
-        s->write_hash = slice->write_r_hash;
+        spp_copy_mac_state(s, slice->read_mac, 1);
         if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
                 goto err;
         
         /* Compute the write hash. */
-        if (slice->write_w_hash != NULL) {
-            s->write_hash = slice->write_w_hash;
+        if (slice->write_mac != NULL) {
+            spp_copy_mac_state(s, slice->write_mac, 0);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + mac_size]),1) < 0)
                 goto err;
         } else {
@@ -963,8 +963,8 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
             memcpy(spp_ctx->write_mac, &(p[wr->length + eivlen + mac_size]), mac_size);
         }
         /* Must be an end point, write the integrity hash. */
-        if (slice->write_i_hash != NULL) {
-            s->write_hash = slice->write_i_hash;
+        if (s->write_i_hash != NULL) {
+            spp_copy_mac_state(s, s->write_i_hash, 0);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + (mac_size*2)]),1) < 0)
                 goto err;            
         } else {

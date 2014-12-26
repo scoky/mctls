@@ -1119,6 +1119,17 @@ const char *SSL_get_psk_identity(const SSL *s);
 
 #ifndef OPENSSL_NO_SSL_INTERN
 
+struct spp_mac_st {
+    unsigned char read_sequence[8];
+    int read_mac_secret_size;
+    unsigned char read_mac_secret[EVP_MAX_MD_SIZE];
+    unsigned char write_sequence[8];
+    int write_mac_secret_size;
+    unsigned char write_mac_secret[EVP_MAX_MD_SIZE];
+    EVP_MD_CTX *read_hash;
+    EVP_MD_CTX *write_hash;
+};
+
 struct spp_slice_st
         {
         /* Contains the details of a slices encryption and 
@@ -1127,19 +1138,11 @@ struct spp_slice_st
          * each encrypt or decrypt operation. */
         EVP_CIPHER_CTX *enc_read_ctx;
         EVP_CIPHER_CTX *enc_write_ctx;
-        /* Context for the read access MAC */
-        EVP_MD_CTX *read_r_hash;
-        EVP_MD_CTX *write_r_hash;
-        /* Context for the write access MAC */
-        EVP_MD_CTX *read_w_hash;
-        EVP_MD_CTX *write_w_hash;
-        /* Context for the end-to-end integrity MAC */
-        EVP_MD_CTX *read_i_hash;
-        EVP_MD_CTX *write_i_hash;
+        SPP_MAC *read_mac;
+        SPP_MAC *write_mac;
         /* Indicates whether this context contains the material 
          * need to encrypt/decrypt. basically, whether enc_read_ctx 
          * and enc_write_ctx are valid or not. */
-        int have_material; /* Should use read_access and write_access instead */
         int read_access;
         int write_access;
         /* Id assigned to this slice during handshake. The id of the 
@@ -1147,6 +1150,8 @@ struct spp_slice_st
          * included in each record header on the wire. */
         int slice_id;
         char *purpose;
+        unsigned char read_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char write_mat[EVP_MAX_KEY_LENGTH];
         };
         
 struct spp_proxy_st 
@@ -1442,6 +1447,10 @@ struct ssl_st
         /* State for each proxy for reading MACs from any of them. */
         SPP_PROXY *proxies;
         size_t proxies_len;
+        
+        /* Context for the end-to-end integrity MAC */
+        SPP_MAC *read_i_hash;
+        SPP_MAC *write_i_hash;
         
         /* Generator variables */
         int _proxy_id;

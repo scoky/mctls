@@ -212,7 +212,7 @@ int spp_connect(SSL *s) {
                 ret=ssl3_send_client_key_exchange(s);
                 if (ret <= 0) goto end;
                 
-                s->state=SSL3_ST_CW_CHANGE_A;
+                s->state=SPP_ST_CW_PRXY_MAT_A;
                 s->s3->change_cipher_spec=0;
                 s->init_num=0;
                 break;
@@ -221,6 +221,16 @@ int spp_connect(SSL *s) {
             case SPP_ST_CW_PRXY_MAT_A:
             case SPP_ST_CW_PRXY_MAT_B:
                 ret=spp_send_proxy_key_material(s);
+                if (ret <= 0) goto end;
+                s->state=SPP_ST_CR_PRXY_MAT_A;
+                s->s3->change_cipher_spec=0;
+
+                s->init_num=0;
+                break;
+                
+            case SPP_ST_CR_PRXY_MAT_A:
+            case SPP_ST_CR_PRXY_MAT_B:
+                ret=spp_get_proxy_key_material(s);
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CW_CHANGE_A;
                 s->s3->change_cipher_spec=0;
@@ -261,6 +271,7 @@ int spp_connect(SSL *s) {
                     ret= -1;
                     goto end;
                 }
+                /* Set up all */
 
                 break;
 
@@ -410,6 +421,10 @@ end:
     return(ret);
 }
         
+int spp_get_proxy_key_material(SSL *s) { 
+    return -1;
+}
+
 int spp_send_proxy_key_material(SSL *s) {
 	unsigned char *p,*d;
 	int n;
@@ -1782,4 +1797,19 @@ err:
     X509_free(x);
     sk_X509_pop_free(sk,X509_free);
     return(ret);
+}
+
+int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send) {
+    if (send) {
+        s->write_hash = mac->write_hash;
+        memcpy(s->s3->write_mac_secret, mac->write_mac_secret, EVP_MAX_MD_SIZE);
+	s->s3->write_mac_secret_size = mac->write_mac_secret_size;
+        memcpy(s->s3->write_sequence, mac->write_sequence, 8);
+    } else {
+        s->read_hash = mac->read_hash;
+        memcpy(s->s3->read_mac_secret, mac->read_mac_secret, EVP_MAX_MD_SIZE);
+	s->s3->read_mac_secret_size = mac->read_mac_secret_size;
+        memcpy(s->s3->read_sequence, mac->read_sequence, 8);
+    }
+    return 1;
 }

@@ -384,6 +384,8 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->proxies_len = 0;
         s->slices = NULL;
         s->slices_len = 0;
+        s->write_i_hash = NULL;
+        s->read_i_hash = NULL;
         s->spp_write_ctx = NULL;
         s->spp_read_ctx = NULL;
         s->write_slice = NULL;
@@ -986,15 +988,10 @@ SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {
     slice->slice_id = (s->_slice_id++);
     slice->enc_read_ctx = NULL;
     slice->enc_write_ctx = NULL;
-    slice->have_material = 1;
     slice->read_access = 1;
-    slice->read_i_hash = NULL;
-    slice->read_r_hash = NULL;
-    slice->read_w_hash = NULL;
+    slice->read_mac = NULL;
+    slice->write_mac = NULL;
     slice->write_access = 1;
-    slice->write_i_hash = NULL;
-    slice->write_r_hash = NULL;
-    slice->write_w_hash = NULL;
     return slice;
 }
 SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id) {
@@ -1010,7 +1007,7 @@ SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id) {
 SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id) {
     int i;
     SPP_PROXY* cprxy = s->proxies;
-    for (i = 0; i < s->proxies; i++) {
+    for (i = 0; i < s->proxies_len; i++) {
         if (cprxy[i].proxy_id == id) {
             return cprxy;
         }

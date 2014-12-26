@@ -1086,6 +1086,8 @@ int spp_get_proxy_certificate(SSL *s);
 int spp_get_proxy_done(SSL *s);
 int spp_get_proxy_key_exchange(SSL *s);
 int spp_send_proxy_key_material(SSL *s);
+int spp_get_proxy_key_material(SSL *s);
+int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send);
 
 int dtls1_send_hello_request(SSL *s);
 int dtls1_send_server_hello(SSL *s);
