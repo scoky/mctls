@@ -22,9 +22,7 @@ static int spp_get_record(SSL *s) {
     short version;
     unsigned mac_size, orig_len;
     size_t extra;
-    unsigned empty_record_count = 0;
-
-    spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
+    unsigned empty_record_count = 0;    
     
     rr= &(s->s3->rrec);
     sess=s->session;
@@ -150,6 +148,7 @@ printf("dec %d\n",rr->length);
 printf("\n");
 #endif
     
+    spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
     s->spp_read_ctx = spp_ctx;
     /* r->length is now the compressed data plus mac */
     /* We can read this record */

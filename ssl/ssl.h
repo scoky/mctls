@@ -1157,6 +1157,9 @@ struct spp_proxy_st
         size_t read_slice_ids_len;
         int *write_slice_ids;
         size_t write_slice_ids_len;
+        
+        SSL_SESSION *session;
+        X509 *peer;
         };
         
 struct spp_read_st 
@@ -1438,6 +1441,7 @@ struct ssl_st
         /* State for each proxy for reading MACs from any of them. */
         SPP_PROXY *proxies;
         size_t proxies_len;
+        SPP_PROXY* (*get_proxy_by_id)(SSL *s, int id);
         
         /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
@@ -2685,6 +2689,9 @@ void ERR_load_SSL_strings(void);
 #define SPP_R_INVALID_SLICE_ID                           601
 #define SPP_R_MISSING_SLICE                              602
 #define SSL_F_SPP_ENC                                    603
+#define SPP_R_MISSING_PROXY                              604
+#define SPP_R_INVALID_PROXY_ID                           605
+
 
 #ifdef  __cplusplus
 }

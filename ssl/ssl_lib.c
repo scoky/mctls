@@ -379,6 +379,15 @@ SSL *SSL_new(SSL_CTX *ctx)
 	s->psk_client_callback=ctx->psk_client_callback;
 	s->psk_server_callback=ctx->psk_server_callback;
 #endif
+        
+        s->proxies = NULL;
+        s->proxies_len = 0;
+        s->slices = NULL;
+        s->slices_len = 0;
+        s->spp_write_ctx = NULL;
+        s->spp_read_ctx = NULL;
+        s->write_slice = NULL;
+        s->read_slice = NULL;
 
 	return(s);
 err:

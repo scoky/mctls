@@ -165,11 +165,12 @@ int spp_connect(SSL *s) {
                     }
                 }
 #endif
-/*                if (s->s3->tmp.cert_req)
-                    s->state=SSL3_ST_CW_CERT_A;
-                else
-                    s->state=SSL3_ST_CW_KEY_EXCH_A;*/
-                s->state=SPP_ST_CR_PRXY_CERT_A;
+
+                if (s->proxies_len > 0) {
+                    s->state=SPP_ST_CR_PRXY_CERT_A;
+                } else {
+                    s->state=SSL3_ST_CW_KEY_EXCH_A;
+                }
                 s->init_num=0;
 
                 break;
@@ -182,7 +183,7 @@ int spp_connect(SSL *s) {
                 s->init_num=0;
                 break;
                 
-                /* Receive the hello messages from the proxies not. */
+            /* Receive the hello messages from the proxies now. */
             case SPP_ST_CR_PRXY_KEY_EXCH_A:
             case SPP_ST_CR_PRXY_KEY_EXCH_B:
                 ret=spp_get_proxy_key_exchange(s);
@@ -205,10 +206,20 @@ int spp_connect(SSL *s) {
                 }
                 s->init_num=0;                
                 break;
-
-                /* Send the proxy key material. */
+                
             case SSL3_ST_CW_KEY_EXCH_A:
             case SSL3_ST_CW_KEY_EXCH_B:
+                ret=ssl3_send_client_key_exchange(s);
+                if (ret <= 0) goto end;
+                
+                s->state=SSL3_ST_CW_CHANGE_A;
+                s->s3->change_cipher_spec=0;
+                s->init_num=0;
+                break;
+
+            /* Send the proxy key material. */
+            case SPP_ST_CW_PRXY_MAT_A:
+            case SPP_ST_CW_PRXY_MAT_B:
                 ret=spp_send_proxy_key_material(s);
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CW_CHANGE_A;
@@ -1176,65 +1187,54 @@ int spp_get_proxy_key_exchange(SSL *s)
 	int curve_nid = 0;
 	int encoded_pt_len = 0;
 #endif
+        SPP_PROXY *proxy;
+        int proxy_id;
 
 	/* use same message size as in ssl3_get_certificate_request()
 	 * as ServerKeyExchange message may be skipped */
 	n=s->method->ssl_get_message(s,
-		SSL3_ST_CR_KEY_EXCH_A,
-		SSL3_ST_CR_KEY_EXCH_B,
-		-1,
-		s->max_cert_list,
-		&ok);
+            SPP_ST_CR_PRXY_KEY_EXCH_A,
+            SPP_ST_CR_PRXY_KEY_EXCH_B,
+            -1,
+            s->max_cert_list,
+            &ok);
 	if (!ok) return((int)n);
 
-	if (s->s3->tmp.message_type != SSL3_MT_SERVER_KEY_EXCHANGE)
-		{
-#ifndef OPENSSL_NO_PSK
-		/* In plain PSK ciphersuite, ServerKeyExchange can be
-		   omitted if no identity hint is sent. Set
-		   session->sess_cert anyway to avoid problems
-		   later.*/
-		if (s->s3->tmp.new_cipher->algorithm_mkey & SSL_kPSK)
-			{
-			s->session->sess_cert=ssl_sess_cert_new();
-			if (s->ctx->psk_identity_hint)
-				OPENSSL_free(s->ctx->psk_identity_hint);
-			s->ctx->psk_identity_hint = NULL;
-			}
-#endif
-		s->s3->tmp.reuse_message=1;
-		return(1);
-		}
+	if (s->s3->tmp.message_type != SSL3_MT_SERVER_KEY_EXCHANGE) {
+            s->s3->tmp.reuse_message=1;
+            return(1);
+        }
 
 	param=p=(unsigned char *)s->init_msg;
-	if (s->session->sess_cert != NULL)
-		{
+        proxy_id = *(p++);
+        proxy = s->get_proxy_by_id(s,proxy_id);
+        if (proxy == NULL) {
+            SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE, SPP_R_INVALID_PROXY_ID);
+            goto f_err;
+        }
+        
+	if (proxy->sess_cert != NULL) {
 #ifndef OPENSSL_NO_RSA
-		if (s->session->sess_cert->peer_rsa_tmp != NULL)
-			{
-			RSA_free(s->session->sess_cert->peer_rsa_tmp);
-			s->session->sess_cert->peer_rsa_tmp=NULL;
-			}
+            if (proxy->sess_cert->peer_rsa_tmp != NULL) {
+                RSA_free(proxy->sess_cert->peer_rsa_tmp);
+                proxy->sess_cert->peer_rsa_tmp=NULL;
+            }
 #endif
 #ifndef OPENSSL_NO_DH
-		if (s->session->sess_cert->peer_dh_tmp)
-			{
-			DH_free(s->session->sess_cert->peer_dh_tmp);
-			s->session->sess_cert->peer_dh_tmp=NULL;
-			}
+            if (proxy->sess_cert->peer_dh_tmp) {
+                DH_free(proxy->sess_cert->peer_dh_tmp);
+                proxy->sess_cert->peer_dh_tmp=NULL;
+            }
 #endif
 #ifndef OPENSSL_NO_ECDH
-		if (s->session->sess_cert->peer_ecdh_tmp)
-			{
-			EC_KEY_free(s->session->sess_cert->peer_ecdh_tmp);
-			s->session->sess_cert->peer_ecdh_tmp=NULL;
-			}
+            if (proxy->sess_cert->peer_ecdh_tmp) {
+                EC_KEY_free(proxy->sess_cert->peer_ecdh_tmp);
+                proxy->sess_cert->peer_ecdh_tmp=NULL;
+            }
 #endif
-		}
-	else
-		{
-		s->session->sess_cert=ssl_sess_cert_new();
-		}
+        } else {
+            proxy->sess_cert=ssl_sess_cert_new();
+        }
 
 	/* Total length of the parameters including the length prefix */
 	param_len=0;
@@ -1245,267 +1245,15 @@ int spp_get_proxy_key_exchange(SSL *s)
 
 	al=SSL_AD_DECODE_ERROR;
 
-#ifndef OPENSSL_NO_PSK
-	if (alg_k & SSL_kPSK)
-		{
-		char tmp_id_hint[PSK_MAX_IDENTITY_LEN+1];
-
-		param_len = 2;
-		if (param_len > n)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		n2s(p,i);
-
-		/* Store PSK identity hint for later use, hint is used
-		 * in ssl3_send_client_key_exchange.  Assume that the
-		 * maximum length of a PSK identity hint can be as
-		 * long as the maximum length of a PSK identity. */
-		if (i > PSK_MAX_IDENTITY_LEN)
-			{
-			al=SSL_AD_HANDSHAKE_FAILURE;
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_DATA_LENGTH_TOO_LONG);
-			goto f_err;
-			}
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_BAD_PSK_IDENTITY_HINT_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		/* If received PSK identity hint contains NULL
-		 * characters, the hint is truncated from the first
-		 * NULL. p may not be ending with NULL, so create a
-		 * NULL-terminated string. */
-		memcpy(tmp_id_hint, p, i);
-		memset(tmp_id_hint+i, 0, PSK_MAX_IDENTITY_LEN+1-i);
-		if (s->ctx->psk_identity_hint != NULL)
-			OPENSSL_free(s->ctx->psk_identity_hint);
-		s->ctx->psk_identity_hint = BUF_strdup(tmp_id_hint);
-		if (s->ctx->psk_identity_hint == NULL)
-			{
-			al=SSL_AD_HANDSHAKE_FAILURE;
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE, ERR_R_MALLOC_FAILURE);
-			goto f_err;
-			}	   
-
-		p+=i;
-		n-=param_len;
-		}
-	else
-#endif /* !OPENSSL_NO_PSK */
-#ifndef OPENSSL_NO_SRP
-	if (alg_k & SSL_kSRP)
-		{
-		param_len = 2;
-		if (param_len > n)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		n2s(p,i);
-
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_SRP_N_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		if (!(s->srp_ctx.N=BN_bin2bn(p,i,NULL)))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_BN_LIB);
-			goto err;
-			}
-		p+=i;
-
-
-		if (2 > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		param_len += 2;
-
-		n2s(p,i);
-
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_SRP_G_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		if (!(s->srp_ctx.g=BN_bin2bn(p,i,NULL)))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_BN_LIB);
-			goto err;
-			}
-		p+=i;
-
-
-		if (1 > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		param_len += 1;
-
-		i = (unsigned int)(p[0]);
-		p++;
-
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_SRP_S_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		if (!(s->srp_ctx.s=BN_bin2bn(p,i,NULL)))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_BN_LIB);
-			goto err;
-			}
-		p+=i;
-
-		if (2 > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		param_len += 2;
-
-		n2s(p,i);
-
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_SRP_B_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		if (!(s->srp_ctx.B=BN_bin2bn(p,i,NULL)))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_BN_LIB);
-			goto err;
-			}
-		p+=i;
-		n-=param_len;
-
-		if (!srp_verify_server_param(s, &al))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_SRP_PARAMETERS);
-			goto f_err;
-			}
-
-/* We must check if there is a certificate */
-#ifndef OPENSSL_NO_RSA
-		if (alg_a & SSL_aRSA)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
-#else
-		if (0)
-			;
-#endif
-#ifndef OPENSSL_NO_DSA
-		else if (alg_a & SSL_aDSS)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_DSA_SIGN].x509);
-#endif
-		}
-	else
-#endif /* !OPENSSL_NO_SRP */
-#ifndef OPENSSL_NO_RSA
-	if (alg_k & SSL_kRSA)
-		{
-		if ((rsa=RSA_new()) == NULL)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_MALLOC_FAILURE);
-			goto err;
-			}
-
-		param_len = 2;
-		if (param_len > n)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		n2s(p,i);
-
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_RSA_MODULUS_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		if (!(rsa->n=BN_bin2bn(p,i,rsa->n)))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_BN_LIB);
-			goto err;
-			}
-		p+=i;
-
-		if (2 > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
-				SSL_R_LENGTH_TOO_SHORT);
-			goto f_err;
-			}
-		param_len += 2;
-
-		n2s(p,i);
-
-		if (i > n - param_len)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,SSL_R_BAD_RSA_E_LENGTH);
-			goto f_err;
-			}
-		param_len += i;
-
-		if (!(rsa->e=BN_bin2bn(p,i,rsa->e)))
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_BN_LIB);
-			goto err;
-			}
-		p+=i;
-		n-=param_len;
-
-		/* this should be because we are using an export cipher */
-		if (alg_a & SSL_aRSA)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
-		else
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_INTERNAL_ERROR);
-			goto err;
-			}
-		s->session->sess_cert->peer_rsa_tmp=rsa;
-		rsa=NULL;
-		}
-#else /* OPENSSL_NO_RSA */
-	if (0)
-		;
-#endif
 #ifndef OPENSSL_NO_DH
-	else if (alg_k & SSL_kEDH)
-		{
-		if ((dh=DH_new()) == NULL)
-			{
-			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_DH_LIB);
-			goto err;
-			}
+	if (alg_k & SSL_kEDH) {
+            if ((dh=DH_new()) == NULL) {
+                SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,ERR_R_DH_LIB);
+                goto err;
+            }
 
-		param_len = 2;
-		if (param_len > n)
-			{
+            param_len = 2;
+            if (param_len > n) {
 			SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE,
 				SSL_R_LENGTH_TOO_SHORT);
 			goto f_err;
@@ -1871,188 +1619,162 @@ err:
 	return(-1);
 	}
 
-int spp_get_proxy_certificate(SSL *s)
-	{
-	int al,i,ok,ret= -1;
-	unsigned long n,nc,llen,l;
-	X509 *x=NULL;
-	const unsigned char *q,*p;
-	unsigned char *d;
-	STACK_OF(X509) *sk=NULL;
-	SESS_CERT *sc;
-	EVP_PKEY *pkey=NULL;
-	int need_cert = 1; /* VRS: 0=> will allow null cert if auth == KRB5 */
+int spp_get_proxy_certificate(SSL *s) {
+    int al,i,ok,ret= -1;
+    unsigned long n,nc,llen,l;
+    X509 *x=NULL;
+    const unsigned char *q,*p;
+    unsigned char *d;
+    STACK_OF(X509) *sk=NULL;
+    SESS_CERT *sc;
+    SPP_PROXY *proxy;
+    EVP_PKEY *pkey=NULL;
+    int proxy_id;
+    int need_cert = 1; /* VRS: 0=> will allow null cert if auth == KRB5 */
 
-	n=s->method->ssl_get_message(s,
-		SSL3_ST_CR_CERT_A,
-		SSL3_ST_CR_CERT_B,
-		-1,
-		s->max_cert_list,
-		&ok);
+    n=s->method->ssl_get_message(s,
+        SPP_ST_CR_PRXY_CERT_A,
+        SPP_ST_CR_PRXY_CERT_B,
+        -1,
+        s->max_cert_list,
+        &ok);
 
-	if (!ok) return((int)n);
+    if (!ok) return((int)n);
 
-	if ((s->s3->tmp.message_type == SSL3_MT_SERVER_KEY_EXCHANGE) ||
-		((s->s3->tmp.new_cipher->algorithm_auth & SSL_aKRB5) && 
-		(s->s3->tmp.message_type == SSL3_MT_SERVER_DONE)))
-		{
-		s->s3->tmp.reuse_message=1;
-		return(1);
-		}
+    if ((s->s3->tmp.message_type == SSL3_MT_SERVER_KEY_EXCHANGE) ||
+    ((s->s3->tmp.new_cipher->algorithm_auth & SSL_aKRB5) && 
+    (s->s3->tmp.message_type == SSL3_MT_SERVER_DONE))) {
+        s->s3->tmp.reuse_message=1;
+        return(1);
+    }
 
-	if (s->s3->tmp.message_type != SSL3_MT_CERTIFICATE)
-		{
-		al=SSL_AD_UNEXPECTED_MESSAGE;
-		SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_BAD_MESSAGE_TYPE);
-		goto f_err;
-		}
-	p=d=(unsigned char *)s->init_msg;
+    if (s->s3->tmp.message_type != SSL3_MT_CERTIFICATE) {
+        al=SSL_AD_UNEXPECTED_MESSAGE;
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_BAD_MESSAGE_TYPE);
+        goto f_err;
+    }
+    p=d=(unsigned char *)s->init_msg;
 
-	if ((sk=sk_X509_new_null()) == NULL)
-		{
-		SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,ERR_R_MALLOC_FAILURE);
-		goto err;
-		}
+    if ((sk=sk_X509_new_null()) == NULL) {
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,ERR_R_MALLOC_FAILURE);
+        goto err;
+    }
 
-	n2l3(p,llen);
-	if (llen+3 != n)
-		{
-		al=SSL_AD_DECODE_ERROR;
-		SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_LENGTH_MISMATCH);
-		goto f_err;
-		}
-	for (nc=0; nc<llen; )
-		{
-		n2l3(p,l);
-		if ((l+nc+3) > llen)
-			{
-			al=SSL_AD_DECODE_ERROR;
-			SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_CERT_LENGTH_MISMATCH);
-			goto f_err;
-			}
+    // Read the proxy ID off the front of the message.
+    proxy_id=*(p++);
+    proxy = s->get_proxy_from_id(s, proxy_id);
+    if (proxy == NULL) {
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SPP_R_INVALID_PROXY_ID);
+        goto f_err;
+    }
 
-		q=p;
-		x=d2i_X509(NULL,&q,l);
-		if (x == NULL)
-			{
-			al=SSL_AD_BAD_CERTIFICATE;
-			SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,ERR_R_ASN1_LIB);
-			goto f_err;
-			}
-		if (q != (p+l))
-			{
-			al=SSL_AD_DECODE_ERROR;
-			SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_CERT_LENGTH_MISMATCH);
-			goto f_err;
-			}
-		if (!sk_X509_push(sk,x))
-			{
-			SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,ERR_R_MALLOC_FAILURE);
-			goto err;
-			}
-		x=NULL;
-		nc+=l+3;
-		p=q;
-		}
+    n2l3(p,llen);
+    if (llen+3 != n) {
+        al=SSL_AD_DECODE_ERROR;
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_LENGTH_MISMATCH);
+        goto f_err;
+    }
+    for (nc=0; nc<llen; ) {
+        n2l3(p,l);
+        if ((l+nc+3) > llen) {
+            al=SSL_AD_DECODE_ERROR;
+            SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_CERT_LENGTH_MISMATCH);
+            goto f_err;
+        }
 
-	i=ssl_verify_cert_chain(s,sk);
-	if ((s->verify_mode != SSL_VERIFY_NONE) && (i <= 0)
-#ifndef OPENSSL_NO_KRB5
-	    && !((s->s3->tmp.new_cipher->algorithm_mkey & SSL_kKRB5) &&
-		 (s->s3->tmp.new_cipher->algorithm_auth & SSL_aKRB5))
-#endif /* OPENSSL_NO_KRB5 */
-		)
-		{
-		al=ssl_verify_alarm_type(s->verify_result);
-		SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_CERTIFICATE_VERIFY_FAILED);
-		goto f_err; 
-		}
-	ERR_clear_error(); /* but we keep s->verify_result */
+        q=p;
+        x=d2i_X509(NULL,&q,l);
+        if (x == NULL) {
+            al=SSL_AD_BAD_CERTIFICATE;
+            SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,ERR_R_ASN1_LIB);
+            goto f_err;
+        }
+        if (q != (p+l)) {
+            al=SSL_AD_DECODE_ERROR;
+            SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_CERT_LENGTH_MISMATCH);
+            goto f_err;
+        }
+        if (!sk_X509_push(sk,x)) {
+            SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,ERR_R_MALLOC_FAILURE);
+            goto err;
+        }
+        x=NULL;
+        nc+=l+3;
+        p=q;
+    }
 
-	sc=ssl_sess_cert_new();
-	if (sc == NULL) goto err;
+    i=ssl_verify_cert_chain(s,sk);
+    if ((s->verify_mode != SSL_VERIFY_NONE) && (i <= 0) ) {
+        al=ssl_verify_alarm_type(s->verify_result);
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SSL_R_CERTIFICATE_VERIFY_FAILED);
+        goto f_err; 
+    }
+    ERR_clear_error(); /* but we keep s->verify_result */
 
-	if (s->session->sess_cert) ssl_sess_cert_free(s->session->sess_cert);
-	s->session->sess_cert=sc;
+    sc=ssl_sess_cert_new();
+    if (sc == NULL) goto err;
 
-	sc->cert_chain=sk;
-	/* Inconsistency alert: cert_chain does include the peer's
-	 * certificate, which we don't include in s3_srvr.c */
-	x=sk_X509_value(sk,0);
-	sk=NULL;
- 	/* VRS 19990621: possible memory leak; sk=null ==> !sk_pop_free() @end*/
+    if (proxy->sess_cert) ssl_sess_cert_free(proxy->sess_cert);
+    proxy->sess_cert=sc;
 
-	pkey=X509_get_pubkey(x);
+    sc->cert_chain=sk;
+    /* Inconsistency alert: cert_chain does include the peer's
+     * certificate, which we don't include in s3_srvr.c */
+    x=sk_X509_value(sk,0);
+    sk=NULL;
+    /* VRS 19990621: possible memory leak; sk=null ==> !sk_pop_free() @end*/
 
-	/* VRS: allow null cert if auth == KRB5 */
-	need_cert = ((s->s3->tmp.new_cipher->algorithm_mkey & SSL_kKRB5) &&
-	            (s->s3->tmp.new_cipher->algorithm_auth & SSL_aKRB5))
-	            ? 0 : 1;
+    pkey=X509_get_pubkey(x);
 
-#ifdef KSSL_DEBUG
-	printf("pkey,x = %p, %p\n", pkey,x);
-	printf("ssl_cert_type(x,pkey) = %d\n", ssl_cert_type(x,pkey));
-	printf("cipher, alg, nc = %s, %lx, %lx, %d\n", s->s3->tmp.new_cipher->name,
-		s->s3->tmp.new_cipher->algorithm_mkey, s->s3->tmp.new_cipher->algorithm_auth, need_cert);
-#endif    /* KSSL_DEBUG */
+    /* VRS: allow null cert if auth == KRB5 */
+    need_cert = 1;
 
-	if (need_cert && ((pkey == NULL) || EVP_PKEY_missing_parameters(pkey)))
-		{
-		x=NULL;
-		al=SSL3_AL_FATAL;
-		SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,
-			SSL_R_UNABLE_TO_FIND_PUBLIC_KEY_PARAMETERS);
-		goto f_err;
-		}
+    if (need_cert && ((pkey == NULL) || EVP_PKEY_missing_parameters(pkey))) {
+        x=NULL;
+        al=SSL3_AL_FATAL;
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,
+                SSL_R_UNABLE_TO_FIND_PUBLIC_KEY_PARAMETERS);
+        goto f_err;
+    }
 
-	i=ssl_cert_type(x,pkey);
-	if (need_cert && i < 0)
-		{
-		x=NULL;
-		al=SSL3_AL_FATAL;
-		SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,
-			SSL_R_UNKNOWN_CERTIFICATE_TYPE);
-		goto f_err;
-		}
+    i=ssl_cert_type(x,pkey);
+    if (need_cert && i < 0) {
+        x=NULL;
+        al=SSL3_AL_FATAL;
+        SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,
+                SSL_R_UNKNOWN_CERTIFICATE_TYPE);
+        goto f_err;
+    }
 
-	if (need_cert)
-		{
-		sc->peer_cert_type=i;
-		CRYPTO_add(&x->references,1,CRYPTO_LOCK_X509);
-		/* Why would the following ever happen?
-		 * We just created sc a couple of lines ago. */
-		if (sc->peer_pkeys[i].x509 != NULL)
-			X509_free(sc->peer_pkeys[i].x509);
-		sc->peer_pkeys[i].x509=x;
-		sc->peer_key= &(sc->peer_pkeys[i]);
+    if (need_cert) {
+        sc->peer_cert_type=i;
+        CRYPTO_add(&x->references,1,CRYPTO_LOCK_X509);
+        /* Why would the following ever happen?
+         * We just created sc a couple of lines ago. */
+        if (sc->peer_pkeys[i].x509 != NULL)
+                X509_free(sc->peer_pkeys[i].x509);
+        sc->peer_pkeys[i].x509=x;
+        sc->peer_key= &(sc->peer_pkeys[i]);
 
-		if (s->session->peer != NULL)
-			X509_free(s->session->peer);
-		CRYPTO_add(&x->references,1,CRYPTO_LOCK_X509);
-		s->session->peer=x;
-		}
-	else
-		{
-		sc->peer_cert_type=i;
-		sc->peer_key= NULL;
+        CRYPTO_add(&x->references,1,CRYPTO_LOCK_X509);
+        proxy->peer=x;
+    } else {
+        sc->peer_cert_type=i;
+        sc->peer_key= NULL;
+        proxy->peer=NULL;
+    }
 
-		if (s->session->peer != NULL)
-			X509_free(s->session->peer);
-		s->session->peer=NULL;
-		}
-	s->session->verify_result = s->verify_result;
+    x=NULL;
+    ret=1;
 
-	x=NULL;
-	ret=1;
-
-	if (0)
-		{
+    if (0)
+            {
 f_err:
-		ssl3_send_alert(s,SSL3_AL_FATAL,al);
-		}
+            ssl3_send_alert(s,SSL3_AL_FATAL,al);
+            }
 err:
-	EVP_PKEY_free(pkey);
-	X509_free(x);
-	sk_X509_pop_free(sk,X509_free);
-	return(ret);
-	}
+    EVP_PKEY_free(pkey);
+    X509_free(x);
+    sk_X509_pop_free(sk,X509_free);
+    return(ret);
+}

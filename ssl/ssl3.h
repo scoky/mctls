@@ -598,6 +598,8 @@ typedef struct ssl3_state_st
 #define SPP_ST_CR_PRXY_DONE_B           (0x665|SSL_ST_CONNECT)        
 #define SPP_ST_CR_PRXY_MAT_A            (0x666|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_MAT_B            (0x667|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_MAT_A            (0x668|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_MAT_B            (0x669|SSL_ST_CONNECT)
 
 /* write to server */
 #define SSL3_ST_CW_CERT_A		(0x170|SSL_ST_CONNECT)
