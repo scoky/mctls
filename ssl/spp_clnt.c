@@ -1207,7 +1207,7 @@ int spp_get_proxy_key_exchange(SSL *s)
 
 	param=p=(unsigned char *)s->init_msg;
         proxy_id = *(p++);
-        proxy = s->get_proxy_by_id(s,proxy_id);
+        proxy = SPP_get_proxy_by_id(s,proxy_id);
         if (proxy == NULL) {
             SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE, SPP_R_INVALID_PROXY_ID);
             goto f_err;
@@ -1662,7 +1662,7 @@ int spp_get_proxy_certificate(SSL *s) {
 
     // Read the proxy ID off the front of the message.
     proxy_id=*(p++);
-    proxy = s->get_proxy_from_id(s, proxy_id);
+    proxy = SPP_get_proxy_from_id(s, proxy_id);
     if (proxy == NULL) {
         SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SPP_R_INVALID_PROXY_ID);
         goto f_err;

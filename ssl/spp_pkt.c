@@ -122,7 +122,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
-    slice = s->get_slice_by_id(s, rr->slice_id);    
+    slice = SPP_get_slice_by_id(s, rr->slice_id);
     /* Get slice from id if it can be found. */
     if (!slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);

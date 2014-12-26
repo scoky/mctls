@@ -1158,6 +1158,7 @@ struct spp_proxy_st
         int *write_slice_ids;
         size_t write_slice_ids_len;
         
+        struct sess_cert_st /* SESS_CERT */ *sess_cert;
         SSL_SESSION *session;
         X509 *peer;
         };
@@ -1431,8 +1432,7 @@ struct ssl_st
         /* Slices defined for this session. */
         SPP_SLICE *slices;
         /* Number of slices defined. */
-        size_t slices_len;
-        SPP_SLICE* (*get_slice_by_id)(SSL *s, int slice_id);
+        size_t slices_len;        
         
         /* Contains the raw MAC for reading and writing when not modifying content. */
         SPP_CTX *spp_write_ctx;
@@ -1441,7 +1441,10 @@ struct ssl_st
         /* State for each proxy for reading MACs from any of them. */
         SPP_PROXY *proxies;
         size_t proxies_len;
-        SPP_PROXY* (*get_proxy_by_id)(SSL *s, int id);
+        
+        /* Generator variables */
+        int _proxy_id;
+        int _slice_id;
         
         /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
@@ -1938,6 +1941,12 @@ void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
 int     SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies, int proxies_len);
+SPP_PROXY* SPP_generate_proxy(SSL *s, char* address);
+SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose);
+SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id);
+SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id);
+int     SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices, int slices_len);
+int     SPP_assign_proxy_read_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices, int slices_len);
 int 	SSL_read(SSL *ssl,void *buf,int num);
 int 	SPP_read_record(SSL *ssl,void *buf,int num,SPP_SLICE **slice,SPP_CTX **ctx);
 int 	SSL_peek(SSL *ssl,void *buf,int num);
