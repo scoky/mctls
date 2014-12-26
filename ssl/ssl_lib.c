@@ -976,6 +976,7 @@ SPP_PROXY* SPP_generate_proxy(SSL *s, char* address) {
     prxy->read_slice_ids_len = 0;
     prxy->write_slice_ids = NULL;
     prxy->write_slice_ids_len = 0;
+    prxy->done = 0;
     return prxy;
 }
 SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {

@@ -1141,6 +1141,16 @@ err:
 	return(-1);
 	}
 
+SPP_PROXY* spp_get_next_proxy(SSL *s) {
+    int i;
+    for (i = s->proxies_len - 1; i >= 0; i--) {
+        if (s->proxies[i].done == 0) {
+            return &(s->proxies[i]);
+        }
+    }
+    return NULL;
+}
+
 int spp_get_proxy_done(SSL *s) {
     int ok,ret=0;
     long n;
@@ -1188,7 +1198,6 @@ int spp_get_proxy_key_exchange(SSL *s)
 	int encoded_pt_len = 0;
 #endif
         SPP_PROXY *proxy;
-        int proxy_id;
 
 	/* use same message size as in ssl3_get_certificate_request()
 	 * as ServerKeyExchange message may be skipped */
@@ -1206,8 +1215,7 @@ int spp_get_proxy_key_exchange(SSL *s)
         }
 
 	param=p=(unsigned char *)s->init_msg;
-        proxy_id = *(p++);
-        proxy = SPP_get_proxy_by_id(s,proxy_id);
+        proxy = spp_get_next_proxy(s);
         if (proxy == NULL) {
             SSLerr(SSL_F_SSL3_GET_KEY_EXCHANGE, SPP_R_INVALID_PROXY_ID);
             goto f_err;
@@ -1629,7 +1637,6 @@ int spp_get_proxy_certificate(SSL *s) {
     SESS_CERT *sc;
     SPP_PROXY *proxy;
     EVP_PKEY *pkey=NULL;
-    int proxy_id;
     int need_cert = 1; /* VRS: 0=> will allow null cert if auth == KRB5 */
 
     n=s->method->ssl_get_message(s,
@@ -1660,9 +1667,7 @@ int spp_get_proxy_certificate(SSL *s) {
         goto err;
     }
 
-    // Read the proxy ID off the front of the message.
-    proxy_id=*(p++);
-    proxy = SPP_get_proxy_from_id(s, proxy_id);
+    proxy = spp_get_next_proxy(s);
     if (proxy == NULL) {
         SSLerr(SSL_F_SSL3_GET_SERVER_CERTIFICATE,SPP_R_INVALID_PROXY_ID);
         goto f_err;

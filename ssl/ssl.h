@@ -1161,15 +1161,16 @@ struct spp_proxy_st
         struct sess_cert_st /* SESS_CERT */ *sess_cert;
         SSL_SESSION *session;
         X509 *peer;
+        int done;
         };
         
 struct spp_read_st 
-{
-    unsigned char *integrity_mac;
-    unsigned char *read_mac;
-    unsigned char *write_mac;
-    size_t mac_length;
-};
+        {
+        unsigned char *integrity_mac;
+        unsigned char *read_mac;
+        unsigned char *write_mac;
+        size_t mac_length;
+        };
 
 struct ssl_st
 	{
