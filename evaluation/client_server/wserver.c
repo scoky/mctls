@@ -1,3 +1,5 @@
+// A simple https server
+
 #include "common.h"
 
 #define KEYFILE "server.pem"
@@ -60,7 +62,7 @@ void generate_eph_rsa_key(ctx)
   }
     
   
-
+// Just added support for files 
 static int http_serve(ssl,s)
   SSL *ssl;
   int s;
