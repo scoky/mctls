@@ -1,4 +1,3 @@
- /* A simple HTTPS server */
 #include "common.h"
 
 #define KEYFILE "server.pem"
@@ -67,7 +66,7 @@ static int http_serve(ssl,s)
   int s;
   {
     char buf[BUFSIZZ];
-    int r,len;
+    int r; //len; //len seems useless...
     BIO *io,*ssl_bio;
     
     io=BIO_new(BIO_f_buffer());
@@ -80,7 +79,7 @@ static int http_serve(ssl,s)
 
       switch(SSL_get_error(ssl,r)){
         case SSL_ERROR_NONE:
-          len=r;
+          //len=r; // useless? 
           break;
         default:
           berr_exit("SSL read problem");
@@ -102,7 +101,77 @@ static int http_serve(ssl,s)
     if((r=BIO_puts
       (io,"Server test page\r\n"))<=0)
       err_exit("Write error");
-    
+  	/* Attempt to send file index.html*/
+	BIO *file;
+	static int bufsize = BUFSIZZ;
+	int total_bytes; 
+	int j = 0; 
+	/* Commenting since already allocated above */
+	/*
+	char *buf = NULL;
+	static int bufsize = BUFSIZZ;
+	
+	// allocate buffer to send file (check if not already allocated) 
+	buf=OPENSSL_malloc(bufsize);
+	if (buf == NULL) 
+		return(0);
+	*/
+
+	// Code below needs to be checked first 
+	/*char *p;
+	p="index.html"; // mmmmm...*/
+	if ((file=BIO_new_file("index.html","r")) == NULL)
+	{                
+		BIO_puts(io, "Error opening file"); // what is text? ERROR
+        //BIO_printf(io,"Error opening '%s'\r\n",p);
+        BIO_printf(io,"Error opening index.html\r\n");
+		goto write_error;
+	}
+	/*-- START -- */
+            for (;;)
+                {
+                int i = BIO_read(file,buf,bufsize);
+                if (i <= 0)
+					break;
+                total_bytes += i;
+                fprintf(stderr,"%d\n",i);
+                if (total_bytes > 3*1024)
+                    {
+                    total_bytes = 0;
+                    fprintf(stderr,"RENEGOTIATE\n");
+                    SSL_renegotiate(ssl);	// check if this works...(con --> ssl)
+                    }
+                for (j = 0; j < i; )
+                    {
+					/* Black magic START */
+					static int count = 0; 
+					if (++count == 13) { 
+						SSL_renegotiate(ssl); 
+					} 
+					/* Black magic END */
+                    int k = BIO_write(io, &(buf[j]), i-j);
+                    if (k <= 0)
+                        {
+                        if (! BIO_should_retry(io))
+                            goto write_error;
+                        else
+                            {
+                            BIO_printf(io, "rewrite W BLOCK\n");
+                            }
+                        }
+                    else
+                        {
+                        j+=k;
+                        }
+                    }
+
+	write_error:
+	            BIO_free(file);
+    	        break;
+                }
+	
+
+	/*--END--*/ 
     if((r=BIO_flush(io))<0)
       err_exit("Error flushing BIO");
 
