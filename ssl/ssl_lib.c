@@ -968,6 +968,20 @@ int SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies,
     ssl->proxies_len = proxies_len;
     return(SSL_connect(ssl));
 }
+int SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *)) {
+    /* NOT IMPLEMENTED YET!!! */
+    return -1;
+}
+int SPP_get_slices(SSL *ssl, SPP_SLICE **slices, int *slices_len) {
+    *slices = ssl->slices;
+    *slices_len = ssl->slices_len;
+    return 1;
+}
+int SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len){
+    *proxies = ssl->proxies;
+    *proxies_len = ssl->proxies_len;
+    return 1;
+}
 SPP_PROXY* SPP_generate_proxy(SSL *s, char* address) {
     SPP_PROXY *prxy;
     prxy = (SPP_PROXY*)malloc(sizeof(SPP_PROXY));

@@ -1150,8 +1150,10 @@ struct spp_slice_st
          * included in each record header on the wire. */
         int slice_id;
         char *purpose;
-        unsigned char read_mat[EVP_MAX_KEY_LENGTH];
-        unsigned char write_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char client_read_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char server_read_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char client_write_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char server_write_mat[EVP_MAX_KEY_LENGTH];
         };
         
 struct spp_proxy_st 
@@ -1175,7 +1177,7 @@ struct spp_read_st
         unsigned char *read_mac;
         unsigned char *write_mac;
         size_t mac_length;
-        };
+        };       
 
 struct ssl_st
 	{
@@ -1459,7 +1461,13 @@ struct ssl_st
         /* Identifier of this proxy, 1 if client, 2 if server */
         int proxy_id;
         int proxy;      /* are we a proxy? */
-        int proxies_complete;
+        
+        struct
+            {
+            SPP_PROXY *current_proxy;
+            int done;
+            int proxies_complete;
+            } spp_handshake;
 	};
 
 #endif
@@ -1951,6 +1959,9 @@ void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
 int     SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies, int proxies_len);
+int     SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *));
+int     SPP_get_slices(SSL *ssl, SPP_SLICE **slices, int *slices_len);
+int     SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len);
 SPP_PROXY* SPP_generate_proxy(SSL *s, char* address);
 SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose);
 SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id);
