@@ -87,6 +87,9 @@
 #define EVP_MAX_IV_LENGTH		16
 #define EVP_MAX_BLOCK_LENGTH		32
 
+#define MAX_SPP_SLICES                  16
+#define MAX_SPP_PROXIES                 16
+
 #define PKCS5_SALT_LEN			8
 /* Default PKCS#5 iteration count */
 #define PKCS5_DEFAULT_ITER		2048

@@ -386,10 +386,7 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
         /* Write the SPP proxy list extension to a client hello */
         if (s->proxies != NULL && s->slices != NULL) {
             unsigned char *len_pt;
-            SPP_SLICE *cslice;
-            SPP_PROXY *cproxy;
             int i,char_len,n;
-            int *cid;
             
             s2n(TLSEXT_TYPE_proxy_list, ret);
             len_pt = ret; /* Save the position to write the length of the ext. */
@@ -397,43 +394,33 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
                        
             /* Write all of the slice IDs. */
             *(ret++)=s->slices_len&0xff;
-            cslice = s->slices;
             for (i = 0; i < s->slices_len; i++) {
-                *(ret++)=cslice->slice_id&0xff;
+                *(ret++)=s->slices[i]->slice_id&0xff;
                 
-                char_len=strlen(cslice->purpose);
+                char_len=strlen(s->slices[i]->purpose);
                 *(ret++)=char_len&0xff;
-                memcpy(ret, cslice->purpose, char_len);
+                memcpy(ret, s->slices[i]->purpose, char_len);
                 ret+=char_len;
-                
-                cslice++;
             }
             /* Now write all of the proxies. */
             *(ret++)=s->proxies_len&0xff;
-            cproxy = s->proxies;
             for (i = 0; i < s->proxies_len; i++) {
-                char_len=strlen(cproxy->address);
+                char_len=strlen(s->proxies[i]->address);
                 *(ret++)=char_len&0xff;
-                memcpy(ret, cproxy->address, char_len);
+                memcpy(ret, s->proxies[i]->address, char_len);
                 ret+=char_len;
                 
-                *(ret++)=cproxy->proxy_id&0xff;
+                *(ret++)=s->proxies[i]->proxy_id&0xff;
                 
-                *(ret++)=cproxy->read_slice_ids_len&0xff;                
-                cid = cproxy->read_slice_ids;
-                for (n = 0; n < cproxy->read_slice_ids_len; n++) {
-                    *(ret++)=(*cid)&0xff;
-                    cid++;
+                *(ret++)=s->proxies[i]->read_slice_ids_len&0xff;                
+                for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
+                    *(ret++)=(s->proxies[i]->read_slice_ids[n])&0xff;
                 }
                 
-                *(ret++)=cproxy->write_slice_ids_len&0xff;                
-                cid = cproxy->write_slice_ids;
-                for (n = 0; n < cproxy->write_slice_ids_len; n++) {
-                    *(ret++)=(*cid)&0xff;
-                    cid++;
+                *(ret++)=s->proxies[i]->write_slice_ids_len&0xff;                
+                for (n = 0; n < s->proxies[i]->write_slice_ids_len; n++) {
+                    *(ret++)=(s->proxies[i]->write_slice_ids[n])&0xff;
                 }
-                
-                cproxy++;
             }
             
             /* Now go back and fill in length */
@@ -1113,8 +1100,39 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
    - On session reconnect, the servername extension may be absent. 
 
 */      
-
-		if (type == TLSEXT_TYPE_server_name)
+                if (type == TLSEXT_TYPE_proxy_list) {
+                    int i,char_len,n;
+                    
+                    /* Read the slice IDs */
+                    s->slices_len = (unsigned int)data++;
+                    for (i = 0; i < s->slices_len; i++) {
+                        s->slices[i] = (SPP_SLICE *)malloc(sizeof(SPP_SLICE));
+                        s->slices[i]->slice_id = (unsigned int)data++;
+                        char_len = (unsigned int)data++;
+                        s->slices[i]->purpose = (char *)malloc(char_len);
+                        memcpy(s->slices[i]->purpose, data, char_len);
+                        data += char_len;
+                    }
+                    s->proxies_len = (unsigned int)data++;
+                    for (i = 0; i < s->proxies_len; i++) {
+                        s->proxies[i] = (SPP_PROXY *)malloc(sizeof(SPP_PROXY));
+                        s->proxies[i]->proxy_id = (unsigned int)data++;
+                        
+                        char_len = (unsigned int)data++;
+                        s->proxies[i]->address = (char *)malloc(char_len);
+                        memcpy(s->proxies[i]->address, data, char_len);
+                        data += char_len;
+                        
+                        s->proxies[i]->read_slice_ids_len = (unsigned int)data++;
+                        for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
+                            s->proxies[i]->read_slice_ids[n] = (unsigned int)data++;
+                        }
+                        s->proxies[i]->write_slice_ids_len = (unsigned int)data++;
+                        for (n = 0; n < s->proxies[i]->write_slice_ids_len; n++) {
+                            s->proxies[i]->write_slice_ids[n] = (unsigned int)data++;
+                        }
+                    }            
+                } else if (type == TLSEXT_TYPE_server_name)
 			{
 			unsigned char *sdata;
 			int servname_type;

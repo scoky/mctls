@@ -16,6 +16,7 @@ static int spp_get_record(SSL *s) {
     SSL3_RECORD *rr;
     SSL_SESSION *sess;
     SPP_SLICE *slice;
+    SPP_CTX ctx_tmp;
     SPP_CTX *spp_ctx;
     unsigned char *p;
     unsigned char md[EVP_MAX_MD_SIZE];
@@ -148,10 +149,9 @@ printf("dec %d\n",rr->length);
 printf("\n");
 #endif
     
-    if (s->proxy) {
+    if (s->proxy == 1) {
         spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
-    } else {
-        SPP_CTX ctx_tmp;
+    } else {        
         spp_ctx = &(ctx_tmp);
     }
     s->spp_read_ctx = spp_ctx;

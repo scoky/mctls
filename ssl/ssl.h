@@ -1160,9 +1160,9 @@ struct spp_proxy_st
         {
         int proxy_id;    
         char *address;
-        int *read_slice_ids;
+        int read_slice_ids[MAX_SPP_SLICES];
         size_t read_slice_ids_len;
-        int *write_slice_ids;
+        int write_slice_ids[MAX_SPP_SLICES];
         size_t write_slice_ids_len;
         
         struct sess_cert_st /* SESS_CERT */ *sess_cert;
@@ -1438,7 +1438,7 @@ struct ssl_st
         SPP_SLICE *write_slice;
         SPP_SLICE *read_slice;
         /* Slices defined for this session. */
-        SPP_SLICE *slices;
+        SPP_SLICE* slices[MAX_SPP_SLICES];
         /* Number of slices defined. */
         size_t slices_len;        
         
@@ -1447,12 +1447,14 @@ struct ssl_st
         SPP_CTX *spp_read_ctx;
         
         /* State for each proxy for reading MACs from any of them. */
-        SPP_PROXY *proxies;
+        SPP_PROXY* proxies[MAX_SPP_PROXIES];
         size_t proxies_len;
         
         /* Context for the end-to-end integrity MAC */
         SPP_MAC *read_i_hash;
         SPP_MAC *write_i_hash;
+        EVP_CIPHER_CTX *read_i_ctx;
+        EVP_CIPHER_CTX *write_i_ctx;
         
         /* Generator variables */
         int _proxy_id;
@@ -1466,7 +1468,6 @@ struct ssl_st
             {
             SPP_PROXY *current_proxy;
             int done;
-            int proxies_complete;
             } spp_handshake;
 	};
 
@@ -1958,7 +1959,7 @@ char *SSL_get_srp_userinfo(SSL *s);
 void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
-int     SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies, int proxies_len);
+int     SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY* proxies[], int proxies_len);
 int     SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *));
 int     SPP_get_slices(SSL *ssl, SPP_SLICE **slices, int *slices_len);
 int     SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len);
@@ -1966,8 +1967,8 @@ SPP_PROXY* SPP_generate_proxy(SSL *s, char* address);
 SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose);
 SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id);
 SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id);
-int     SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices, int slices_len);
-int     SPP_assign_proxy_read_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices, int slices_len);
+int     SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices[], int slices_len);
+int     SPP_assign_proxy_read_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices[], int slices_len);
 int 	SSL_read(SSL *ssl,void *buf,int num);
 int 	SPP_read_record(SSL *ssl,void *buf,int num,SPP_SLICE **slice,SPP_CTX **ctx);
 int 	SSL_peek(SSL *ssl,void *buf,int num);

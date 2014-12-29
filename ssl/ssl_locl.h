@@ -1082,9 +1082,9 @@ int ssl3_get_next_proto(SSL *s);
 #endif
 
 /* SPP handshake functions */
-int spp_get_proxy_certificate(SSL *s);
-int spp_get_proxy_done(SSL *s);
-int spp_get_proxy_key_exchange(SSL *s);
+int spp_get_proxy_certificate(SSL *s, SPP_PROXY* proxy);
+int spp_get_proxy_key_exchange(SSL *s, SPP_PROXY* proxy);
+int spp_get_proxy_done(SSL *s, SPP_PROXY* proxy);
 int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy);
 int spp_send_end_key_material(SSL *s);
 int spp_get_proxy_key_material(SSL *s, SPP_PROXY* proxy);
