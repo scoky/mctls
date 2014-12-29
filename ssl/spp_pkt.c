@@ -148,7 +148,12 @@ printf("dec %d\n",rr->length);
 printf("\n");
 #endif
     
-    spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
+    if (s->proxy) {
+        spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
+    } else {
+        SPP_CTX ctx_tmp;
+        spp_ctx = &(ctx_tmp);
+    }
     s->spp_read_ctx = spp_ctx;
     /* r->length is now the compressed data plus mac */
     /* We can read this record */
@@ -157,14 +162,14 @@ printf("\n");
         (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
             unsigned char *mac = NULL;
-            unsigned char mac_tmp[EVP_MAX_MD_SIZE];
+            unsigned char mac_tmp[EVP_MAX_MD_SIZE*3];
             
             spp_copy_mac_state(s, slice->read_mac, 0);
             mac_size=EVP_MD_CTX_size(s->read_hash);
-            spp_ctx->mac_length = mac_size;
+            spp_ctx->mac_length = mac_size;                        
+            OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
             /* Going to fetch all three MACs at once */
             mac_size = mac_size*3;
-            OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
                     
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
@@ -190,7 +195,7 @@ printf("\n");
                  * without leaking the contents of the padding bytes.
                  * */
                 mac = mac_tmp;
-                ssl3_cbc_copy_mac(mac_tmp, rr, mac_size, orig_len);
+                spp_cbc_copy_mac(mac_tmp, rr, mac_size, orig_len);
                 rr->length -= mac_size;
             } else {
                 /* In this case there's no padding, so |orig_len|
@@ -201,13 +206,18 @@ printf("\n");
             }
             /* Save the locations of the MACs into context. */
             /* We are creating a copy here that must be freed when writing the record out again. */
-            spp_ctx->read_mac = (unsigned char*)malloc(mac_size);
-            memcpy(spp_ctx->read_mac, mac, mac_size);
-            spp_ctx->write_mac = &(spp_ctx->read_mac[spp_ctx->mac_length]);
-            spp_ctx->integrity_mac = &(spp_ctx->write_mac[spp_ctx->mac_length]);
+            if (s->proxy == 1) {
+                spp_ctx->read_mac = (unsigned char*)malloc(mac_size);
+                memcpy(spp_ctx->read_mac, mac, mac_size);
+            } else {
+                spp_ctx->read_mac = mac;
+            }            
+            mac_size = spp_ctx->mac_length;
+            spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
+            spp_ctx->integrity_mac = &(spp_ctx->write_mac[mac_size]);
 
             /* Compute the read mac, the only one we must be able to verify. */
-            mac_size = spp_ctx->mac_length;
+            
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                 enc_err = -1;

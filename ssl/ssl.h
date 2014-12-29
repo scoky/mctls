@@ -1150,10 +1150,10 @@ struct spp_slice_st
          * included in each record header on the wire. */
         int slice_id;
         char *purpose;
-        unsigned char client_read_mat[EVP_MAX_KEY_LENGTH];
-        unsigned char server_read_mat[EVP_MAX_KEY_LENGTH];
-        unsigned char client_write_mat[EVP_MAX_KEY_LENGTH];
-        unsigned char server_write_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char read_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char other_read_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char write_mat[EVP_MAX_KEY_LENGTH];
+        unsigned char other_write_mat[EVP_MAX_KEY_LENGTH];
         };
         
 struct spp_proxy_st 

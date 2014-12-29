@@ -1086,10 +1086,11 @@ int spp_get_proxy_certificate(SSL *s);
 int spp_get_proxy_done(SSL *s);
 int spp_get_proxy_key_exchange(SSL *s);
 int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy);
-int spp_send_server_key_material(SSL *s);
-int spp_get_proxy_key_material(SSL *s);
+int spp_send_end_key_material(SSL *s);
+int spp_get_proxy_key_material(SSL *s, SPP_PROXY* proxy);
+int spp_get_end_key_material(SSL *s);
 int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send);
-int spp_generate_slice_keys(SSL *s, int client);
+int spp_generate_slice_keys(SSL *s);
 SPP_PROXY* spp_get_next_proxy(SSL *s, int forward);
 
 int dtls1_send_hello_request(SSL *s);
@@ -1219,6 +1220,9 @@ int ssl_parse_serverhello_use_srtp_ext(SSL *s, unsigned char *d, int len,int *al
 
 /* s3_cbc.c */
 void ssl3_cbc_copy_mac(unsigned char* out,
+		       const SSL3_RECORD *rec,
+		       unsigned md_size,unsigned orig_len);
+void spp_cbc_copy_mac(unsigned char* out,
 		       const SSL3_RECORD *rec,
 		       unsigned md_size,unsigned orig_len);
 int ssl3_cbc_remove_padding(const SSL* s,

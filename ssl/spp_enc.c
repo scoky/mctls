@@ -20,7 +20,7 @@ int spp_enc(SSL *s, int send) {
         slice = s->read_slice;
     }
     // Error if a slice has not been specified for this encrypt/decrypt op
-    if (!slice) {
+    if (slice == NULL) {
         SSLerr(SSL_F_SPP_ENC,SPP_R_MISSING_SLICE);
         return -1;
     }
