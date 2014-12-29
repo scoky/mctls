@@ -1,10 +1,10 @@
-// A simple https server
+// A simple https server orginally provided by Ilias
 
 #include "common.h"
-
 #define KEYFILE "server.pem"
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
+#include <openssl/e_os2.h>
 
 
 int tcp_listen()
@@ -12,7 +12,8 @@ int tcp_listen()
     int sock;
     struct sockaddr_in sin;
     int val=1;
-    
+
+
     if((sock=socket(AF_INET,SOCK_STREAM,0))<0)
       err_exit("Couldn't make socket");
     
@@ -106,7 +107,7 @@ static int http_serve(ssl,s)
   	/* Attempt to send file index.html*/
 	BIO *file;
 	static int bufsize = BUFSIZZ;
-	int total_bytes; 
+	int total_bytes = 0; 
 	int j = 0; 
 	/* Commenting since already allocated above */
 	/*
@@ -215,7 +216,9 @@ int main(argc,argv)
     SSL *ssl;
     int r;
     pid_t pid;
-    
+	SPP_PROXY *tempProxy; 
+
+	
     /* Build our SSL context*/
     ctx=initialize_ctx(KEYFILE,PASSWORD);
     load_dh_params(ctx,DHFILE);
@@ -232,8 +235,12 @@ int main(argc,argv)
       else {
         sbio=BIO_new_socket(s,BIO_NOCLOSE);
         ssl=SSL_new(ctx);
-        SSL_set_bio(ssl,sbio,sbio);
-        
+	    SSL_set_bio(ssl,sbio,sbio);
+       	/* temp stuff*/
+		tempProxy = SPP_generate_proxy(ssl, "192.168.1.1"); 
+		printf("Proxy address is: %s\n", tempProxy->address); 
+		//
+ 
         if((r=SSL_accept(ssl)<=0))
           berr_exit("SSL accept error");
         
