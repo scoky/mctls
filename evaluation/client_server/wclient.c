@@ -17,8 +17,9 @@ int tcp_connect(host,port)
     struct sockaddr_in addr;
     int sock;
     
-    if(!(hp=gethostbyname(host)))
-      berr_exit("Couldn't resolve host");
+	if(!(hp=gethostbyname(host))){
+		berr_exit("Couldn't resolve host");
+	}
     memset(&addr,0,sizeof(addr));
     addr.sin_addr=*(struct in_addr*)
       hp->h_addr_list[0];

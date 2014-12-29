@@ -1,6 +1,4 @@
 #include "common.h"
-#include <openssl/err.h>
-
 
 BIO *bio_err=0;
 static char *pass;

@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define CA_LIST "root.pem"
 #define HOST	"localhost"
