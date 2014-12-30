@@ -393,33 +393,33 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
             ret += 2; /* Then skip it */
                        
             /* Write all of the slice IDs. */
-            *(ret++)=s->slices_len&0xff;
+            s1n(s->slices_len, ret);
             for (i = 0; i < s->slices_len; i++) {
-                *(ret++)=s->slices[i]->slice_id&0xff;
+                s1n(s->slices[i]->slice_id, ret);
                 
                 char_len=strlen(s->slices[i]->purpose);
-                *(ret++)=char_len&0xff;
+                s1n(char_len, ret);
                 memcpy(ret, s->slices[i]->purpose, char_len);
                 ret+=char_len;
             }
             /* Now write all of the proxies. */
-            *(ret++)=s->proxies_len&0xff;
+            s1n(s->proxies_len, ret);
             for (i = 0; i < s->proxies_len; i++) {
                 char_len=strlen(s->proxies[i]->address);
-                *(ret++)=char_len&0xff;
+                s1n(char_len, ret);
                 memcpy(ret, s->proxies[i]->address, char_len);
                 ret+=char_len;
                 
-                *(ret++)=s->proxies[i]->proxy_id&0xff;
+                s1n(s->proxies[i]->proxy_id, ret);
                 
-                *(ret++)=s->proxies[i]->read_slice_ids_len&0xff;                
+                s1n(s->proxies[i]->read_slice_ids_len, ret);
                 for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
-                    *(ret++)=(s->proxies[i]->read_slice_ids[n])&0xff;
+                    s1n(s->proxies[i]->read_slice_ids[n], ret);
                 }
                 
-                *(ret++)=s->proxies[i]->write_slice_ids_len&0xff;                
+                s1n(s->proxies[i]->write_slice_ids_len, ret);
                 for (n = 0; n < s->proxies[i]->write_slice_ids_len; n++) {
-                    *(ret++)=(s->proxies[i]->write_slice_ids[n])&0xff;
+                    s1n(s->proxies[i]->write_slice_ids[n], ret);
                 }
             }
             
@@ -1104,32 +1104,33 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                     int i,char_len,n;
                     
                     /* Read the slice IDs */
-                    s->slices_len = (unsigned int)data++;
+                    n1s(data, s->slices_len);
                     for (i = 0; i < s->slices_len; i++) {
                         s->slices[i] = (SPP_SLICE *)malloc(sizeof(SPP_SLICE));
-                        s->slices[i]->slice_id = (unsigned int)data++;
-                        char_len = (unsigned int)data++;
+                        n1s(data, s->slices[i]->slice_id);
+                        
+                        n1s(data, char_len);
                         s->slices[i]->purpose = (char *)malloc(char_len);
                         memcpy(s->slices[i]->purpose, data, char_len);
                         data += char_len;
                     }
-                    s->proxies_len = (unsigned int)data++;
+                    n1s(data, s->proxies_len);
                     for (i = 0; i < s->proxies_len; i++) {
                         s->proxies[i] = (SPP_PROXY *)malloc(sizeof(SPP_PROXY));
-                        s->proxies[i]->proxy_id = (unsigned int)data++;
+                        n1s(data, s->proxies[i]->proxy_id);
                         
-                        char_len = (unsigned int)data++;
+                        n1s(data, char_len);
                         s->proxies[i]->address = (char *)malloc(char_len);
                         memcpy(s->proxies[i]->address, data, char_len);
                         data += char_len;
                         
-                        s->proxies[i]->read_slice_ids_len = (unsigned int)data++;
+                        n1s(data, s->proxies[i]->read_slice_ids_len);
                         for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
-                            s->proxies[i]->read_slice_ids[n] = (unsigned int)data++;
+                            n1s(data, s->proxies[i]->read_slice_ids[n]);
                         }
-                        s->proxies[i]->write_slice_ids_len = (unsigned int)data++;
+                        n1s(data, s->proxies[i]->write_slice_ids_len);
                         for (n = 0; n < s->proxies[i]->write_slice_ids_len; n++) {
-                            s->proxies[i]->write_slice_ids[n] = (unsigned int)data++;
+                            n1s(data, s->proxies[i]->write_slice_ids[n]);
                         }
                     }            
                 } else if (type == TLSEXT_TYPE_server_name)

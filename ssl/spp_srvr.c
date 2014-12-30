@@ -374,18 +374,18 @@ int spp_accept(SSL *s) 	{
                         ret=ssl3_get_client_certificate(s);
                         if (ret <= 0) goto end;
                     }
+                    proxy = spp_get_next_proxy(s, 1);
+                    if (proxy == NULL) {
+                        s->state=SSL3_ST_CW_KEY_EXCH_A;
+                    } else {
+                        s->state=SPP_ST_CR_PRXY_CERT_A;
+                    }
                     s->init_num=0;
-                    s->state=SPP_ST_CR_PRXY_CERT_A;
                 }
                 break;
-
+                
             case SPP_ST_CR_PRXY_CERT_A:
             case SPP_ST_CR_PRXY_CERT_B:
-                proxy = spp_get_next_proxy(s, 1);
-                if (proxy = NULL) {
-                    s->state=SSL3_ST_SR_KEY_EXCH_A;
-                    s->init_num=0;
-                }
                 ret=spp_get_proxy_certificate(s, proxy);
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
@@ -405,9 +405,14 @@ int spp_accept(SSL *s) 	{
             case SPP_ST_CR_PRXY_DONE_B:
                 ret=spp_get_proxy_done(s, proxy);
                 if (ret <= 0) goto end;
-                
-                /* Go back and read the next proxy */
-                s->state=SPP_ST_CR_PRXY_CERT_A;
+                                
+                proxy = spp_get_next_proxy(s, 1);
+                if (proxy == NULL) {
+                    s->state=SSL3_ST_SR_KEY_EXCH_A;
+                } else {
+                    /* Go back and read the next proxy */
+                    s->state=SPP_ST_CR_PRXY_CERT_A;
+                }
                 s->init_num=0;                
                 break;
                 

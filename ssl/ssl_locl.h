@@ -246,6 +246,9 @@
 				} \
 			}
 
+#define n1s(c,s)        (s=((unsigned int)(c[0])),c+=1)
+#define s1n(s,c)        (c[0]=((unsigned char)((s)        &0xff)),c+=1)
+
 #define n2s(c,s)	((s=(((unsigned int)(c[0]))<< 8)| \
 			    (((unsigned int)(c[1]))    )),c+=2)
 #define s2n(s,c)	((c[0]=(unsigned char)(((s)>> 8)&0xff), \
