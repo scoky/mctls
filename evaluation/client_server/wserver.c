@@ -216,8 +216,6 @@ int main(argc,argv)
     SSL *ssl;
     int r;
     pid_t pid;
-	SPP_PROXY *tempProxy; 
-
 	
     /* Build our SSL context*/
     ctx=initialize_ctx(KEYFILE,PASSWORD);
@@ -236,10 +234,6 @@ int main(argc,argv)
         sbio=BIO_new_socket(s,BIO_NOCLOSE);
         ssl=SSL_new(ctx);
 	    SSL_set_bio(ssl,sbio,sbio);
-       	/* temp stuff*/
-		tempProxy = SPP_generate_proxy(ssl, "192.168.1.1"); 
-		printf("Proxy address is: %s\n", tempProxy->address); 
-		//
  
         if((r=SSL_accept(ssl)<=0))
           berr_exit("SSL accept error");
