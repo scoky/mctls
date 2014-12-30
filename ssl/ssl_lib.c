@@ -380,9 +380,7 @@ SSL *SSL_new(SSL_CTX *ctx)
 	s->psk_server_callback=ctx->psk_server_callback;
 #endif
         
-        s->proxies = NULL;
         s->proxies_len = 0;
-        s->slices = NULL;
         s->slices_len = 0;
         s->write_i_hash = NULL;
         s->read_i_hash = NULL;
@@ -961,11 +959,16 @@ int SSL_connect(SSL *s)
 
 	return(s->method->ssl_connect(s));
 	}
-int SPP_connect(SSL *ssl, SPP_SLICE* slices, int slices_len, SPP_PROXY *proxies, int proxies_len) {
-    ssl->slices = slices;
+int SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY *proxies[], int proxies_len) {
+    int i;    
     ssl->slices_len = slices_len;
-    ssl->proxies = proxies;
+    for (i = 0; i < slices_len; i++) {
+        ssl->slices[i] = slices[i];
+    }    
     ssl->proxies_len = proxies_len;
+    for (i = 0; i < proxies_len; i++) {
+        ssl->proxies[i] = proxies[i];
+    }
     return(SSL_connect(ssl));
 }
 int SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *)) {
@@ -988,9 +991,7 @@ SPP_PROXY* SPP_generate_proxy(SSL *s, char* address) {
     prxy->address = address;
     prxy->proxy_id = (s->_proxy_id++);
     prxy->session = NULL;
-    prxy->read_slice_ids = NULL;
     prxy->read_slice_ids_len = 0;
-    prxy->write_slice_ids = NULL;
     prxy->write_slice_ids_len = 0;
     prxy->done = 0;
     return prxy;
@@ -1010,41 +1011,35 @@ SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {
 }
 SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id) {
     int i;
-    SPP_SLICE* cslice = s->slices;
     for (i = 0; i < s->slices_len; i++) {
-        if (cslice[i].slice_id == id) {
-            return cslice;
+        if (s->slices[i]->slice_id == id) {
+            return s->slices[i];
         }
     }
     return NULL;    
 }
 SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id) {
     int i;
-    SPP_PROXY* cprxy = s->proxies;
     for (i = 0; i < s->proxies_len; i++) {
-        if (cprxy[i].proxy_id == id) {
-            return cprxy;
+        if (s->proxies[i]->proxy_id == id) {
+            return s->proxies[i];
         }
     }
     return NULL;
 }
-int SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices, int slices_len) {
+int SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE *slices[], int slices_len) {
     int i;
-    SPP_SLICE* cslice = slices;
-    proxy->write_slice_ids = (int*)malloc(sizeof(int)*slices_len);
     proxy->write_slice_ids_len = slices_len;
     for (i = 0; i < slices_len; i++) {
-        proxy->write_slice_ids[i] = cslice->slice_id;
+        proxy->write_slice_ids[i] = slices[i]->slice_id;
     }
     return 1;
 }
-int SPP_assign_proxy_read_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE* slices, int slices_len) {
+int SPP_assign_proxy_read_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE *slices[], int slices_len) {
     int i;
-    SPP_SLICE* cslice = slices;
-    proxy->read_slice_ids = (int*)malloc(sizeof(int)*slices_len);
     proxy->read_slice_ids_len = slices_len;
     for (i = 0; i < slices_len; i++) {
-        proxy->read_slice_ids[i] = cslice->slice_id;
+        proxy->read_slice_ids[i] = slices[i]->slice_id;
     }
     return 1;
 }
