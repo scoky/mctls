@@ -24,7 +24,7 @@ int spp_accept(SSL *s) 	{
     SPP_PROXY *proxy;
     unsigned long alg_k,Time=(unsigned long)time(NULL);
     void (*cb)(const SSL *ssl,int type,int val)=NULL;
-    int ret= -1;
+    int ret= -1,i;
     int new_state,state,skip=0;
 
     RAND_add(&Time,sizeof(Time),0);
@@ -376,7 +376,7 @@ int spp_accept(SSL *s) 	{
                     }
                     proxy = spp_get_next_proxy(s, 1);
                     if (proxy == NULL) {
-                        s->state=SSL3_ST_CW_KEY_EXCH_A;
+                        s->state=SSL3_ST_SR_KEY_EXCH_A;
                     } else {
                         s->state=SPP_ST_CR_PRXY_CERT_A;
                     }
@@ -418,82 +418,113 @@ int spp_accept(SSL *s) 	{
                 
             case SSL3_ST_SR_KEY_EXCH_A:
             case SSL3_ST_SR_KEY_EXCH_B:
-			ret=ssl3_get_client_key_exchange(s);
-			if (ret <= 0)
-				goto end;
-			if (ret == 2)
-				{
-				/* For the ECDH ciphersuites when
-				 * the client sends its ECDH pub key in
-				 * a certificate, the CertificateVerify
-				 * message is not sent.
-				 * Also for GOST ciphersuites when
-				 * the client uses its key from the certificate
-				 * for key exchange.
-				 */
+                ret=ssl3_get_client_key_exchange(s);
+                if (ret <= 0)
+                    goto end;
+                if (ret == 2)
+                    {
+                    /* For the ECDH ciphersuites when
+                     * the client sends its ECDH pub key in
+                     * a certificate, the CertificateVerify
+                     * message is not sent.
+                     * Also for GOST ciphersuites when
+                     * the client uses its key from the certificate
+                     * for key exchange.
+                     */
+                    s->state = SPP_ST_CW_PRXY_MAT_A;
+                    s->init_num = 0;
+                    }
+                else if (TLS1_get_version(s) >= TLS1_2_VERSION)
+                    {
+                    s->state=SPP_ST_CW_PRXY_MAT_A;
+                    s->init_num=0;
+                    if (!s->session->peer)
+                            break;
+                    /* For TLS v1.2 freeze the handshake buffer
+                     * at this point and digest cached records.
+                     */
+                    if (!s->s3->handshake_buffer)
+                            {
+                            SSLerr(SSL_F_SSL3_ACCEPT,ERR_R_INTERNAL_ERROR);
+                            return -1;
+                            }
+                    s->s3->flags |= TLS1_FLAGS_KEEP_HANDSHAKE;
+                    if (!ssl3_digest_cached_records(s))
+                            return -1;
+                    }
+                else
+                    {
+                    int offset=0;
+                    int dgst_num;
+
+                    s->state=SPP_ST_CW_PRXY_MAT_A;
+                    s->init_num=0;
+
+                    /* We need to get hashes here so if there is
+                     * a client cert, it can be verified
+                     * FIXME - digest processing for CertificateVerify
+                     * should be generalized. But it is next step
+                     */
+                    if (s->s3->handshake_buffer)
+                            if (!ssl3_digest_cached_records(s))
+                                    return -1;
+                    for (dgst_num=0; dgst_num<SSL_MAX_DIGEST;dgst_num++)	
+                            if (s->s3->handshake_dgst[dgst_num]) 
+                                    {
+                                    int dgst_size;
+
+                                    s->method->ssl3_enc->cert_verify_mac(s,EVP_MD_CTX_type(s->s3->handshake_dgst[dgst_num]),&(s->s3->tmp.cert_verify_md[offset]));
+                                    dgst_size=EVP_MD_CTX_size(s->s3->handshake_dgst[dgst_num]);
+                                    if (dgst_size < 0)
+                                            {
+                                            ret = -1;
+                                            goto end;
+                                            }
+                                    offset+=dgst_size;
+                                    }		
+                    }
+                break;
+                        
+            /* Send the proxy key material. */
+            case SPP_ST_CW_PRXY_MAT_A:
+            case SPP_ST_CW_PRXY_MAT_B:
+                for (i = 0; i < s->proxies_len; i++) {
+                    ret=spp_send_proxy_key_material(s, s->proxies[i]);
+                    if (ret <= 0) goto end;
+                    s->state = SPP_ST_CW_PRXY_MAT_A;
+                }
+                ret=spp_send_end_key_material(s);
+                
+                s->state=SPP_ST_CR_PRXY_MAT_A;
+                s->s3->change_cipher_spec=0;
+
+                s->init_num=0;
+                break;
+                
+            case SPP_ST_CR_PRXY_MAT_A:
+            case SPP_ST_CR_PRXY_MAT_B:
+                for (i = s->proxies_len-1; i >= 0; i--) {
+                    ret=spp_get_proxy_key_material(s, s->proxies[i]);
+                    if (ret <= 0) goto end;
+                    s->state = SPP_ST_CR_PRXY_MAT_A;
+                }
+                ret=spp_get_end_key_material(s);
+                if (ret <= 0) goto end;
 #if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
-				s->state=SSL3_ST_SR_FINISHED_A;
+                s->state=SSL3_ST_SR_FINISHED_A;
 #else
-				if (s->s3->next_proto_neg_seen)
-					s->state=SSL3_ST_SR_NEXT_PROTO_A;
-				else
-					s->state=SSL3_ST_SR_FINISHED_A;
+                if (s->s3->next_proto_neg_seen)
+                    s->state=SSL3_ST_SR_NEXT_PROTO_A;
+                else
+                    s->state=SSL3_ST_SR_FINISHED_A;
 #endif
-				s->init_num = 0;
-				}
-			else if (TLS1_get_version(s) >= TLS1_2_VERSION)
-				{
-				s->state=SSL3_ST_SR_CERT_VRFY_A;
-				s->init_num=0;
-				if (!s->session->peer)
-					break;
-				/* For TLS v1.2 freeze the handshake buffer
-				 * at this point and digest cached records.
-				 */
-				if (!s->s3->handshake_buffer)
-					{
-					SSLerr(SSL_F_SSL3_ACCEPT,ERR_R_INTERNAL_ERROR);
-					return -1;
-					}
-				s->s3->flags |= TLS1_FLAGS_KEEP_HANDSHAKE;
-				if (!ssl3_digest_cached_records(s))
-					return -1;
-				}
-			else
-				{
-				int offset=0;
-				int dgst_num;
+                //s->s3->change_cipher_spec=0;
 
-				s->state=SSL3_ST_SR_CERT_VRFY_A;
-				s->init_num=0;
+                s->init_num=0;
+                break;
 
-				/* We need to get hashes here so if there is
-				 * a client cert, it can be verified
-				 * FIXME - digest processing for CertificateVerify
-				 * should be generalized. But it is next step
-				 */
-				if (s->s3->handshake_buffer)
-					if (!ssl3_digest_cached_records(s))
-						return -1;
-				for (dgst_num=0; dgst_num<SSL_MAX_DIGEST;dgst_num++)	
-					if (s->s3->handshake_dgst[dgst_num]) 
-						{
-						int dgst_size;
-
-						s->method->ssl3_enc->cert_verify_mac(s,EVP_MD_CTX_type(s->s3->handshake_dgst[dgst_num]),&(s->s3->tmp.cert_verify_md[offset]));
-						dgst_size=EVP_MD_CTX_size(s->s3->handshake_dgst[dgst_num]);
-						if (dgst_size < 0)
-							{
-							ret = -1;
-							goto end;
-							}
-						offset+=dgst_size;
-						}		
-				}
-			break;
-
-		case SSL3_ST_SR_CERT_VRFY_A:
-		case SSL3_ST_SR_CERT_VRFY_B:
+            case SSL3_ST_SR_CERT_VRFY_A:
+            case SSL3_ST_SR_CERT_VRFY_B:
 
 			s->s3->flags |= SSL3_FLAGS_CCS_OK;
 			/* we should decide if we expected this one */
