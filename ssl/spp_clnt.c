@@ -357,6 +357,10 @@ int spp_connect(SSL *s) {
                 else
                     s->state=SSL_ST_OK;
                 s->init_num=0;
+                
+                // Store the values for end-to-end integrity checking
+                if (spp_init_integrity_st(s) <= 0)
+                    goto end;
                 break;
 
             case SSL3_ST_CW_FLUSH:

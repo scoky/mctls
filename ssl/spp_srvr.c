@@ -636,6 +636,10 @@ int spp_accept(SSL *s) 	{
 			else
 				s->s3->tmp.next_state=SSL_ST_OK;
 			s->init_num=0;
+                        
+                        // Store the values for end-to-end integrity checking
+                        if (spp_init_integrity_st(s) <= 0)
+                            goto end;
 			break;
 
 		case SSL_ST_OK:

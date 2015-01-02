@@ -1451,10 +1451,10 @@ struct ssl_st
         size_t proxies_len;
         
         /* Context for the end-to-end integrity MAC */
-        SPP_MAC *read_i_hash;
-        SPP_MAC *write_i_hash;
-        EVP_CIPHER_CTX *read_i_ctx;
-        EVP_CIPHER_CTX *write_i_ctx;
+        SPP_MAC *i_mac;
+        //SPP_MAC *write_i_hash;
+        //EVP_CIPHER_CTX *read_i_ctx;
+        //EVP_CIPHER_CTX *write_i_ctx;
         
         /* Generator variables */
         int _proxy_id;

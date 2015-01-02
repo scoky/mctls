@@ -234,8 +234,8 @@ printf("\n");
                     enc_err = -1; 
             }
             /* Compare the end-to-end integrity mac to see if there have been any writes at all */
-            if (enc_err >= 0 && s->read_i_hash != NULL && EVP_MD_CTX_md(s->read_i_hash->read_hash) != NULL) {
-                spp_copy_mac_state(s, s->read_i_hash, 0);
+            if (enc_err >= 0 && s->i_mac != NULL && EVP_MD_CTX_md(s->i_mac->read_hash) != NULL) {
+                spp_copy_mac_state(s, s->i_mac, 0);
                 mac = spp_ctx->integrity_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
@@ -973,8 +973,8 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
             memcpy(spp_ctx->write_mac, &(p[wr->length + eivlen + mac_size]), mac_size);
         }
         /* Must be an end point, write the integrity hash. */
-        if (s->write_i_hash != NULL) {
-            spp_copy_mac_state(s, s->write_i_hash, 0);
+        if (s->i_mac != NULL) {
+            spp_copy_mac_state(s, s->i_mac, 0);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + (mac_size*2)]),1) < 0)
                 goto err;            
         } else {

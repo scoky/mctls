@@ -99,7 +99,8 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
             ssl_replace_hash(&slice->read_mac->write_hash,m);
             memcpy(&(slice->read_mac->write_mac_secret[0]), key, s->s3->write_mac_secret_size);
             memcpy(&(slice->read_mac->read_mac_secret[0]), key, s->s3->read_mac_secret_size);
-            
+            slice->read_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
+            slice->read_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
             slice->read_mac->read_hash = EVP_MD_CTX_create();
             slice->read_mac->write_hash = EVP_MD_CTX_create();
         }
@@ -117,14 +118,34 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
             memset(&(slice->write_mac->write_sequence[0]),0,8);
             memset(&(slice->write_mac->read_sequence[0]),0,8);
             ssl_replace_hash(&slice->write_mac->read_hash,m);
-            ssl_replace_hash(&slice->write_mac->write_hash,m);
+            ssl_replace_hash(&slice->write_mac->write_hash,m);           
             memcpy(&(slice->write_mac->write_mac_secret[0]), key, s->s3->write_mac_secret_size);
             memcpy(&(slice->write_mac->read_mac_secret[0]), key, s->s3->read_mac_secret_size);
-            
+            slice->write_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
+            slice->write_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
             slice->write_mac->read_hash = EVP_MD_CTX_create();
             slice->write_mac->write_hash = EVP_MD_CTX_create();
         }
     }
+    return 1;
+err:
+    return -1;
+}
+
+int spp_init_integrity_st(SSL *s) {
+    if (s->i_mac == NULL) {
+        if ((s->i_mac=(SPP_MAC*)malloc(sizeof(SPP_MAC)))==NULL)
+            goto err;
+        memset(&(s->i_mac->read_sequence[0]),0,8);
+        memset(&(s->i_mac->write_sequence[0]),0,8);
+        s->i_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
+        s->i_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
+        memcpy(&(s->i_mac->read_mac_secret[0]), &(s->s3->read_mac_secret[0]), s->s3->read_mac_secret_size);
+        memcpy(&(s->i_mac->write_mac_secret[0]), &(s->s3->write_mac_secret[0]), s->s3->write_mac_secret_size); 
+        s->i_mac->read_hash = s->read_hash;
+        s->i_mac->write_hash = s->write_hash;
+    }
+    
     return 1;
 err:
     return -1;

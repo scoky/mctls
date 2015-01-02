@@ -382,8 +382,7 @@ SSL *SSL_new(SSL_CTX *ctx)
         
         s->proxies_len = 0;
         s->slices_len = 0;
-        s->write_i_hash = NULL;
-        s->read_i_hash = NULL;
+        s->i_mac = NULL;
         s->spp_write_ctx = NULL;
         s->spp_read_ctx = NULL;
         s->write_slice = NULL;
