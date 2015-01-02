@@ -1110,8 +1110,9 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                         n1s(data, s->slices[i]->slice_id);
                         
                         n1s(data, char_len);
-                        s->slices[i]->purpose = (char *)malloc(char_len);
+                        s->slices[i]->purpose = (char *)malloc(char_len+1);
                         memcpy(s->slices[i]->purpose, data, char_len);
+                        s->slices[i]->purpose[char_len] = '\0';
                         data += char_len;
                     }
                     n1s(data, s->proxies_len);
@@ -1120,8 +1121,9 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                         n1s(data, s->proxies[i]->proxy_id);
                         
                         n1s(data, char_len);
-                        s->proxies[i]->address = (char *)malloc(char_len);
+                        s->proxies[i]->address = (char *)malloc(char_len+1);
                         memcpy(s->proxies[i]->address, data, char_len);
+                        s->proxies[i]->address[char_len] = '\0';
                         data += char_len;
                         
                         n1s(data, s->proxies[i]->read_slice_ids_len);
