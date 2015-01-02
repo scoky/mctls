@@ -62,68 +62,94 @@ void generate_eph_rsa_key(ctx)
     RSA_free(rsa);
   }
     
-  
-// Just added support for files 
-static int http_serve(ssl,s)
-  SSL *ssl;
-  int s;
-  {
-    char buf[BUFSIZZ];
-    int r; //len; //len seems useless...
-    BIO *io,*ssl_bio;
-    
-    io=BIO_new(BIO_f_buffer());
-    ssl_bio=BIO_new(BIO_f_ssl());
-    BIO_set_ssl(ssl_bio,ssl,BIO_CLOSE);
-    BIO_push(io,ssl_bio);
-    
-    while(1){
-      r=BIO_gets(io,buf,BUFSIZZ-1);
+// Compute the size of a file to be served
+int calculate_file_size(char *filename){ 
 
-      switch(SSL_get_error(ssl,r)){
-        case SSL_ERROR_NONE:
-          //len=r; // useless? 
-          break;
-        default:
-          berr_exit("SSL read problem");
-      }
+	FILE *fp; 	
+	int sz = 0; 
+
+	// Open file 
+ 	fp = fopen(filename,"r");
+ 
+	// Check for errors while opening file
+	if(fp == NULL){
+		printf("Error while opening file %s.\r\n", filename);
+		exit(-1);
+	}
+	
+	// Seek  to the end of the file and ask for position 
+	fseek(fp, 0L, SEEK_END);
+	sz = ftell(fp);
+	//fseek(fp, 0L, SEEK_SET);
+
+	// Close file 
+	fclose (fp);
+	
+	// Return file size  
+	return sz; 
+}
+		
+ 
+// Just added support for files 
+static int http_serve(SSL *ssl, int s){
+   
+	char buf[BUFSIZZ];
+	int r; //len; //len seems useless...
+	BIO *io,*ssl_bio;
+    
+	io = BIO_new(BIO_f_buffer());	
+	ssl_bio = BIO_new(BIO_f_ssl());
+	BIO_set_ssl(ssl_bio, ssl, BIO_CLOSE);
+	BIO_push(io, ssl_bio);
+    	
+	while(1){
+		r = BIO_gets(io,buf,BUFSIZZ-1);
+		
+		if (SSL_get_error(ssl, r) == "SSL_ERROR_NONE"){
+		} else {
+			berr_exit("SSL read problem");
+		}
+		/* [Matteo] Simplified as above 
+		switch(SSL_get_error(ssl,r)){
+			case SSL_ERROR_NONE:
+				//len=r; // useless? 
+				break; 
+			
+			default:
+				berr_exit("SSL read problem");
+		}
+		*/
 
       /* Look for the blank line that signals
          the end of the HTTP headers */
-      if(!strcmp(buf,"\r\n") ||
-        !strcmp(buf,"\n"))
-        break;
-    }
+		if(!strcmp(buf, "\r\n") || !strcmp(buf, "\n")){
+			break; 
+		}
+	}
+    
+	// Put 200 OK on the wire 
+	if((r = BIO_puts (io, "HTTP/1.0 200 OK\r\n")) <= 0){
+		err_exit("Write error");
+	}
 
-    if((r=BIO_puts
-      (io,"HTTP/1.0 200 OK\r\n"))<=0)
-      err_exit("Write error");
-    if((r=BIO_puts
-      (io,"Server: Svarvel\r\n\r\n"))<=0)
-      err_exit("Write error");
-    if((r=BIO_puts
-      (io,"Server test page\r\n"))<=0)
-      err_exit("Write error");
-  	/* Attempt to send file index.html*/
+	// Put server name on the wire 
+    if((r = BIO_puts (io,"Server: Svarvel\r\n\r\n")) <= 0){
+		err_exit("Write error");
+	}
+	
+	if((r=BIO_puts (io,"Server test page\r\n"))<=0){
+		err_exit("Write error");
+	}
+  	
+	/* Send file index.html -- TO DO, extend to a requested name*/
 	BIO *file;
 	static int bufsize = BUFSIZZ;
-	int total_bytes = 0; 
-	int j = 0; 
-	/* Commenting since already allocated above */
-	/*
-	char *buf = NULL;
-	static int bufsize = BUFSIZZ;
-	
-	// allocate buffer to send file (check if not already allocated) 
-	buf=OPENSSL_malloc(bufsize);
-	if (buf == NULL) 
-		return(0);
-	*/
+	int total_bytes = 0, j = 0, file_size = 0; 
 
-	// Code below needs to be checked first 
-	/*char *p;
-	p="index.html"; // mmmmm...*/
-	if ((file=BIO_new_file("index.html","r")) == NULL)
+	// Determine file size -- TO DO: integration with BIO stuff 
+	file_size = calculate_file_size("index.html"); 
+	
+	if ((file = BIO_new_file("index.html","r")) == NULL)
 	{                
 		BIO_puts(io, "Error opening file"); // what is text? ERROR
         //BIO_printf(io,"Error opening '%s'\r\n",p);
@@ -131,20 +157,23 @@ static int http_serve(ssl,s)
 		goto write_error;
 	}
 	/*-- START -- */
-            for (;;)
-                {
-                int i = BIO_read(file,buf,bufsize);
-                if (i <= 0)
-					break;
-                total_bytes += i;
-                fprintf(stderr,"%d\n",i);
-                if (total_bytes > 3*1024)
-                    {
-                    total_bytes = 0;
-                    fprintf(stderr,"RENEGOTIATE\n");
-                    SSL_renegotiate(ssl);	// check if this works...(con --> ssl)
-                    }
-                for (j = 0; j < i; )
+	for (;;){
+		// Read bufsize from requested file 
+		int i = BIO_read(file, buf, bufsize);
+		if (i <= 0)
+			break; 
+
+		// Keep count of bytes sent on the wire 
+		total_bytes += i;
+		//fprintf(stderr,"%d\n",i);
+		// Check if too many losses 
+		if (total_bytes > (3 * file_size)){
+			total_bytes = 0;
+			fprintf(stderr,"RENEGOTIATE\n");
+			SSL_renegotiate(ssl); 
+		}
+		
+		for (j = 0; j < i; )
                     {
 					/* Black magic START */
 					static int count = 0; 
