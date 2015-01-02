@@ -94,7 +94,9 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies, SSL *ssl){
 void print_proxy_list(SPP_PROXY **proxies, int N){
 	int i; 
 	
-	printf("Print proxy list. There are %d available proxies.\r\n", N); 
+	#ifdef DEBUG	
+	printf("Print proxy list. There are %d available proxies.\r\n", N);	
+	#endif 
 	for (i = 0; i < N; i++){
 		printf("Proxy %d -- %s\r\n", i, proxies[i]->address);
 	}
@@ -159,6 +161,7 @@ static char *REQUEST_TEMPLATE=
    "EKRClient\r\nHost: %s:%d\r\n\r\n";
 
 static char *host=HOST;
+static char *proto; 
 static int port=PORT;
 static int require_server_auth=1;
 
@@ -230,7 +233,7 @@ static int http_request(ssl)
   }
 
 
-// Usage
+// Usage function 
 void usage(void){
 	printf("usage: wclient -h -p -s -r -w -i -f\n"); 
 	printf("-h:   name of host to connect to\n"); 
@@ -244,7 +247,7 @@ void usage(void){
 }
 
 
-// Main goes here     
+// Main function     
 int main(int argc, char **argv){
 	SSL_CTX *ctx;						// SSL context
 	SSL *ssl;							// SSL context
@@ -255,7 +258,6 @@ int main(int argc, char **argv){
 	int N_proxies = 0;					// number of proxies indicated
 	char *filename = "proxyList"; 		// filename for proxy
 	int slices_len = 0, r = 0, w = 0;	// slice related parameters
-	int proto = 0; 						// SPP off by default 
 	
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:")) != -1){
@@ -299,8 +301,8 @@ int main(int argc, char **argv){
       		
 			// Integrity check requested 
 			case 'f':
-				if(! (proto = atoi(optarg) ))
-					err_exit("Bogus input for protocol selection"); 
+				if(! (proto = strdup(optarg) ))
+					err_exit("Out of memory");
 				break; 
 					
 			// default case 
@@ -311,15 +313,22 @@ int main(int argc, char **argv){
     }
 
 
-	// Check input parameters are correct 
+	// Check that input parameters are correct 
+	#ifdef DEBUG
 	printf("Parameters count: %d\n", argc); 
+	#endif
 	if (argc == 1){
 		usage(); 
 	}
 	
+	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0)){
+		printf("Protocol type specified is not supported. Support proto are: spp, ssl\n"); 
+		usage(); 
+	}
+
 	// Read number of proxy from file 
 	N_proxies = read_proxy_count(filename); 
-	printf("INPUT host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%d\n", host, port, slices_len, r, w, N_proxies, proto); 
+	printf("INPUT host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s\n", host, port, slices_len, r, w, N_proxies, proto); 
 	if (r > N_proxies || w > N_proxies){
 		printf ("Check your values for r and w\n"); 
 		usage(); 
@@ -340,7 +349,7 @@ int main(int argc, char **argv){
 	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
     SSL_set_bio(ssl, sbio, sbio);
 
-	// Create slices -- simple 
+	// Create slices_n slices with incremental purpose 
 	int i; 
 	SPP_SLICE *slice_set[slices_len];
 	#ifdef DEBUG
@@ -375,7 +384,6 @@ int main(int argc, char **argv){
 		// assign read access if requested
 		if (i < r){
 			if (SPP_assign_proxy_read_slices(ssl, proxies[i], slice_set, slices_len) == 1 ) {
-			//if (SPP_assign_proxy_read_slices(ssl, proxies[i], *slice_set, slices_len) == 1 ) {
 				#ifdef DEBUG
 				printf ("Proxy %s correctly assigned read access to slice-set (READ_COUNT=%d)\n", proxies[i]->address, (i + 1)); 
 				#endif
@@ -385,7 +393,6 @@ int main(int argc, char **argv){
 		// assign write access if requested
 		if (i < w){
 			if (SPP_assign_proxy_write_slices(ssl, proxies[i], slice_set, slices_len) == 1 ) {
-			//if (SPP_assign_proxy_write_slices(ssl, proxies[i], *slice_set, slices_len) == 1 ) {
 				#ifdef DEBUG
 				printf ("Proxy %s correctly assigned write access to slice-set (WRITE COUNT=%d)\n", proxies[i]->address, (i + 1)); 
 				#endif
@@ -393,39 +400,42 @@ int main(int argc, char **argv){
 		}
 	}
 
-	// Do a CONNECT here 
-	if (proto == 1){
+	// SPP CONNECT 
+	if (strcmp(proto, "spp") == 0){
 		#ifdef DEBUG
-		printf("Here attempt at SPP_connect\n");
+		printf("SPP_connect\n");
 		#endif 
 		if (SPP_connect(ssl, slice_set, slices_len, proxies, N_proxies) <= 0){
-			berr_exit("SSL SPP_connect error");
+			berr_exit("SPP connect error");
 		}
-	} else { 
+	} 
+	
+	// SSL CONNECT 
+	if (strcmp(proto, "ssl") == 0){
 		#ifdef DEBUG
-		printf("Here attempt at SSL_connect\n");
+		printf("SSL_connect\n");
 		#endif
-		if(SSL_connect(ssl)<=0){
+		if(SSL_connect(ssl) <= 0)
 			berr_exit("SSL connect error");
-		}
-		/* Temporay off since buggy on server side 	
-		// Check for authentication 
-	    if(require_server_auth){
-			check_cert(ssl,host);
+    
+		if(require_server_auth){
+	      check_cert(ssl, host);
 		}
  
 	    // Make HTTP request -- TO DO:  extend by passing filename!
-    	http_request(ssl);
-		*/
+	    http_request(ssl);
 	}
 
     // Shutdown the socket
     destroy_ctx(ctx);
     close(sock);
 
-	//Free array of proxies 
+	//Free memory 
 	for (i = 0; i < N_proxies ; i++){
 	    free(proxies[i]);
+	}
+	for (i = 0; i < slices_len; i++){
+		free(slice_set[i]); 
 	}
 	
 	// All done
