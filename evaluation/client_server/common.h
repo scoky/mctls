@@ -27,7 +27,7 @@ extern BIO *bio_err;
 int berr_exit (char *string);
 int err_exit(char *string);
 
-SSL_CTX *initialize_ctx(char *keyfile, char *password);
+SSL_CTX *initialize_ctx(char *keyfile, char *password, char *protocol);
 void destroy_ctx(SSL_CTX *ctx);
 
 #ifndef ALLOW_OLD_VERSIONS
