@@ -1095,6 +1095,8 @@ int spp_get_end_key_material(SSL *s);
 int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send);
 int spp_generate_slice_keys(SSL *s);
 SPP_PROXY* spp_get_next_proxy(SSL *s, int forward);
+int xor_array(unsigned char* dst, unsigned char* src1, unsigned char* src2, size_t len);
+int spp_init_slice_st(SSL *s, SPP_SLICE *slice);
 
 int dtls1_send_hello_request(SSL *s);
 int dtls1_send_server_hello(SSL *s);
@@ -1157,7 +1159,7 @@ int	spp_proxy_accept(SSL *s);
 int spp_enc(SSL *s, int send);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
 int spp_write_bytes(SSL *s, int type, const void *buf, int len);
-/* TODO: add other needed SPP methods here. */
+/* TODO: add other needed SPP internal methods here. */
 
 #ifndef OPENSSL_NO_ECDH
 int ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s);

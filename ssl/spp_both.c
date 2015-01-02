@@ -1048,24 +1048,13 @@ int spp_get_end_key_material(SSL *s) {
     EC_POINT *srvr_ecpoint = NULL;
     int curve_nid = 0;
     int encoded_pt_len = 0;
-#endif   
-    const EVP_CIPHER *c;
-#ifndef OPENSSL_NO_ECDH
     EC_KEY *clnt_ecdh = NULL;
     EVP_PKEY *srvr_pub_pkey = NULL;
     unsigned char *encodedPoint = NULL;
 #endif
-    const EVP_MD *m;
-    EVP_CIPHER_CTX *cipher;
     int id,slice_id,len;
     SPP_SLICE *slice;
-    
-    int is_exp;
     struct sess_cert_st /* SESS_CERT */ *sess_cert;
-
-    is_exp=SSL_C_IS_EXPORT(s->s3->tmp.new_cipher);
-    c=s->s3->tmp.new_sym_enc;
-    m=s->s3->tmp.new_hash;
 
     n=s->method->ssl_get_message(s,
         SPP_ST_CR_PRXY_MAT_A,
@@ -1085,7 +1074,7 @@ int spp_get_end_key_material(SSL *s) {
     /* More to read */
     while (p-param <= n) {
         n1s(p, slice_id);
-        slice = spp_get_slice_by_id(s, slice_id);
+        slice = SPP_get_slice_by_id(s, slice_id);
         if (slice == NULL)
             goto err;
         
@@ -1107,8 +1096,14 @@ int spp_get_end_key_material(SSL *s) {
     /* Should now have read the full message. */
     if (p-param != n)
         goto err;
+    /* Check to make sure we have material for all slices. 
+     * and generate the contexts. */
     for (n = 0; n < s->slices_len; n++) {
         if (s->slices[n]->write_access == 0 || s->slices[n]->read_access == 0) {
+            goto err;
+        }
+        
+        if (spp_init_slice_st(s, s->slices[n]) <= 0) {
             goto err;
         }
     }
