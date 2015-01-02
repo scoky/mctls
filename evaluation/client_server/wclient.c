@@ -339,7 +339,7 @@ int main(int argc, char **argv){
 	printf("Host: %s, port %d\n", host, port);
 
     // Build our SSL context
-	ctx = initialize_ctx(KEYFILE, PASSWORD);
+	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
 
 	// Connect the TCP socket
 	sock = tcp_connect(host, port);

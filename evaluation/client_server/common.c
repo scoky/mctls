@@ -37,10 +37,8 @@ static int password_cb(char *buf,int num,
 static void sigpipe_handle(int x){
 }
 
-SSL_CTX *initialize_ctx(keyfile,password)
-  char *keyfile;
-  char *password;
-  {
+// Initialize context
+SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
     SSL_METHOD *meth;
     SSL_CTX *ctx;
     
@@ -57,8 +55,14 @@ SSL_CTX *initialize_ctx(keyfile,password)
     signal(SIGPIPE,sigpipe_handle);
     
     /* Create our context*/
-    meth=SSLv23_method();
-    ctx=SSL_CTX_new(meth);
+	if (strcmp(proto, "ssl") == 0){		
+		meth = SSLv23_method();
+	} else {
+		//meth = SPP_method(); 
+		printf("!!!Due to a bug, temporary using SSLv23_method() despite requested SPP (line 62, common.c)\n"); 
+		meth = SSLv23_method();
+	}
+    ctx = SSL_CTX_new(meth);
 
     /* Load our keys and certificates*/
     if(!(SSL_CTX_use_certificate_chain_file(ctx,

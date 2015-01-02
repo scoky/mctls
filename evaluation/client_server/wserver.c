@@ -107,6 +107,28 @@ void print_proxy_list(SPP_PROXY **proxies, int N){
 		printf("Proxy %d -- %s\r\n", i, proxies[i]->address);
 	}
 }
+
+// Simple test for SPP
+static int test_SPP(SSL *ssl, int s){
+
+	int N_proxies, N_slices, i; 
+	
+	// print proxies
+	N_proxies = ssl->proxies_len; 
+	for (i = 0; i < N_proxies; i++){
+		printf("Proxy: %s\n", ssl->proxies[i]->address); 
+	}
+
+	// print slices
+	N_slices = ssl->slices_len; 
+	for (i = 0; i < N_slices; i++){
+		printf("Slice with ID %d and purpose %s\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
+	}
+
+	// All good	
+	return 0; 
+}
+
  
 // Temporary http serve with SPP
 static int http_serve_SPP(SSL *ssl, int s){
@@ -311,7 +333,7 @@ int main(int argc, char **argv){
 	}
 
 	// Build our SSL context
-	ctx = initialize_ctx(KEYFILE, PASSWORD);
+	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
 	load_dh_params(ctx,DHFILE);
    
 	// Socket in listen state
@@ -321,7 +343,7 @@ int main(int argc, char **argv){
 		if((s = accept(sock, 0, 0)) < 0){
 			err_exit("Problem socket accept\n");
 		}
-
+		// fork a new proces 
 		if((pid = fork())){
 			close(s);
 		} else {
@@ -342,14 +364,14 @@ int main(int argc, char **argv){
 				#endif
 			}
     
-			// Serve some content here 
+			// Serve some content here (SPP is currently simplified)
 			if (strcmp(proto, "spp") == 0){ 
-				http_serve_SPP(ssl, s);
+				test_SPP(ssl, s);
+				//http_serve_SPP(ssl, s);
 			} else {
 				http_serve(ssl, s);
 			}
 
-			// ? Exit ? 
 			exit(0);
 		}
 	}
@@ -357,6 +379,6 @@ int main(int argc, char **argv){
 	// Clean context
 	destroy_ctx(ctx);
 	
-	// ? Exit ? 
+	// Exit
 	exit(0);
   }
