@@ -408,15 +408,16 @@ int main(int argc, char **argv){
 		if(SSL_connect(ssl)<=0){
 			berr_exit("SSL connect error");
 		}
-	}
-	/*
-	// ?? to check 
-    if(require_server_auth)
-      check_cert(ssl,host);
+		/* Temporay off since buggy on server side 	
+		// Check for authentication 
+	    if(require_server_auth){
+			check_cert(ssl,host);
+		}
  
-    // Make HTTP request -- TO DO:  extend by passing filename!
-    http_request(ssl);
-	*/
+	    // Make HTTP request -- TO DO:  extend by passing filename!
+    	http_request(ssl);
+		*/
+	}
 
     // Shutdown the socket
     destroy_ctx(ctx);
