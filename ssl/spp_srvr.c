@@ -373,18 +373,20 @@ int spp_accept(SSL *s) 	{
             case SSL3_ST_SR_CERT_A:
             case SSL3_ST_SR_CERT_B:
                 /* Check for second client hello (MS SGC) */
-                ret = ssl3_check_client_hello(s);
                 printf("Checking for second client hello\n");
+                ret = ssl3_check_client_hello(s);
+                printf("Checked for second client hello\n");
                 if (ret <= 0)
                     goto end;
                 if (ret == 2)
                     s->state = SSL3_ST_SR_CLNT_HELLO_C;
                 else {
                     if (s->s3->tmp.cert_request) {
+                        printf("Receiving required client certificate\n");
                         ret=ssl3_get_client_certificate(s);
                         if (ret <= 0) goto end;
                     }
-                    proxy = spp_get_next_proxy(s, 1);
+                    proxy = spp_get_next_proxy(s, 0);
                     if (proxy == NULL) {
                         s->state=SSL3_ST_SR_KEY_EXCH_A;
                     } else {
@@ -432,6 +434,7 @@ int spp_accept(SSL *s) 	{
                 
             case SSL3_ST_SR_KEY_EXCH_A:
             case SSL3_ST_SR_KEY_EXCH_B:
+                printf("Receiving client key exchange\n");
                 ret=ssl3_get_client_key_exchange(s);
                 printf("Received client key exchange\n");
                 if (ret <= 0)

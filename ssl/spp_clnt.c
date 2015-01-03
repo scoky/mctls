@@ -193,7 +193,7 @@ int spp_connect(SSL *s) {
                 s->init_num=0;
 
                 break;
-                
+
             case SSL3_ST_CW_CERT_A:
             case SSL3_ST_CW_CERT_B:
             case SSL3_ST_CW_CERT_C:
@@ -211,7 +211,7 @@ int spp_connect(SSL *s) {
 
                 s->init_num=0;
                 break;
-                
+
             case SPP_ST_CR_PRXY_CERT_A:
             case SPP_ST_CR_PRXY_CERT_B:
                 printf("Waiting for proxy certificate\n");
@@ -270,14 +270,16 @@ int spp_connect(SSL *s) {
                 }
                 ret=spp_send_end_key_material(s);
                 
-                s->state=SPP_ST_CR_PRXY_MAT_A;
+                s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
+                s->state=SSL3_ST_CW_FLUSH;
                 s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
                 break;
                 
             case SPP_ST_CR_PRXY_MAT_A:
-            case SPP_ST_CR_PRXY_MAT_B:                
+            case SPP_ST_CR_PRXY_MAT_B:
+                printf("Receiving proxy key material\n");
                 for (i = s->proxies_len-1; i >= 0; i--) {
                     ret=spp_get_proxy_key_material(s, &(s->proxies[i]));
                     if (ret <= 0) goto end;

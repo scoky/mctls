@@ -52,10 +52,10 @@ again:
             rr->type= *(p++);
             ssl_major= *(p++);
             ssl_minor= *(p++);
-            version=(ssl_major<<8)|ssl_minor;
+            version=(ssl_major<<8)|ssl_minor;            
+            n2s(p,rr->length);
             /* New header fields: slice_id, proxy_id */
             rr->slice_id = *(p++);
-            n2s(p,rr->length);
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
@@ -912,15 +912,16 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     wr->type=type;
 
     *(p++)=(s->version>>8);
-    *(p++)=s->version&0xff;
-    
-    /* Write the slice ID as the 4th byte of the header. */
-    wr->slice_id = slice == NULL ? 0 : slice->slice_id;
-    *(p++)=wr->slice_id;    
-    
+    *(p++)=s->version&0xff;            
+
     /* field where we are to write out packet length */
     plen=p; 
     p+=2;
+
+    /* Write the slice ID as the 4th byte of the header. */
+    wr->slice_id = slice == NULL ? 0 : slice->slice_id;
+    *(p++)=wr->slice_id;
+    
     /* Explicit IV length, block ciphers and TLS version 1.1 or later */
     if (s->enc_write_ctx && s->version >= TLS1_1_VERSION) {
         int mode = EVP_CIPHER_CTX_mode(s->enc_write_ctx);
