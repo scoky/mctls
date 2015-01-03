@@ -1,4 +1,20 @@
-// A simple https server orginally provided by Ilias
+/* 
+ * Copyright (C) Telefonica 2015
+ * All rights reserved.
+ *
+ * Telefonica Proprietary Information.
+ *
+ * Contains proprietary/trade secret information which is the property of 
+ * Telefonica and must not be made available to, or copied or used by
+ * anyone outside Telefonica without its written authorization.
+ *
+ * Authors: 
+ *   Matteo Varvello <matteo.varvello@telefonica.com> et al. 
+ *
+ * Description: 
+ * An SSL/SPP server. 
+ */
+
 
 #include "common.h"
 #define KEYFILE "server.pem"
@@ -8,49 +24,52 @@
 
 #define DEBUG
 
-
-int tcp_listen()
-  {
-    int sock;
-    struct sockaddr_in sin;
-    int val=1;
-
-
-    if((sock=socket(AF_INET,SOCK_STREAM,0))<0)
-      err_exit("Couldn't make socket");
+// Listen TCP socket
+int tcp_listen(){
     
-    memset(&sin,0,sizeof(sin));
-    sin.sin_addr.s_addr=INADDR_ANY;
-    sin.sin_family=AF_INET;
-    sin.sin_port=htons(PORT);
-    setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,
-      &val,sizeof(val));
-    
-    if(bind(sock,(struct sockaddr *)&sin,
-      sizeof(sin))<0)
-      berr_exit("Couldn't bind");
+	int sock;
+	struct sockaddr_in sin;
+	int val = 1;
+
+	// Create socket, allocate memory and set sock options
+	if((sock=socket(AF_INET,SOCK_STREAM,0)) < 0){
+		err_exit("Couldn't make socket");
+	}
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_addr.s_addr = INADDR_ANY;
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(PORT);
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &val,sizeof(val));
+
+	// Bind to socket    
+	if(bind(sock,(struct sockaddr *)&sin, sizeof(sin))<0){
+		berr_exit("Couldn't bind");
+	}
+
+	// Listen to socket
     listen(sock,5);  
 
+	// Return socket descriptor
     return(sock);
-  }
+}
 
-void load_dh_params(ctx,file)
-  SSL_CTX *ctx;
-  char *file;
-  {
-    DH *ret=0;
-    BIO *bio;
+// Load parameters from "dh1024.pem"
+void load_dh_params(SSL_CTX *ctx, char *file){
+	DH *ret=0;
+	BIO *bio;
 
-    if ((bio=BIO_new_file(file,"r")) == NULL)
+    if ((bio=BIO_new_file(file,"r")) == NULL){
       berr_exit("Couldn't open DH file");
+	}
 
-    ret=PEM_read_bio_DHparams(bio,NULL,NULL,
-      NULL);
-    BIO_free(bio);
-    if(SSL_CTX_set_tmp_dh(ctx,ret)<0)
-      berr_exit("Couldn't set DH parameters");
-  }
+	ret = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+	BIO_free(bio);
+	if(SSL_CTX_set_tmp_dh(ctx,ret) < 0){
+		berr_exit("Couldn't set DH parameters");
+	}
+}
 
+// 
 void generate_eph_rsa_key(ctx)
   SSL_CTX *ctx;
   {
@@ -129,45 +148,209 @@ static int test_SPP(SSL *ssl, int s){
 	return 0; 
 }
 
- 
-// Temporary http serve with SPP
-static int http_serve_SPP(SSL *ssl, int s){
+// Check for SSL_write error (just write at this point) -- TO DO: check behavior per slice 
+void check_SSL_write_error(SSL *ssl, int r, int request_len){
 
-	int N_proxies; 
-	N_proxies = ssl->proxies_len; 
+    switch(SSL_get_error(ssl, r)){
+        case SSL_ERROR_NONE:
+            if(request_len != r){
+                err_exit("Incomplete write!");
+            }
+            break;
 
-	int i; 
-	for (i = 0; i < N_proxies; i++){
-		printf("Proxy: %s\n", ssl->proxies[i]->address); 
-	}
-
-	/*
-	int N_proxies; 
-	SPP_PROXY *proxies = NULL; 
-
-	// Get proxy list 
-	#ifdef DEBUG
-	printf("Http serve SPP - Getting proxy list\n"); 
-	#endif
-	if ( !SPP_get_proxies(ssl, &proxies, &N_proxies)){
-		return -1; 
-	}
-	
-	#ifdef DEBUG
-	printf("Http serve SPP - %d proxies are in the path. Printing proxy list\n", N_proxies); 
-	#endif
-	print_proxy_list(proxies, N_proxies); 
-	
-	#ifdef DEBUG
-	printf("Http serve SPP - All good :-)\n"); 
-	#endif
-	*/
-	// all correct 			
-	return 0; 
+        default:
+            berr_exit("SSL write problem");
+    }
 }
 
-// Regular http serve
-static int http_serve(SSL *ssl, int s){
+// Send a resonse (SSL and SPP) 
+void sendResponse(SSL *ssl, char *request, char *proto){
+
+	int request_len; 
+	int i, r;  
+
+	request_len = strlen(request);
+	if (strcmp(proto, "spp") == 0){
+		for (i = 0; i < ssl->slices_len; i++){
+			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
+			check_SSL_write_error(ssl, r, request_len);
+		}
+	}
+	if (strcmp(proto, "ssl") == 0){
+		r = SSL_write(ssl, request, request_len); 
+		check_SSL_write_error(ssl, r, request_len);
+	}
+}
+
+
+// 1) work with both SSL and SPP
+// 2) no usage of BIO APIs
+static int http_serve_new(SSL *ssl, int s, char *proto){
+  
+	char buf[BUFSIZZ];
+	char *request; 
+    int r; 
+	
+	#ifdef DEBUG
+	printf("HTTP serve SPP\n"); 
+	#endif
+
+	// Wait for HTTP header received -- TO DO: verify that a single read is enough!
+	while(1){
+		if (strcmp(proto, "spp") == 0){
+			// ssl->spp_read_ctx???? 
+			r = SPP_read_record(ssl, buf, BUFSIZZ, ssl->slices, &ssl->spp_read_ctx);
+		}
+	
+		if (strcmp(proto, "ssl") == 0){
+			r = SSL_read(ssl, buf, BUFSIZZ);
+		}
+
+		if (SSL_get_error(ssl, r) == SSL_ERROR_NONE){
+		} else {
+			berr_exit("SSL read problem");
+		}
+		
+		#ifdef DEBUG
+		printf("Received %s\n", buf); 
+		#endif
+
+		//Look for the blank line that signals the end of the HTTP header
+		if(strstr(buf, "\r\n") || strstr(buf, "\n")){
+			break; 
+		}
+	}
+    
+	// Put 200 OK on the wire 
+	request = "HTTP/1.0 200 OK\r\n"; 
+	sendResponse(ssl, request, proto); 
+
+	// Put server name on the wire
+	request = "Server: Svarvel\r\n\n"; 
+	sendResponse(ssl, request, proto); 
+
+	// Line for test page
+	request = "Server test page\r\n"; 
+	sendResponse(ssl, request, proto); 
+
+	/*
+	request = "HTTP/1.0 200 OK\r\n"; 
+	request_len = strlen(request);
+	if((r = SSL_write(ssl, request, request_len)) <= 0){
+		err_exit("Write error");
+	}
+
+	// Put server name on the wire
+	request = "Server: Svarvel\r\n\n"; 
+	request_len = strlen(request); 
+	if((r = SSL_write(ssl, request, request_len)) <= 0){
+		err_exit("Write error");
+	}
+
+	// Line for test page
+	request = "Server test page\r\n"; 
+	request_len = strlen(request);
+	if((r = SSL_write(ssl, request, request_len)) <= 0){
+		err_exit("Write error");
+	}
+	*/
+  	
+	/* code to serve a FILE -- 1) port from BIO usage, 2) extend getting requested name from above 
+	// Send file index.html -- TO DO, extend to a requested name
+	BIO *file;
+	static int bufsize = BUFSIZZ;
+	int total_bytes = 0, j = 0, file_size = 0; 
+
+	// Determine file size -- TO DO: integration with BIO stuff 
+	file_size = calculate_file_size("index.html"); 
+	
+	// Open requested file 
+	if ((file = BIO_new_file("index.html","r")) == NULL){                
+		BIO_puts(io, "Error opening file"); // what is text? ERROR
+        BIO_printf(io,"Error opening index.html\r\n");
+		goto write_error;
+	}
+
+	// Put file on the wire 
+	for (;;){
+		// Read bufsize from requested file 
+		int i = BIO_read(file, buf, bufsize);
+		if (i <= 0){
+			break; 
+		}
+
+		// Keep count of bytes sent on the wire 
+		total_bytes += i;
+		
+		// Check if too many losses 
+		if (total_bytes > (3 * file_size)){
+			total_bytes = 0;
+			fprintf(stderr,"RENEGOTIATE\n");
+			SSL_renegotiate(ssl); 
+		}
+		
+		// ??
+		for (j = 0; j < i; ){
+			// After 13 attempts, re-negotate at SSL level 
+			static int count = 0; 
+			if (++count == 13) { 
+				SSL_renegotiate(ssl); 
+			} 
+
+			int k = BIO_write(io, &(buf[j]), i-j);
+			if (k <= 0){
+				if (! BIO_should_retry(io)){
+					goto write_error; 
+				}else {
+					BIO_printf(io, "rewrite W BLOCK\n");
+					}
+				}else{
+					j += k;
+				}
+			write_error:
+				BIO_free(file);
+				break; 
+			}
+
+		if((r = BIO_flush(io))<0){
+			err_exit("Error flushing BIO");
+		}
+    } // end for loop 
+	*/		
+	
+	r = SSL_shutdown(ssl);
+	if( !r ){
+    /* If we called SSL_shutdown() first then
+         we always get return value of '0'. In
+         this case, try again, but first send a
+         TCP FIN to trigger the other side's
+         close_notify */
+		shutdown(s, 1);
+		r = SSL_shutdown(ssl);
+    }
+
+	switch(r){  
+		case 1:
+       		break; // 
+		case 0:
+		case -1:
+		default: // Error 
+			berr_exit("Shutdown failed");
+	}
+
+	// free SSL 
+    SSL_free(ssl);
+	
+	// Close socket
+    close(s);
+
+	// All good 
+    return(0);
+}
+
+
+// SSL http serve
+static int http_serve_SSL(SSL *ssl, int s){
   
 	char buf[BUFSIZZ];
 	int r; //len; //len seems useless...
@@ -315,12 +498,13 @@ int main(int argc, char **argv){
 
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "f:")) != -1){
-			switch(c){
-				// Protocol 
-				case 'f':
-					if(! (proto = strdup(optarg) ))
-						err_exit("Out of memory");
-					break; 
+		switch(c){
+			// Protocol 
+			case 'f':
+				if(! (proto = strdup(optarg) )){
+					err_exit("Out of memory");
+				}
+				break; 
 			}
 	}
 
@@ -332,7 +516,7 @@ int main(int argc, char **argv){
 		usage();
 	}
 
-	// Build our SSL context
+	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
 	load_dh_params(ctx,DHFILE);
    
@@ -364,14 +548,15 @@ int main(int argc, char **argv){
 				#endif
 			}
     
-			// Serve some content here (SPP is currently simplified)
+			// Serve some content here (for SPP just test handshake)
 			if (strcmp(proto, "spp") == 0){ 
 				test_SPP(ssl, s);
-				//http_serve_SPP(ssl, s);
+				//http_serve_new(ssl, s, proto);
 			} else {
-				http_serve(ssl, s);
+				http_serve_new(ssl, s, proto);
+				//http_serve_SSL(ssl, s);
 			}
-
+			// exit from process forked (?)
 			exit(0);
 		}
 	}

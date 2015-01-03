@@ -225,14 +225,15 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 }
 
 
-static char *REQUEST_TEMPLATE = "GET / HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
+//static char *REQUEST_TEMPLATE = "GET / HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
+static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
 static char *host=HOST;
 static char *proto; 
 static int port=PORT;
 static int require_server_auth=1;
 
 // Make an HTTP request  -- add filename here 
-static int http_request(SSL *ssl){
+static int http_request(SSL *ssl, char *filename){
 	char *request=0;
 	char buf[BUFSIZZ];
 	int r;
@@ -244,8 +245,8 @@ static int http_request(SSL *ssl){
 		err_exit("Couldn't allocate request");
 	}
 
-	// Write request_len bytes to request from the template 
-    snprintf(request, request_len, REQUEST_TEMPLATE, host, port);
+	// Write request_len bytes to request by replacing input into the template 
+	snprintf(request, request_len, REQUEST_TEMPLATE, filename, host, port);
 
 	// Find exact request_len
 	request_len = strlen(request);
@@ -253,7 +254,7 @@ static int http_request(SSL *ssl){
 	// SPP write
 	if (strcmp(proto, "spp") == 0){
 		#ifdef DEBUG
-		printf("SPP_write\n");
+		printf("[DEBUG] SPP_write\n");
 		#endif 
 		int i; 
 		for (i = 0; i < ssl->slices_len; i++){
@@ -265,7 +266,7 @@ static int http_request(SSL *ssl){
 	// SSL write
 	if (strcmp(proto, "ssl") == 0){
 		#ifdef DEBUG
-		printf("SSL_write\n");
+		printf("[DEBUG] SSL_write\n");
 		#endif 
 		r = SSL_write(ssl, request, request_len);
 		check_SSL_write_error(ssl, r, request_len); 
@@ -276,9 +277,8 @@ static int http_request(SSL *ssl){
 		// SPP read
 		if (strcmp(proto, "spp") == 0){
 			#ifdef DEBUG
-			printf("SPP_read\n");
+			printf("[DEBUG] SPP_read\n");
 			#endif 
-			int i; 
 			// ssl->spp_read_ctx???? 
 			r = SPP_read_record(ssl, buf, BUFSIZZ, ssl->slices, &ssl->spp_read_ctx);	
 			switch(SSL_get_error(ssl, r)){
@@ -301,7 +301,7 @@ static int http_request(SSL *ssl){
 		// SSL read
 		if (strcmp(proto, "ssl") == 0){
 			#ifdef DEBUG
-			printf("SSL_read\n");
+			printf("[DEBUG] SSL_read\n");
 			#endif 
 			r = SSL_read(ssl, buf, BUFSIZZ);
 			switch(SSL_get_error(ssl, r)){
@@ -356,25 +356,27 @@ void usage(void){
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
-	printf("-f:   spp protocol was request\n"); 
+	printf("-f:   file for http GET\n"); 
+	printf("-c:   protocol chosen (sll ; spp)\n"); 
 	exit(-1);  
 }
 
 
 // Main function     
 int main(int argc, char **argv){
-	SSL_CTX *ctx;						// SSL context
-	SSL *ssl;							// SSL context
-	BIO *sbio;							// ?
-	int sock;							// socket
-	extern char *optarg;				// user input parameters
-	int c;								// user iput from getopt
-	int N_proxies = 0;					// number of proxies indicated
-	char *filename = "proxyList"; 		// filename for proxy
-	int slices_len = 0, r = 0, w = 0;	// slice related parameters
-	
+	SSL_CTX *ctx;							// SSL context
+	SSL *ssl;								// SSL context
+	BIO *sbio;								// ?
+	int sock;								// socket
+	extern char *optarg;					// user input parameters
+	int c;									// user iput from getopt
+	int N_proxies = 0;						// number of proxies indicated
+	char *filename = "proxyList"; 			// filename for proxy
+	int slices_len = 0, r = 0, w = 0;		// slice related parameters
+	char *file_requested = "index.html";	// file requeste for HTTP GET
+
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:")) != -1){
+	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:")) != -1){
 			
 			switch(c){
 	
@@ -413,9 +415,15 @@ int main(int argc, char **argv){
 				require_server_auth = 0;
 				break; 
       		
-			// Integrity check requested 
-			case 'f':
+			// Protocol chosen
+			case 'c':
 				if(! (proto = strdup(optarg) ))
+					err_exit("Out of memory");
+				break; 
+			
+			// File requested for HTTP GET
+			case 'f':
+				if(! (file_requested = strdup(optarg) ))
 					err_exit("Out of memory");
 				break; 
 					
@@ -549,7 +557,7 @@ int main(int argc, char **argv){
 		}
  
 	    // Make HTTP request -- TO DO:  extend by passing filename!
-	    http_request(ssl);
+	    http_request(ssl, file_requested);
 	}
 
     // Shutdown the socket
