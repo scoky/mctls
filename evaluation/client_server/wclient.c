@@ -228,12 +228,11 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 //static char *REQUEST_TEMPLATE = "GET / HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
 static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
 static char *host=HOST;
-static char *proto; 
 static int port=PORT;
 static int require_server_auth=1;
 
 // Make an HTTP request  -- add filename here 
-static int http_request(SSL *ssl, char *filename){
+static int http_request(SSL *ssl, char *filename, char *proto){
 	char *request=0;
 	char buf[BUFSIZZ];
 	int r;
@@ -374,6 +373,7 @@ int main(int argc, char **argv){
 	char *filename = "proxyList"; 			// filename for proxy
 	int slices_len = 0, r = 0, w = 0;		// slice related parameters
 	char *file_requested = "index.html";	// file requeste for HTTP GET
+	char *proto = "ssl"; 					// protocl of choice 
 
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:")) != -1){
@@ -557,7 +557,7 @@ int main(int argc, char **argv){
 		}
  
 	    // Make HTTP request -- TO DO:  extend by passing filename!
-	    http_request(ssl, file_requested);
+	    http_request(ssl, file_requested, proto);
 	}
 
     // Shutdown the socket
