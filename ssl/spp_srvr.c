@@ -69,6 +69,7 @@ int spp_accept(SSL *s) 	{
             case SSL_ST_ACCEPT:
             case SSL_ST_BEFORE|SSL_ST_ACCEPT:
             case SSL_ST_OK|SSL_ST_ACCEPT:
+                printf("Before state\n");
                 s->server=1;
                 s->proxy = 0;
                 s->proxy_id = 2;
@@ -130,6 +131,7 @@ int spp_accept(SSL *s) 	{
             case SSL3_ST_SW_HELLO_REQ_A:
             case SSL3_ST_SW_HELLO_REQ_B:
                 s->shutdown=0;
+                printf("Sending hello request\n");
                 ret=ssl3_send_hello_request(s);
                 if (ret <= 0) goto end;
                 s->s3->tmp.next_state=SSL3_ST_SW_HELLO_REQ_C;
@@ -149,20 +151,21 @@ int spp_accept(SSL *s) 	{
                 s->shutdown=0;
                 if (s->rwstate != SSL_X509_LOOKUP) {
                     ret=ssl3_get_client_hello(s);
+                    printf("Received client hello\n");
                     if (ret <= 0) goto end;
                 }
-#ifndef OPENSSL_NO_SRP
+/* #ifndef OPENSSL_NO_SRP
                 {
                     int al;
                     if ((ret = ssl_check_srp_ext_ClientHello(s,&al))  < 0) {
-                        /* callback indicates firther work to be done */
+                        // callback indicates firther work to be done 
                         s->rwstate=SSL_X509_LOOKUP;
                         goto end;
                     }
                     if (ret != SSL_ERROR_NONE) {
                         ssl3_send_alert(s,SSL3_AL_FATAL,al);	
-                        /* This is not really an error but the only means to
-                           for a client to detect whether srp is supported. */
+                        // This is not really an error but the only means to
+                        //   for a client to detect whether srp is supported. 
                            if (al != TLS1_AD_UNKNOWN_PSK_IDENTITY)
                                 SSLerr(SSL_F_SSL3_ACCEPT,SSL_R_CLIENTHELLO_TLSEXT);			
                         ret = SSL_TLSEXT_ERR_ALERT_FATAL;			
@@ -170,7 +173,7 @@ int spp_accept(SSL *s) 	{
                         goto end;	
                     }
                 }
-#endif		
+#endif */		
 
                 s->renegotiate = 2;
                 s->state=SSL3_ST_SW_SRVR_HELLO_A;
@@ -179,6 +182,7 @@ int spp_accept(SSL *s) 	{
 
             case SSL3_ST_SW_SRVR_HELLO_A:
             case SSL3_ST_SW_SRVR_HELLO_B:
+                printf("Sending server hello\n");
                 ret=ssl3_send_server_hello(s);
                 if (ret <= 0) goto end;
 #ifndef OPENSSL_NO_TLSEXT
@@ -203,6 +207,7 @@ int spp_accept(SSL *s) 	{
                 /* normal PSK or KRB5 or SRP */
                 if (!(s->s3->tmp.new_cipher->algorithm_auth & (SSL_aNULL|SSL_aKRB5|SSL_aSRP))
                     && !(s->s3->tmp.new_cipher->algorithm_mkey & SSL_kPSK)) {
+                        printf("Sending certificate\n");
                         ret=ssl3_send_server_certificate(s);
                         if (ret <= 0) goto end;
 #ifndef OPENSSL_NO_TLSEXT
@@ -275,6 +280,7 @@ int spp_accept(SSL *s) 	{
                         )
                     )
                         {
+                        printf("Sending server key exchange\n");
                         ret=ssl3_send_server_key_exchange(s);
                         if (ret <= 0) goto end;
                         }
@@ -319,6 +325,7 @@ int spp_accept(SSL *s) 	{
                 else
                 {
                     s->s3->tmp.cert_request=1;
+                    printf("Sending certificate request\n");
                     ret=ssl3_send_certificate_request(s);
                     if (ret <= 0) goto end;
 #ifndef NETSCAPE_HANG_BUG
@@ -333,7 +340,9 @@ int spp_accept(SSL *s) 	{
 
             case SSL3_ST_SW_SRVR_DONE_A:
             case SSL3_ST_SW_SRVR_DONE_B:
+                printf("Sending server done\n");
                 ret=ssl3_send_server_done(s);
+                printf("Sent server done\n");
                 if (ret <= 0) goto end;
                 s->s3->tmp.next_state=SSL3_ST_SR_CERT_A;
                 s->state=SSL3_ST_SW_FLUSH;
@@ -365,6 +374,7 @@ int spp_accept(SSL *s) 	{
             case SSL3_ST_SR_CERT_B:
                 /* Check for second client hello (MS SGC) */
                 ret = ssl3_check_client_hello(s);
+                printf("Checking for second client hello\n");
                 if (ret <= 0)
                     goto end;
                 if (ret == 2)
@@ -386,7 +396,9 @@ int spp_accept(SSL *s) 	{
                 
             case SPP_ST_CR_PRXY_CERT_A:
             case SPP_ST_CR_PRXY_CERT_B:
+                printf("Waiting for proxy certificate\n");
                 ret=spp_get_proxy_certificate(s, proxy);
+                printf("Received proxy certificate\n");
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
                 s->init_num=0;
@@ -396,6 +408,7 @@ int spp_accept(SSL *s) 	{
             case SPP_ST_CR_PRXY_KEY_EXCH_A:
             case SPP_ST_CR_PRXY_KEY_EXCH_B:
                 ret=spp_get_proxy_key_exchange(s, proxy);
+                printf("Received proxy key exchange\n");
                 if (ret <= 0) goto end;
                 s->state=SPP_ST_CR_PRXY_DONE_A;
                 s->init_num=0; 
@@ -404,6 +417,7 @@ int spp_accept(SSL *s) 	{
             case SPP_ST_CR_PRXY_DONE_A:
             case SPP_ST_CR_PRXY_DONE_B:
                 ret=spp_get_proxy_done(s, proxy);
+                printf("Received proxy done\n");
                 if (ret <= 0) goto end;
                                 
                 proxy = spp_get_next_proxy(s, 1);
@@ -419,6 +433,7 @@ int spp_accept(SSL *s) 	{
             case SSL3_ST_SR_KEY_EXCH_A:
             case SSL3_ST_SR_KEY_EXCH_B:
                 ret=ssl3_get_client_key_exchange(s);
+                printf("Received client key exchange\n");
                 if (ret <= 0)
                     goto end;
                 if (ret == 2)
@@ -488,6 +503,7 @@ int spp_accept(SSL *s) 	{
             /* Send the proxy key material. */
             case SPP_ST_CW_PRXY_MAT_A:
             case SPP_ST_CW_PRXY_MAT_B:
+                printf("Sending proxy key material\n");
                 for (i = 0; i < s->proxies_len; i++) {
                     ret=spp_send_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
@@ -503,6 +519,7 @@ int spp_accept(SSL *s) 	{
                 
             case SPP_ST_CR_PRXY_MAT_A:
             case SPP_ST_CR_PRXY_MAT_B:
+                printf("Receiving proxy key material\n");
                 for (i = s->proxies_len-1; i >= 0; i--) {
                     ret=spp_get_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
@@ -699,6 +716,7 @@ int spp_accept(SSL *s) 	{
 		skip=0;
 		}
 end:
+        printf("Handshake end\n");
 	/* BIO_flush(s->wbio); */
 
 	s->in_handshake--;

@@ -405,12 +405,12 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
             /* Now write all of the proxies. */
             s1n(s->proxies_len, ret);
             for (i = 0; i < s->proxies_len; i++) {
+                s1n(s->proxies[i]->proxy_id, ret);
+                
                 char_len=strlen(s->proxies[i]->address);
                 s1n(char_len, ret);
                 memcpy(ret, s->proxies[i]->address, char_len);
-                ret+=char_len;
-                
-                s1n(s->proxies[i]->proxy_id, ret);
+                ret+=char_len;                               
                 
                 s1n(s->proxies[i]->read_slice_ids_len, ret);
                 for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
@@ -1101,40 +1101,51 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 
 */      
                 if (type == TLSEXT_TYPE_proxy_list) {
-                    int i,char_len,n;
+                    int i,char_len,x;
+                    unsigned char *sdata = data;
                     
                     /* Read the slice IDs */
-                    n1s(data, s->slices_len);
+                    n1s(sdata, s->slices_len);
                     for (i = 0; i < s->slices_len; i++) {
                         s->slices[i] = (SPP_SLICE *)malloc(sizeof(SPP_SLICE));
-                        n1s(data, s->slices[i]->slice_id);
+                        n1s(sdata, s->slices[i]->slice_id);
                         
-                        n1s(data, char_len);
+                        n1s(sdata, char_len);
                         s->slices[i]->purpose = (char *)malloc(char_len+1);
-                        memcpy(s->slices[i]->purpose, data, char_len);
+                        memcpy(s->slices[i]->purpose, sdata, char_len);
                         s->slices[i]->purpose[char_len] = '\0';
-                        data += char_len;
+                        sdata += char_len;
+                        
+                        //printf("Decoded slice %d with purpose %s\n", s->slices[i]->slice_id, s->slices[i]->purpose);
                     }
-                    n1s(data, s->proxies_len);
+                    n1s(sdata, s->proxies_len);
                     for (i = 0; i < s->proxies_len; i++) {
                         s->proxies[i] = (SPP_PROXY *)malloc(sizeof(SPP_PROXY));
-                        n1s(data, s->proxies[i]->proxy_id);
+                        n1s(sdata, s->proxies[i]->proxy_id);
                         
-                        n1s(data, char_len);
+                        n1s(sdata, char_len);
                         s->proxies[i]->address = (char *)malloc(char_len+1);
-                        memcpy(s->proxies[i]->address, data, char_len);
+                        memcpy(s->proxies[i]->address, sdata, char_len);
                         s->proxies[i]->address[char_len] = '\0';
-                        data += char_len;
+                        sdata += char_len;
                         
-                        n1s(data, s->proxies[i]->read_slice_ids_len);
-                        for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
-                            n1s(data, s->proxies[i]->read_slice_ids[n]);
+                        n1s(sdata, s->proxies[i]->read_slice_ids_len);
+                        for (x = 0; x < s->proxies[i]->read_slice_ids_len; x++) {
+                            n1s(sdata, s->proxies[i]->read_slice_ids[x]);
                         }
-                        n1s(data, s->proxies[i]->write_slice_ids_len);
-                        for (n = 0; n < s->proxies[i]->write_slice_ids_len; n++) {
-                            n1s(data, s->proxies[i]->write_slice_ids[n]);
+                        n1s(sdata, s->proxies[i]->write_slice_ids_len);
+                        for (x = 0; x < s->proxies[i]->write_slice_ids_len; x++) {
+                            n1s(sdata, s->proxies[i]->write_slice_ids[x]);
                         }
-                    }            
+                        
+                        //printf("Decoded proxy %d with address %s, read %d write %d\n", s->proxies[i]->proxy_id, s->proxies[i]->address, s->proxies[i]->read_slice_ids_len, s->proxies[i]->write_slice_ids_len);
+                    }  
+                    if (sdata - data != size) {
+                        printf("Error decoding proxy list\n");
+                        *al = TLS1_AD_DECODE_ERROR;
+                        return 0;
+                    }
+                    //printf("Parsed %d slices and %d proxies\n", s->slices_len, s->proxies_len);
                 } else if (type == TLSEXT_TYPE_server_name)
 			{
 			unsigned char *sdata;

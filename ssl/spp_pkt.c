@@ -125,10 +125,10 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
     rr->data=rr->input;
     slice = SPP_get_slice_by_id(s, rr->slice_id);
     /* Get slice from id if it can be found. */
-    if (!slice) {
+    /*if (!slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
         goto f_err;
-    }     
+    } */    
     s->read_slice = slice;
     /* Send to ssp_enc for decryption. */
     enc_err = s->method->ssl3_enc->enc(s,0);
@@ -159,6 +159,7 @@ printf("\n");
     /* We can read this record */
     if ((sess != NULL) &&
         (s->enc_read_ctx != NULL) &&
+        (slice != NULL) &&
         (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
             unsigned char *mac = NULL;
@@ -315,7 +316,7 @@ int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek) {
     unsigned int n;
     SSL3_RECORD *rr;
     void (*cb)(const SSL *ssl,int type2,int val)=NULL;
-
+    
     if (s->s3->rbuf.buf == NULL) /* Not initialized yet */
         if (!ssl3_setup_read_buffer(s)) /* Method OK to use with SPP */
             return(-1);
@@ -833,14 +834,16 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     wr = &(s->s3->wrec);
     sess = s->session;
 
-    s->enc_write_ctx = slice->enc_write_ctx;
-    spp_copy_mac_state(s, slice->read_mac, 1);
+    if (slice != NULL) {
+        s->enc_write_ctx = slice->enc_write_ctx;
+        spp_copy_mac_state(s, slice->read_mac, 1);
+    }
     if ((sess == NULL) ||
         (s->enc_write_ctx == NULL) ||
         (EVP_MD_CTX_md(s->write_hash) == NULL)) {
         /* No idea what this means... */
 #if 1
-            clear=s->write_slice->enc_write_ctx?0:1;	/* must be AEAD cipher */
+            clear=s->enc_write_ctx?0:1;	/* must be AEAD cipher */
 #else
             clear=1;
 #endif
@@ -912,7 +915,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     *(p++)=s->version&0xff;
     
     /* Write the slice ID as the 4th byte of the header. */
-    wr->slice_id = s->write_slice->slice_id;
+    wr->slice_id = slice == NULL ? 0 : slice->slice_id;
     *(p++)=wr->slice_id;    
     
     /* field where we are to write out packet length */

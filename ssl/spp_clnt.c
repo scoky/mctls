@@ -62,7 +62,7 @@ int spp_connect(SSL *s) {
             case SSL_ST_CONNECT:
             case SSL_ST_BEFORE|SSL_ST_CONNECT:
             case SSL_ST_OK|SSL_ST_CONNECT:
-
+                printf("Connecting\n");
                 s->server=0; /* We are the client */
                 s->proxy=0;
                 s->proxy_id=1;
@@ -75,7 +75,7 @@ int spp_connect(SSL *s) {
                     goto end;
                 }
 				
-                /* s->version=SSL3_VERSION; */
+                s->version=SPP_VERSION;
                 s->type=SSL_ST_CONNECT;
 
                 if (s->init_buf == NULL) {
@@ -108,7 +108,7 @@ int spp_connect(SSL *s) {
 
             case SSL3_ST_CW_CLNT_HELLO_A:
             case SSL3_ST_CW_CLNT_HELLO_B:
-
+                printf("Sending client hello\n");
                 s->shutdown=0;
                 ret=ssl3_client_hello(s);
                 if (ret <= 0) goto end;
@@ -124,6 +124,7 @@ int spp_connect(SSL *s) {
             case SSL3_ST_CR_SRVR_HELLO_A:
             case SSL3_ST_CR_SRVR_HELLO_B:
                 ret=ssl3_get_server_hello(s);
+                printf("Received server hello\n");
 		if (ret <= 0) goto end;
 
                 s->state=SSL3_ST_CR_CERT_A;
@@ -133,14 +134,16 @@ int spp_connect(SSL *s) {
             case SSL3_ST_CR_CERT_A:
             case SSL3_ST_CR_CERT_B:
                 ret=ssl3_get_server_certificate(s);
+                printf("Received server certificate\n");
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
                 s->init_num=0;
                 break;
 
             case SSL3_ST_CR_KEY_EXCH_A:
-            case SSL3_ST_CR_KEY_EXCH_B:
+            case SSL3_ST_CR_KEY_EXCH_B:                
                 ret=ssl3_get_key_exchange(s);
+                printf("Received server key exchange\n");
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_CERT_REQ_A;
                 s->init_num=0;
@@ -151,13 +154,23 @@ int spp_connect(SSL *s) {
                     ret= -1;
                     goto end;
                 }
-                break;                
+                break;     
+                
+            case SSL3_ST_CR_CERT_REQ_A:
+            case SSL3_ST_CR_CERT_REQ_B:                
+                ret=ssl3_get_certificate_request(s);
+                printf("Done certificate request\n");
+                if (ret <= 0) goto end;
+                s->state=SSL3_ST_CR_SRVR_DONE_A;
+                s->init_num=0;
+                break;
 
             case SSL3_ST_CR_SRVR_DONE_A:
             case SSL3_ST_CR_SRVR_DONE_B:
                 ret=ssl3_get_server_done(s);
+                printf("Received server done\n");
                 if (ret <= 0) goto end;
-#ifndef OPENSSL_NO_SRP
+/*#ifndef OPENSSL_NO_SRP
                 if (s->s3->tmp.new_cipher->algorithm_mkey & SSL_kSRP) {
                     if ((ret = SRP_Calc_A_param(s))<=0) {
                         SSLerr(SSL_F_SSL3_CONNECT,SSL_R_SRP_A_CALC);
@@ -165,7 +178,29 @@ int spp_connect(SSL *s) {
                         goto end;
                     }
                 }
-#endif
+#endif*/
+
+                if (s->s3->tmp.cert_req)
+                    s->state=SSL3_ST_CW_CERT_A;
+                else {
+                    proxy = spp_get_next_proxy(s, 1);
+                    if (proxy == NULL) {
+                        s->state=SSL3_ST_CW_KEY_EXCH_A;
+                    } else {
+                        s->state=SPP_ST_CR_PRXY_CERT_A;
+                    }
+                }
+                s->init_num=0;
+
+                break;
+                
+            case SSL3_ST_CW_CERT_A:
+            case SSL3_ST_CW_CERT_B:
+            case SSL3_ST_CW_CERT_C:
+            case SSL3_ST_CW_CERT_D:
+                ret=ssl3_send_client_certificate(s);
+                printf("Sending client certificate\n");
+                if (ret <= 0) goto end;
 
                 proxy = spp_get_next_proxy(s, 1);
                 if (proxy == NULL) {
@@ -173,13 +208,15 @@ int spp_connect(SSL *s) {
                 } else {
                     s->state=SPP_ST_CR_PRXY_CERT_A;
                 }
-                s->init_num=0;
 
+                s->init_num=0;
                 break;
                 
             case SPP_ST_CR_PRXY_CERT_A:
             case SPP_ST_CR_PRXY_CERT_B:
+                printf("Waiting for proxy certificate\n");
                 ret=spp_get_proxy_certificate(s, proxy);
+                printf("Received proxy certificate\n");
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
                 s->init_num=0;
@@ -189,6 +226,7 @@ int spp_connect(SSL *s) {
             case SPP_ST_CR_PRXY_KEY_EXCH_A:
             case SPP_ST_CR_PRXY_KEY_EXCH_B:
                 ret=spp_get_proxy_key_exchange(s, proxy);
+                printf("Received proxy key exchange\n");
                 if (ret <= 0) goto end;
                 s->state=SPP_ST_CR_PRXY_DONE_A;
                 s->init_num=0; 
@@ -197,6 +235,7 @@ int spp_connect(SSL *s) {
             case SPP_ST_CR_PRXY_DONE_A:
             case SPP_ST_CR_PRXY_DONE_B:
                 ret=spp_get_proxy_done(s, proxy);
+                printf("Received proxy done\n");
                 if (ret <= 0) goto end;
                                 
                 proxy = spp_get_next_proxy(s, 1);
@@ -211,6 +250,7 @@ int spp_connect(SSL *s) {
                 
             case SSL3_ST_CW_KEY_EXCH_A:
             case SSL3_ST_CW_KEY_EXCH_B:
+                printf("Sending client key exchange\n");
                 ret=ssl3_send_client_key_exchange(s);
                 if (ret <= 0) goto end;
                 
@@ -222,6 +262,7 @@ int spp_connect(SSL *s) {
             /* Send the proxy key material. */
             case SPP_ST_CW_PRXY_MAT_A:
             case SPP_ST_CW_PRXY_MAT_B:
+                printf("Sending proxy key material\n");
                 for (i = 0; i < s->proxies_len; i++) {
                     ret=spp_send_proxy_key_material(s, &(s->proxies[i]));
                     if (ret <= 0) goto end;
@@ -236,13 +277,14 @@ int spp_connect(SSL *s) {
                 break;
                 
             case SPP_ST_CR_PRXY_MAT_A:
-            case SPP_ST_CR_PRXY_MAT_B:
+            case SPP_ST_CR_PRXY_MAT_B:                
                 for (i = s->proxies_len-1; i >= 0; i--) {
                     ret=spp_get_proxy_key_material(s, &(s->proxies[i]));
                     if (ret <= 0) goto end;
                     s->state = SPP_ST_CR_PRXY_MAT_A;
                 }
                 ret=spp_get_end_key_material(s);
+                printf("Received proxy key material\n");
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CW_CHANGE_A;
                 s->s3->change_cipher_spec=0;
@@ -252,6 +294,7 @@ int spp_connect(SSL *s) {
 
             case SSL3_ST_CW_CHANGE_A:
             case SSL3_ST_CW_CHANGE_B:
+                printf("Sending change cipher state\n");
                 ret=ssl3_send_change_cipher_spec(s,SSL3_ST_CW_CHANGE_A,SSL3_ST_CW_CHANGE_B);
                 if (ret <= 0) goto end;
 
@@ -429,6 +472,7 @@ int spp_connect(SSL *s) {
         skip=0;
     }
 end:
+    printf("Handshake end\n");
     s->in_handshake--;
     if (buf != NULL)
         BUF_MEM_free(buf);
