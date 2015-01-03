@@ -1,13 +1,29 @@
-/* A simple HTTPS client
+/* 
+ * Copyright (C) Telefonica 2015
+ * All rights reserved.
+ *
+ * Telefonica Proprietary Information.
+ *
+ * Contains proprietary/trade secret information which is the property of 
+ * Telefonica and must not be made available to, or copied or used by
+ * anyone outside Telefonica without its written authorization.
+ *
+ * Authors: 
+ *   Matteo Varvello <matteo.varvello@telefonica.com> et al. 
+ *
+ * Description: 
+ * An SSL/SPP client that connects to an SSL/SPP through a bunch of 
+ * proxies. 
+ */
 
-   It connects to the server, makes an HTTP
-   request and waits for the response
-*/
-#include <stdbool.h>
-#include "common.h"
-#define KEYFILE "client.pem"
-#define PASSWORD "password"
-#define DEBUG
+#include <stdbool.h>			// to support boolean
+#include "common.h"				// common library between client and server
+#define KEYFILE "client.pem"	// client certificate
+#define PASSWORD "password"		// unused now 	
+#define DEBUG					// verbose logging
+//#define PROXY					// at least one proxy is physically available
+#define CONNECT_TIMEOUT 5		// socket connection timeout 
+
 
 // Read counter of number of proxies in the provided list 
 int read_proxy_count(char *file_name){
@@ -102,27 +118,65 @@ void print_proxy_list(SPP_PROXY **proxies, int N){
 	}
 }
 
+/*
+// Timeout for connect 
+static int sTimeout = 0; 
+
+// Handler for alarm raised by TCP connect 
+static void AlarmHandler(int sig) { 
+  sTimeout = 1; 
+}
+*/
+
 // TCP connect function 
 int tcp_connect(char *host, int port){
 
 	struct hostent *hp;
 	struct sockaddr_in addr;
 	int sock;
-    
-	if(!(hp=gethostbyname(host))){
+
+	// Resolve host 
+	if(!(hp = gethostbyname(host))){
 		berr_exit("Couldn't resolve host");
 	}
-	memset(&addr,0,sizeof(addr));
-	addr.sin_addr=*(struct in_addr*)
-	hp->h_addr_list[0];
-	addr.sin_family=AF_INET;
-	addr.sin_port=htons(port);
+	#ifdef DEBUG
+	printf("Host resolved\n"); 
+	#endif
 
-	if((sock=socket(AF_INET,SOCK_STREAM, IPPROTO_TCP))<0)
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_addr = *(struct in_addr*)
+	hp->h_addr_list[0];
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+
+	if((sock=socket(AF_INET,SOCK_STREAM, IPPROTO_TCP))<0){
 		err_exit("Couldn't create socket");
-	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0)
+	}
+	#ifdef DEBUG
+	printf("Socket created\n"); 
+	#endif
+
+	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0){
 		err_exit("Couldn't connect socket");
-    
+	}
+	#ifdef DEBUG
+	printf("Socket connected\n"); 
+	#endif
+	
+   	/* Check solution below if we need to support a timeout -- to debug  
+	signal(SIGALRM, AlarmHandler); 
+	sTimeout = 0; 
+	alarm(CONNECT_TIMEOUT); 
+
+	if ( connect(sock, (struct sockaddr *) &addr, sizeof(addr)) ){
+		if ( sTimeout ){
+			err_exit("timeout connecting stream socket"); 
+		}
+	}
+	
+	sTimeout = 0; 
+	alarm(CONNECT_TIMEOUT); 
+	*/
 	return sock;
 }
 
@@ -155,87 +209,147 @@ void check_cert(SSL *ssl, char *host){
 	}
 }
 
+// Check for SSL_write error (just write at this point) -- TO DO: check behavior per slice 
+void check_SSL_write_error(SSL *ssl, int r, int request_len){
+	
+	switch(SSL_get_error(ssl, r)){
+		case SSL_ERROR_NONE:
+			if(request_len != r){
+				err_exit("Incomplete write!");
+			}
+			break;
 
-static char *REQUEST_TEMPLATE=
-   "GET / HTTP/1.0\r\nUser-Agent:"
-   "EKRClient\r\nHost: %s:%d\r\n\r\n";
+		default:
+			berr_exit("SSL write problem");
+	}
+}
 
+
+static char *REQUEST_TEMPLATE = "GET / HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
 static char *host=HOST;
 static char *proto; 
 static int port=PORT;
 static int require_server_auth=1;
 
-static int http_request(ssl)
-  SSL *ssl;
-  {
-    char *request=0;
-    char buf[BUFSIZZ];
-    int r;
-    int len, request_len;
-    
-    /* Now construct our HTTP request */
-    request_len=strlen(REQUEST_TEMPLATE)+
-      strlen(host)+6;
-    if(!(request=(char *)malloc(request_len)))
-      err_exit("Couldn't allocate request");
-    snprintf(request,request_len,REQUEST_TEMPLATE,
-      host,port);
+// Make an HTTP request  -- add filename here 
+static int http_request(SSL *ssl){
+	char *request=0;
+	char buf[BUFSIZZ];
+	int r;
+	int len, request_len;
+    	
+	// Construct HTTP request 
+	request_len = strlen(REQUEST_TEMPLATE) + strlen(host) + 6;
+	if(!(request = (char *)malloc(request_len))){
+		err_exit("Couldn't allocate request");
+	}
 
-    /* Find the exact request_len */
-    request_len=strlen(request);
+	// Write request_len bytes to request from the template 
+    snprintf(request, request_len, REQUEST_TEMPLATE, host, port);
 
-    r=SSL_write(ssl,request,request_len);
-    switch(SSL_get_error(ssl,r)){      
-      case SSL_ERROR_NONE:
-        if(request_len!=r)
-          err_exit("Incomplete write!");
-        break;
-        default:
-          berr_exit("SSL write problem");
+	// Find exact request_len
+	request_len = strlen(request);
+
+	// SPP write
+	if (strcmp(proto, "spp") == 0){
+		#ifdef DEBUG
+		printf("SPP_write\n");
+		#endif 
+		int i; 
+		for (i = 0; i < ssl->slices_len; i++){
+			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
+			check_SSL_write_error(ssl, r, request_len); 
+		}
+	} 
+	
+	// SSL write
+	if (strcmp(proto, "ssl") == 0){
+		#ifdef DEBUG
+		printf("SSL_write\n");
+		#endif 
+		r = SSL_write(ssl, request, request_len);
+		check_SSL_write_error(ssl, r, request_len); 
+	}
+
+	// Now read the server's response, assuming  that it's terminated by a close
+	while(1){
+		// SPP read
+		if (strcmp(proto, "spp") == 0){
+			#ifdef DEBUG
+			printf("SPP_read\n");
+			#endif 
+			int i; 
+			// ssl->spp_read_ctx???? 
+			r = SPP_read_record(ssl, buf, BUFSIZZ, ssl->slices, &ssl->spp_read_ctx);	
+			switch(SSL_get_error(ssl, r)){
+				case SSL_ERROR_NONE:
+					len = r;
+					break;
+
+				case SSL_ERROR_ZERO_RETURN:
+					goto shutdown;
+
+				case SSL_ERROR_SYSCALL: 
+					fprintf(stderr, "SSL Error: Premature close\n");
+					goto done;
+
+				default:
+					berr_exit("SSL read problem");
+			}
+		} 
+	
+		// SSL read
+		if (strcmp(proto, "ssl") == 0){
+			#ifdef DEBUG
+			printf("SSL_read\n");
+			#endif 
+			r = SSL_read(ssl, buf, BUFSIZZ);
+			switch(SSL_get_error(ssl, r)){
+				case SSL_ERROR_NONE:
+					len = r;
+					break;
+
+				case SSL_ERROR_ZERO_RETURN:
+					goto shutdown;
+
+				case SSL_ERROR_SYSCALL: 
+					fprintf(stderr, "SSL Error: Premature close\n");
+					goto done;
+
+				default:
+					berr_exit("SSL read problem");
+			}
+		}
+		
+		// Write buf to stdout
+		fwrite(buf, 1, len, stdout);
     }
     
-    /* Now read the server's response, assuming
-       that it's terminated by a close */
-    while(1){
-      r=SSL_read(ssl,buf,BUFSIZZ);
-      switch(SSL_get_error(ssl,r)){
-        case SSL_ERROR_NONE:
-          len=r;
-          break;
-        case SSL_ERROR_ZERO_RETURN:
-          goto shutdown;
-        case SSL_ERROR_SYSCALL:
-          fprintf(stderr,
-            "SSL Error: Premature close\n");
-          goto done;
-        default:
-          berr_exit("SSL read problem");
-      }
+	shutdown:
+		r = SSL_shutdown(ssl);
 
-      fwrite(buf,1,len,stdout);
-    }
+	switch(r){
+		case 1:
+			break; // Success 
+		case 0:
+
+		case -1:
+
+		default:
+			berr_exit("Shutdown failed");
+	}
     
-  shutdown:
-    r=SSL_shutdown(ssl);
-    switch(r){
-      case 1:
-        break; /* Success */
-      case 0:
-      case -1:
-      default:
-        berr_exit("Shutdown failed");
-    }
-    
-  done:
-    SSL_free(ssl);
-    free(request);
-    return(0);
-  }
+	done:
+		SSL_free(ssl);
+		free(request);
+		return(0);
+}
 
 
 // Usage function 
 void usage(void){
 	printf("usage: wclient -h -p -s -r -w -i -f\n"); 
+	printf("[default host=localhost ; default port=4433]"); 
 	printf("-h:   name of host to connect to\n"); 
 	printf("-p:   port of host to connect to\n"); 
 	printf("-s:   number of slices requested\n"); 
@@ -333,19 +447,38 @@ int main(int argc, char **argv){
 		printf ("Check your values for r and w\n"); 
 		usage(); 
 	}
+
+	// Allocate memory for proxies 	
 	SPP_PROXY *proxies[N_proxies]; 
-
-	// Logging 
-	printf("Host: %s, port %d\n", host, port);
-
-    // Build our SSL context
+	
+    // Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
+	ssl = SSL_new(ctx);
 
-	// Connect the TCP socket
+	// Read proxy list 
+	read_proxy_list(filename, proxies, ssl);
+
+	// Print proxy list 
+	#ifdef DEBUG
+	print_proxy_list(proxies, N_proxies); 
+	#endif
+
+	// Connect TCP socket
+	#ifdef PROXY
+	// Following line can be an issue when we want common name to match hostname and a proxy is used 
+	// host = proxies[0]->address; 
+	#ifdef DEBUG 
+	printf("Opening socket to host: %s, port %d\n", proxies[0]->address, port);
+	#endif
+	sock = tcp_connect(proxies[0]->address, port);
+	#else
+	#ifdef DEBUG 
+	printf("Opening socket to host: %s, port %d\n", host, port);
+	#endif
 	sock = tcp_connect(host, port);
+	#endif
 	
 	// Connect the SSL socket 
-	ssl = SSL_new(ctx);
 	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
     SSL_set_bio(ssl, sbio, sbio);
 
@@ -364,14 +497,7 @@ int main(int argc, char **argv){
 		#endif
 	}
 
-	// Read proxy list 
-	read_proxy_list(filename, proxies, ssl);
-
-	// Print proxy list 
-	#ifdef DEBUG
-	print_proxy_list(proxies, N_proxies); 
-	#endif
-	
+		
 	// Assign write access to proxies for all slices 
 	// Find MAX between r and w
 	int MAX = r; 

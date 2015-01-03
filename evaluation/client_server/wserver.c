@@ -108,7 +108,7 @@ void print_proxy_list(SPP_PROXY **proxies, int N){
 	}
 }
 
-// Simple test for SPP
+// Simple test for SPP handshake 
 static int test_SPP(SSL *ssl, int s){
 
 	int N_proxies, N_slices, i; 

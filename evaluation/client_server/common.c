@@ -37,6 +37,7 @@ static int password_cb(char *buf,int num,
 static void sigpipe_handle(int x){
 }
 
+
 // Initialize context
 SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
     SSL_METHOD *meth;
