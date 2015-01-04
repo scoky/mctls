@@ -1128,6 +1128,7 @@ struct spp_mac_st {
     unsigned char write_mac_secret[EVP_MAX_MD_SIZE];
     EVP_MD_CTX *read_hash;
     EVP_MD_CTX *write_hash;
+    long spacer;
 };
 
 struct spp_slice_st

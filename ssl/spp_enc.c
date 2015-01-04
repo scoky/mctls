@@ -77,6 +77,7 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
         // Generate the encryption contexts.
         
         if (slice->enc_read_ctx == NULL) {
+            printf("Generating decryption context\n");
             if ((slice->enc_read_ctx=OPENSSL_malloc(sizeof(EVP_CIPHER_CTX))) == NULL)
                 goto err;
             EVP_CIPHER_CTX_init(slice->enc_read_ctx);
@@ -84,6 +85,7 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
         }
         
         if (slice->enc_write_ctx == NULL) {
+            printf("Generating encryption context\n");
             if ((slice->enc_write_ctx=OPENSSL_malloc(sizeof(EVP_CIPHER_CTX))) == NULL)
                 goto err;
             EVP_CIPHER_CTX_init(slice->enc_write_ctx);
@@ -93,42 +95,44 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
         // And the read mac contexts
         
         if (slice->read_mac == NULL) {
-            EVP_MD_CTX md;            
-            if ((slice->read_mac=malloc(sizeof(SPP_MAC))) == NULL) {
+            EVP_MD_CTX md;       
+            printf("Generating MAC read context\n");
+            if ((slice->read_mac=OPENSSL_malloc(sizeof(SPP_MAC))) == NULL) {
                 goto err;
-            }
+            }            
+            ssl_replace_hash(&(slice->read_mac->write_hash),NULL);
+            printf("Copying a bunch of memory\n");
             memset(&(slice->read_mac->write_sequence[0]),0,8);
             memset(&(slice->read_mac->read_sequence[0]),0,8);
-            ssl_replace_hash(&slice->read_mac->read_hash,m);
-            ssl_replace_hash(&slice->read_mac->write_hash,m);
+            OPENSSL_assert(s->s3->write_mac_secret_size <= EVP_MAX_MD_SIZE);
+            OPENSSL_assert(s->s3->read_mac_secret_size <= EVP_MAX_MD_SIZE);
             memcpy(&(slice->read_mac->write_mac_secret[0]), key, s->s3->write_mac_secret_size);
             memcpy(&(slice->read_mac->read_mac_secret[0]), key, s->s3->read_mac_secret_size);
             slice->read_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
             slice->read_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
-            slice->read_mac->read_hash = EVP_MD_CTX_create();
-            slice->read_mac->write_hash = EVP_MD_CTX_create();
+            printf("Creating second hash\n");
+            ssl_replace_hash(&(slice->read_mac->read_hash),NULL);
         }
     }
     if (slice->write_access) {
+        printf("Generating MAC write context\n");
         xor_array(slice->write_mat, slice->write_mat, slice->other_write_mat, EVP_MAX_KEY_LENGTH);
         key = &(slice->write_mat[0]);
         
         // Generate the write mac context
         
         if (slice->write_mac == NULL) {
-            if ((slice->write_mac=malloc(sizeof(SPP_MAC))) == NULL) {
+            if ((slice->write_mac=OPENSSL_malloc(sizeof(SPP_MAC))) == NULL) {
                 goto err;
             }
+            ssl_replace_hash(&(slice->write_mac->write_hash),NULL);            
             memset(&(slice->write_mac->write_sequence[0]),0,8);
-            memset(&(slice->write_mac->read_sequence[0]),0,8);
-            ssl_replace_hash(&slice->write_mac->read_hash,m);
-            ssl_replace_hash(&slice->write_mac->write_hash,m);           
+            memset(&(slice->write_mac->read_sequence[0]),0,8);                        
             memcpy(&(slice->write_mac->write_mac_secret[0]), key, s->s3->write_mac_secret_size);
             memcpy(&(slice->write_mac->read_mac_secret[0]), key, s->s3->read_mac_secret_size);
             slice->write_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
             slice->write_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
-            slice->write_mac->read_hash = EVP_MD_CTX_create();
-            slice->write_mac->write_hash = EVP_MD_CTX_create();
+            ssl_replace_hash(&(slice->write_mac->read_hash),NULL);
         }
     }
     return 1;
