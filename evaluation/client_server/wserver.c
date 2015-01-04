@@ -17,6 +17,7 @@
 
 
 #include "common.h"
+#include <stdbool.h>            
 #define KEYFILE "server.pem"
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
@@ -131,6 +132,10 @@ void print_proxy_list(SPP_PROXY **proxies, int N){
 static int test_SPP(SSL *ssl, int s){
 
 	int N_proxies, N_slices, i; 
+
+	#ifdef DEBUG
+	printf("[DEBUG] test_SPP called\n"); 
+	#endif 	
 	
 	// print proxies
 	N_proxies = ssl->proxies_len; 
@@ -192,7 +197,7 @@ static int http_serve_new(SSL *ssl, int s, char *proto){
     int r; 
 	
 	#ifdef DEBUG
-	printf("HTTP serve SPP\n"); 
+	printf("[DEBUG] HTTP serve via SPP\n"); 
 	#endif
 
 	// Wait for HTTP header received -- TO DO: verify that a single read is enough!
@@ -479,7 +484,8 @@ static int http_serve_SSL(SSL *ssl, int s){
 // Usage function 
 void usage(void){
 	printf("usage: wserver -f \n");
-	printf("-f:   protocol requested: ssl, spp.\n");
+	printf("-c:   protocol requested: ssl, spp.\n");
+	printf("-t:   {1=test handshake ; 0=data delivery}\n");
 	exit(-1);
 }
 
@@ -495,22 +501,31 @@ int main(int argc, char **argv){
 	char *proto; 						// protocol type 
 	extern char *optarg;                // user input parameters
 	int c; 								// user iput from getopt
+	int temp;	 
+	bool testing = true; 				// testing handhshave vs data delivery 
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "f:")) != -1){
+	while((c = getopt(argc, argv, "c:t:")) != -1){
 		switch(c){
 			// Protocol 
-			case 'f':
+			case 'c':
 				if(! (proto = strdup(optarg) )){
 					err_exit("Out of memory");
 				}
+				break; 
+
+			// Testing choice
+			case 't':
+				temp = atoi(optarg); 
+				testing = (temp == 1 ? true : false);
 				break; 
 			}
 	}
 
 	// Check that input parameters are correct 
 	#ifdef DEBUG
-	printf("Parameters count: %d\n", argc);
+	printf("[DEBUG] Parameters count: %d\n", argc);
+	printf("[DEBUG] proto=%s ; testing=%s\n", proto, testing ? "true" : "false");
 	#endif 
 	if (argc == 1){
 		usage();
@@ -548,15 +563,21 @@ int main(int argc, char **argv){
 				#endif
 			}
     
-			// Serve some content here (for SPP just test handshake)
+			// Serve some content here  (SPP)
 			if (strcmp(proto, "spp") == 0){ 
-				test_SPP(ssl, s);
-				//http_serve_new(ssl, s, proto);
-			} else {
+				if (testing){
+					test_SPP(ssl, s);
+				}else{
+					http_serve_new(ssl, s, proto);
+				}
+			} 
+			
+			// Serve some content here  (SSL)
+			if (strcmp(proto, "ssl") == 0){ 
 				http_serve_new(ssl, s, proto);
-				//http_serve_SSL(ssl, s);
 			}
-			// exit from process forked (?)
+	
+			// exit from process forked
 			exit(0);
 		}
 	}
