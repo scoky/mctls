@@ -242,6 +242,59 @@ printf("\n");
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                     enc_err = 0;    /* This is not a fatal error. Just important information to know. Expose it somehow to the application */
             }
+    } else if ((sess != NULL) &&
+        (s->enc_read_ctx != NULL) &&
+        (EVP_MD_CTX_md(s->read_hash) != NULL))
+        {
+            /* s->read_hash != NULL => mac_size != -1 */
+            unsigned char *mac = NULL;
+            unsigned char mac_tmp[EVP_MAX_MD_SIZE];
+            mac_size=EVP_MD_CTX_size(s->read_hash);
+            OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
+
+            /* kludge: *_cbc_remove_padding passes padding length in rr->type */
+            orig_len = rr->length+((unsigned int)rr->type>>8);
+
+            /* orig_len is the length of the record before any padding was
+             * removed. This is public information, as is the MAC in use,
+             * therefore we can safely process the record in a different
+             * amount of time if it's too short to possibly contain a MAC.
+             */
+            if (orig_len < mac_size ||
+                /* CBC records must have a padding length byte too. */
+                (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE &&
+                 orig_len < mac_size+1))
+                    {
+                    al=SSL_AD_DECODE_ERROR;
+                    SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_LENGTH_TOO_SHORT);
+                    goto f_err;
+                    }
+
+            if (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE)
+                    {
+                    /* We update the length so that the TLS header bytes
+                     * can be constructed correctly but we need to extract
+                     * the MAC in constant time from within the record,
+                     * without leaking the contents of the padding bytes.
+                     * */
+                    mac = mac_tmp;
+                    ssl3_cbc_copy_mac(mac_tmp, rr, mac_size, orig_len);
+                    rr->length -= mac_size;
+                    }
+            else
+                    {
+                    /* In this case there's no padding, so |orig_len|
+                     * equals |rec->length| and we checked that there's
+                     * enough bytes for |mac_size| above. */
+                    rr->length -= mac_size;
+                    mac = &rr->data[rr->length];
+                    }
+
+            i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
+            if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
+                    enc_err = -1;
+            if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
+                    enc_err = -1;
     }
 
     if (enc_err < 0) {
@@ -961,7 +1014,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* we should still have the output to wr->data and the input
      * from wr->input.  Length should be wr->length.
      * wr->data still points in the wb->buf */
-    if (mac_size != 0) {
+    if (mac_size != 0 && slice != NULL) {
         /* Must have read access, so write the read MAC. */
         spp_copy_mac_state(s, slice->read_mac, 1);
         if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
@@ -985,7 +1038,14 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
             /* Copy from the previous record. */
             memcpy(spp_ctx->integrity_mac, &(p[wr->length + eivlen + (mac_size*2)]), mac_size);
         }        
-        wr->length+=(mac_size*3);
+        wr->length+=(mac_size*3);        
+    } else if (mac_size != 0) {
+        /* This will only happen when sending the finished message at the end of the handshake. 
+         * Instead of using a slice, use the parameters computed via the standard TLS handshake to 
+         * both encrypt and generate MAC. */
+        if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
+            goto err;
+	wr->length+=mac_size;
     }
     /* If we do not have read access, then the MACs were interpreted as part of the payload. */
     if (spp_ctx != NULL) {

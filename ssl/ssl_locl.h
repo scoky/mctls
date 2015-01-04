@@ -1098,6 +1098,7 @@ SPP_PROXY* spp_get_next_proxy(SSL *s, int forward);
 int xor_array(unsigned char* dst, unsigned char* src1, unsigned char* src2, size_t len);
 int spp_init_slice_st(SSL *s, SPP_SLICE *slice);
 int spp_init_integrity_st(SSL *s);
+int spp_init_slices_st(SSL *s);
 
 int dtls1_send_hello_request(SSL *s);
 int dtls1_send_server_hello(SSL *s);

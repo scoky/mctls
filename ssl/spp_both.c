@@ -990,7 +990,7 @@ int spp_send_end_key_material(SSL *s) {
         sess_cert = s->session->sess_cert;
         
         n = 0;
-        s1n(s->server == 0 ? 1 : 2, p);
+        s1n(s->server == 0 ? 2 : 1, p);
         for (i = 0; i < s->slices_len; i++) {
             s1n(s->slices[i]->slice_id, p);
             s2n(EVP_MAX_KEY_LENGTH, p);    
@@ -1066,16 +1066,18 @@ int spp_get_end_key_material(SSL *s) {
 
     param=p=(unsigned char *)s->init_msg;
     /* Server or client identifier */
+    printf("Message header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
     n1s(p, id);
-    if (id != 1 || id != 2) {
-        return -1;
+    if (id != 1 && id != 2) {
+        goto err;
     }
     
     /* More to read */
-    while (p-param <= n) {
+    while (p-param < n) {
         n1s(p, slice_id);
+        printf("Slice %d received\n", slice_id);
         slice = SPP_get_slice_by_id(s, slice_id);
-        if (slice == NULL)
+        if (slice == NULL)            
             goto err;
         
         n2s(p, len);
@@ -1094,21 +1096,26 @@ int spp_get_end_key_material(SSL *s) {
         slice->read_access = 1;        
     }
     /* Should now have read the full message. */
-    if (p-param != n)
+    if (p-param != n) {
+        printf("Did not read the whole message, %d != %d\n", p-param, n);
         goto err;
+    }
     /* Check to make sure we have material for all slices. 
      * and generate the contexts. */
     for (n = 0; n < s->slices_len; n++) {
         if (s->slices[n]->write_access == 0 || s->slices[n]->read_access == 0) {
+            printf("Slice %d missing\n", s->slices[n]->slice_id);
             goto err;
         }
         
-        if (spp_init_slice_st(s, s->slices[n]) <= 0) {
+        /* Do not init yet. Save this for on sending the change cipher state message. */
+        /*if (spp_init_slice_st(s, s->slices[n]) <= 0) {
+            printf("Slice %d init failure\n", s->slices[n]->slice_id);
             goto err;
-        }
+        }*/
     }
     
-    return 1;   
+    return 1;
 err:
     return(-1);
 }
