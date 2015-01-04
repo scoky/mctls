@@ -101,7 +101,6 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
                 goto err;
             }            
             ssl_replace_hash(&(slice->read_mac->write_hash),NULL);
-            printf("Copying a bunch of memory\n");
             memset(&(slice->read_mac->write_sequence[0]),0,8);
             memset(&(slice->read_mac->read_sequence[0]),0,8);
             OPENSSL_assert(s->s3->write_mac_secret_size <= EVP_MAX_MD_SIZE);
@@ -110,7 +109,6 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice) {
             memcpy(&(slice->read_mac->read_mac_secret[0]), key, s->s3->read_mac_secret_size);
             slice->read_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
             slice->read_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
-            printf("Creating second hash\n");
             ssl_replace_hash(&(slice->read_mac->read_hash),NULL);
         }
     }

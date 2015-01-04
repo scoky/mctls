@@ -566,8 +566,9 @@ int main(int argc, char **argv){
 		}
  
 	    // Make HTTP request -- TO DO:  extend by passing filename!
-	    http_request(ssl, file_requested, proto);
 	}
+	    http_request(ssl, file_requested, proto);
+
 
     // Shutdown the socket
     destroy_ctx(ctx);

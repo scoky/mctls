@@ -272,7 +272,7 @@ int spp_connect(SSL *s) {
                 
                 s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
                 s->state=SSL3_ST_CW_FLUSH;
-                s->s3->change_cipher_spec=0;
+                //s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
                 break;

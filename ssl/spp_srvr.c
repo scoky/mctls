@@ -449,12 +449,12 @@ int spp_accept(SSL *s) 	{
                      * the client uses its key from the certificate
                      * for key exchange.
                      */
-                    s->state = SPP_ST_CW_PRXY_MAT_A;
+                    s->state = SPP_ST_CR_PRXY_MAT_A;
                     s->init_num = 0;
                     }
                 else if (TLS1_get_version(s) >= TLS1_2_VERSION)
                     {
-                    s->state=SPP_ST_CW_PRXY_MAT_A;
+                    s->state=SPP_ST_CR_PRXY_MAT_A;
                     s->init_num=0;
                     if (!s->session->peer)
                             break;
@@ -475,7 +475,7 @@ int spp_accept(SSL *s) 	{
                     int offset=0;
                     int dgst_num;
 
-                    s->state=SPP_ST_CW_PRXY_MAT_A;
+                    s->state=SPP_ST_CR_PRXY_MAT_A;
                     s->init_num=0;
 
                     /* We need to get hashes here so if there is
@@ -514,7 +514,14 @@ int spp_accept(SSL *s) 	{
                 }
                 ret=spp_send_end_key_material(s);
                 
-                s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
+#if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
+                s->s3->tmp.next_state=SSL3_ST_SR_FINISHED_A;
+#else
+                if (s->s3->next_proto_neg_seen)
+                    s->s3->tmp.next_state=SSL3_ST_SR_NEXT_PROTO_A;
+                else
+                    s->s3->tmp.next_state=SSL3_ST_SR_FINISHED_A;
+#endif
                 s->state=SSL3_ST_SW_FLUSH;
                 //s->s3->change_cipher_spec=0;
 
@@ -531,14 +538,7 @@ int spp_accept(SSL *s) 	{
                 }
                 ret=spp_get_end_key_material(s);
                 if (ret <= 0) goto end;
-#if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
-                s->state=SSL3_ST_SR_FINISHED_A;
-#else
-                if (s->s3->next_proto_neg_seen)
-                    s->state=SSL3_ST_SR_NEXT_PROTO_A;
-                else
-                    s->state=SSL3_ST_SR_FINISHED_A;
-#endif
+                s->state=SPP_ST_CW_PRXY_MAT_A;
                 //s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
