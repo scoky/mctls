@@ -514,8 +514,9 @@ int spp_accept(SSL *s) 	{
                 }
                 ret=spp_send_end_key_material(s);
                 
-                s->state=SPP_ST_CR_PRXY_MAT_A;
-                s->s3->change_cipher_spec=0;
+                s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
+                s->state=SSL3_ST_SW_FLUSH;
+                //s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
                 break;
@@ -587,6 +588,7 @@ int spp_accept(SSL *s) 	{
 			else
 				s->state=SSL3_ST_SW_CHANGE_A;
 			s->init_num=0;
+                                                
 			break;
 
 #ifndef OPENSSL_NO_TLSEXT
@@ -656,7 +658,10 @@ int spp_accept(SSL *s) 	{
 			else
 				s->s3->tmp.next_state=SSL_ST_OK;
 			s->init_num=0;
-                        
+                                
+                        // Handshake finished, setup slices
+                        if (spp_init_slices_st(s) <= 0)
+                            goto end;
                         // Store the values for end-to-end integrity checking
                         if (spp_init_integrity_st(s) <= 0)
                             goto end;
