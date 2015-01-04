@@ -503,9 +503,12 @@ int main(int argc, char **argv){
 	printf("Generating %d slices\n", slices_len); 
 	#endif
 	for (i = 0;  i < slices_len; i++){
+		char *newPurpose;  
 		char str[30]; 
 		sprintf (str, "slices_%d", i); 
-		slice_set[i] = SPP_generate_slice(ssl, str); 
+		newPurpose = (char *)malloc(strlen(str));    
+		strcpy(newPurpose, str);
+		slice_set[i] = SPP_generate_slice(ssl, newPurpose); 
 		#ifdef DEBUG
 		printf("Generated slices %d with purpose %s\n", slice_set[i]->slice_id, slice_set[i]->purpose); 
 		#endif
