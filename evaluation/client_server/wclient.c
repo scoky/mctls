@@ -225,8 +225,14 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 }
 
 
+//HTTP REQUEST -- TO DO (check size calculation since I am sending more junk that I should)
 //static char *REQUEST_TEMPLATE = "GET / HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
-static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
+//static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
+static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\n"
+								"User-Agent:SVAClient\r\n"
+     							"Content-type: application/x-www-form-urlencoded\r\n"
+     							"Content-length: %d\r\n"
+								"Host: %s:%d\r\n\r\n";
 static char *host=HOST;
 static int port=PORT;
 static int require_server_auth=1;
@@ -239,13 +245,13 @@ static int http_request(SSL *ssl, char *filename, char *proto){
 	int len, request_len;
     	
 	// Construct HTTP request 
-	request_len = strlen(REQUEST_TEMPLATE) + strlen(host) + 6;
+	request_len = strlen(REQUEST_TEMPLATE) + strlen(host) + strlen(filename) + 6;
 	if(!(request = (char *)malloc(request_len))){
 		err_exit("Couldn't allocate request");
 	}
 
 	// Write request_len bytes to request by replacing input into the template 
-	snprintf(request, request_len, REQUEST_TEMPLATE, filename, host, port);
+	snprintf(request, request_len, REQUEST_TEMPLATE, filename, request_len, host, port);
 
 	// Find exact request_len
 	request_len = strlen(request);
