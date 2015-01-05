@@ -109,7 +109,7 @@ int calculate_file_size(char *filename){
 	
 	// Return file size 
 	#ifdef DEBUG
-	printf ("File requested is <<%s>> with size <<%d bytes>>\n", filename, sz); 
+	printf ("[DEBUG] File requested is <<%s>> with size <<%d bytes>>\n", filename, sz); 
 	#endif 
 	return sz; 
 }
@@ -119,7 +119,7 @@ void print_proxy_list(SPP_PROXY **proxies, int N){
 	int i; 
 
 	#ifdef DEBUG
-	printf("Print proxy list. There are %d available proxies.\r\n", N);
+	printf("[DEBUG] Print proxy list (There are %d available proxies)\r\n", N);
 	#endif
 
 	// Iterate through list 
@@ -224,9 +224,6 @@ char* parse_http_get(char *buf){
 	delim=" "; 
 	char *fn = strtok(token, delim);   
 	fn = strtok(NULL, delim);   
-	#ifdef DEBUG
-	printf("Requested file is: %s\n", fn); 
-	#endif
 	return fn; 
 }
 
@@ -236,23 +233,18 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 	
  	FILE *fp;				// file descriptot 
 	char buf[BUFSIZZ];		// buffer for data to send
-	char *text;				// some content to send
-	int text_len; 			// lenght of content to send
 	int file_size = 0;		// size of file being sent 
 	int still_to_send; 		// amount of data from file still to be sent 
  
 	// Open requested file for reading
  	if ((fp = fopen(filename,"r")) == NULL){
+		#ifdef DEBUG
+		printf ("File <<%s>> do not exist\n", filename); 
+		#endif 
 		char *data = "Error opening file\r\n"; 
 		sendData(ssl, data, proto); 
-		return -1; 
-		/*text = "Error opening file"; 
-		text_len = strlen(text);
-		int r = SSL_write(ssl, text, text_len);
-		check_SSL_write_error(ssl, r, text_len);
 		fclose(fp); 
 		return -1; 
-		*/
 	}else{
 		// Calculate file size 
 		// Seek  to the end of the file and ask for position 
@@ -262,7 +254,7 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 		fseek(fp, 0L, SEEK_SET);
 		
 		#ifdef DEBUG
-		printf ("File requested is <<%s>> with size <<%d bytes>>\n", filename, file_size); 
+		printf ("[DEBUG] File requested is <<%s>> with size <<%d bytes>>\n", filename, file_size); 
 		#endif 
 	}
 
@@ -301,17 +293,9 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 		// Update how much content is still to send 
 		still_to_send -= (i * toSend);
 		
-		// Put BUFFSIZZ bytes on SPP/SSL connection 
+		// Send <<buf>> on SPP/SSL connection 
 		if (strcmp(proto, "spp") == 0){
-			int j; 
-			//for (j = 0; j < ssl->slices_len; j++){
-			for (j = 0; j < ssl->slices_len; j++){
-				#ifdef DEBUG
-				printf("Writing record with slice %d with purpose %s\n", ssl->slices[j]->slice_id, ssl->slices[j]->purpose); 
-				#endif
-				int r = SPP_write_record(ssl, buf, toSend, ssl->slices[j]);
-				check_SSL_write_error(ssl, r, toSend);
-			}
+			sendData(ssl, buf, proto); 
 		}
 		if (strcmp(proto, "ssl") == 0){
 			int r = SSL_write(ssl, buf, toSend);
@@ -375,15 +359,11 @@ static int http_serve_new(SSL *ssl, int s, char *proto){
 	char buf[BUFSIZZ];
 	char *filename = "pippo.html"; 
 
-	#ifdef DEBUG
-	printf("[DEBUG] HTTP serve via SPP\n"); 
-	#endif
-
-	// Wait for HTTP header received -- TO DO: verify that a single read is enough!
+	// Read HTTP GET (assuming a single read is enough)
 	while(1){
 		if (strcmp(proto, "spp") == 0){
-			SPP_SLICE *slice;       // slice for SPP_read
-			SPP_CTX *ctx;           // context pointer for SPP_read
+			SPP_SLICE *slice;       
+			SPP_CTX *ctx;           
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
 		}
 	
@@ -414,17 +394,17 @@ static int http_serve_new(SSL *ssl, int s, char *proto){
 	data = "HTTP/1.0 200 OK\r\n"; 
 	sendData(ssl, data, proto); 
 
-	// Put server name on the wire
+	/* Put server name on the wire
 	data = "Server: Svarvel\r\n\n"; 
 	sendData(ssl, data, proto); 
 
 	// Line for test page
 	data = "Server test page\r\n"; 
 	sendData(ssl, data, proto); 
+	*/
 
 	// Serve requested file 
 	serveFile(ssl, filename, proto); 
-	
 	// Shutdown SSL - TO DO (check what happens here) 
 	r = SSL_shutdown(ssl);
 	if( !r ){
@@ -660,9 +640,9 @@ int main(int argc, char **argv){
 			} else {
 				#ifdef DEBUG
 				if (strcmp(proto, "ssl") == 0){ 		
-					printf("SSL accept OK\n"); 
+					printf("[DEBUG] SSL accept OK\n"); 
 				}else{
-					printf("SPP accept OK\n"); 
+					printf("[DEBUG] SPP accept OK\n"); 
 				}
 				#endif
 			}
