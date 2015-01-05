@@ -121,6 +121,8 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
         goto f_err;
     }
 
+    printf("encrypted:");
+    spp_print_buffer(rr->input, rr->length);
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
     slice = SPP_get_slice_by_id(s, rr->slice_id);
@@ -181,6 +183,7 @@ printf("\n");
                     
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
+            printf("orig_len=%d, length=%d\n", orig_len, rr->length);
 
             /* orig_len is the length of the record before any padding was
              * removed. This is public information, as is the MAC in use,
@@ -196,6 +199,8 @@ printf("\n");
                     goto f_err;
             }
 
+            printf("packet:");
+            spp_print_buffer(rr->data, rr->length);
             if (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE) {
                 /* We update the length so that the TLS header bytes
                  * can be constructed correctly but we need to extract
@@ -220,6 +225,8 @@ printf("\n");
             } else {
                 spp_ctx->read_mac = mac;
             }
+            printf("mac: ");
+            spp_print_buffer(mac, mac_size);
             printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
             mac_size = spp_ctx->mac_length;
             spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
@@ -228,6 +235,8 @@ printf("\n");
             /* Compute the read mac, the only one we must be able to verify. */
             
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
+            printf("md: ");
+            spp_print_buffer(md, mac_size);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                 enc_err = -1;
                 printf("Read mac fail, %d\n", i);
@@ -1079,7 +1088,11 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* ssl3_enc can only have an error on read */
     /* This is a call to spp_enc which will encrypt or not 
      * depending upon whether we have the encryption material. */
+    printf("pre-encrypt:");
+    spp_print_buffer(wr->input, wr->length);
     s->method->ssl3_enc->enc(s,1);
+    printf("post-encrypt:");
+    spp_print_buffer(wr->input, wr->length);
 
     /* record length after mac and block padding */
     s2n(wr->length,plen);

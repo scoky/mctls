@@ -1126,3 +1126,10 @@ int spp_get_end_key_material(SSL *s) {
 err:
     return(-1);
 }
+
+void spp_print_buffer(unsigned char *buf, int len) {
+    while (len-- > 0) {
+        printf("[%d]",*(buf++));
+    }
+    printf("\n");
+}

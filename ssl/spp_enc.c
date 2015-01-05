@@ -90,7 +90,7 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice, int which) {
             if ((slice->read_ciph->enc_read_ctx=OPENSSL_malloc(sizeof(EVP_CIPHER_CTX))) == NULL)
                 goto err;
             EVP_CIPHER_CTX_init(slice->read_ciph->enc_read_ctx);
-            EVP_CipherInit_ex(slice->read_ciph->enc_read_ctx,c,NULL,key,iv,SSL3_CC_READ);
+            EVP_CipherInit_ex(slice->read_ciph->enc_read_ctx,c,NULL,key,iv,(which & SSL3_CC_WRITE));
 
             // And the read mac contexts
 
@@ -126,7 +126,7 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice, int which) {
             if ((slice->read_ciph->enc_write_ctx=OPENSSL_malloc(sizeof(EVP_CIPHER_CTX))) == NULL)
                 goto err;
             EVP_CIPHER_CTX_init(slice->read_ciph->enc_write_ctx);
-            EVP_CipherInit_ex(slice->read_ciph->enc_write_ctx,c,NULL,key,iv,SSL3_CC_WRITE);
+            EVP_CipherInit_ex(slice->read_ciph->enc_write_ctx,c,NULL,key,iv,(which & SSL3_CC_WRITE));
 
             // And the read mac contexts
 
