@@ -59,9 +59,9 @@ SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
 	if (strcmp(proto, "ssl") == 0){		
 		meth = SSLv23_method();
 	} else {
-		//meth = SPP_method(); 
-		printf("!!!Due to a bug, temporary using SSLv23_method() despite requested SPP (line 62, common.c)\n"); 
-		meth = SSLv23_method();
+		meth = SPP_method(); 
+		//printf("!!!Due to a bug, temporary using SSLv23_method() despite requested SPP (line 62, common.c)\n"); 
+		//meth = SSLv23_method();
 	}
     ctx = SSL_CTX_new(meth);
 
