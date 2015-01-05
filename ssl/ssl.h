@@ -1131,14 +1131,18 @@ struct spp_mac_st {
     long spacer;
 };
 
+struct spp_ciph_st {
+    EVP_CIPHER_CTX *enc_read_ctx;
+    EVP_CIPHER_CTX *enc_write_ctx;
+};
+
 struct spp_slice_st
         {
         /* Contains the details of a slices encryption and 
          * decryption methods. These values should be copied 
          * over to SSL.enc_read_ctx and SSL.enc_write_ctx before 
          * each encrypt or decrypt operation. */
-        EVP_CIPHER_CTX *enc_read_ctx;
-        EVP_CIPHER_CTX *enc_write_ctx;
+        SPP_CIPH *read_ciph;
         SPP_MAC *read_mac;
         SPP_MAC *write_mac;
         /* Indicates whether this context contains the material 
@@ -1470,6 +1474,9 @@ struct ssl_st
             SPP_PROXY *current_proxy;
             int done;
             } spp_handshake;
+            
+        /* Store the parameters negotiated for end-to-end communication (TLS handshake). */
+        SPP_SLICE *def_ctx;
 	};
 
 #endif
@@ -1961,7 +1968,7 @@ void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
 int     SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY* proxies[], int proxies_len);
-int     SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *));
+int     SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next);
 int     SPP_get_slices(SSL *ssl, SPP_SLICE **slices, int *slices_len);
 int     SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len);
 SPP_PROXY* SPP_generate_proxy(SSL *s, char* address);

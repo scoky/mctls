@@ -1093,12 +1093,15 @@ int spp_send_end_key_material(SSL *s);
 int spp_get_proxy_key_material(SSL *s, SPP_PROXY* proxy);
 int spp_get_end_key_material(SSL *s);
 int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send);
+int spp_copy_ciph_state(SSL *s, SPP_CIPH *ciph, int send);
 int spp_generate_slice_keys(SSL *s);
 SPP_PROXY* spp_get_next_proxy(SSL *s, int forward);
 int xor_array(unsigned char* dst, unsigned char* src1, unsigned char* src2, size_t len);
-int spp_init_slice_st(SSL *s, SPP_SLICE *slice);
+int spp_init_slice_st(SSL *s, SPP_SLICE *slice, int which);
+SPP_MAC* spp_init_mac_st(SSL* s, SPP_MAC* mac, unsigned char* key, int which);
 int spp_init_integrity_st(SSL *s);
-int spp_init_slices_st(SSL *s);
+int spp_init_slices_st(SSL *s, int which);
+int spp_store_defaults(SSL *s, int which);
 
 int dtls1_send_hello_request(SSL *s);
 int dtls1_send_server_hello(SSL *s);
@@ -1159,6 +1162,7 @@ int	spp_accept(SSL *s);
 int	spp_connect(SSL *s);
 int	spp_proxy_accept(SSL *s);
 int spp_enc(SSL *s, int send);
+int spp_change_cipher_state(SSL *s, int which);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
 int spp_write_bytes(SSL *s, int type, const void *buf, int len);
 /* TODO: add other needed SPP internal methods here. */

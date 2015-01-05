@@ -389,6 +389,9 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->read_slice = NULL;
         s->_proxy_id = 3;
         s->_slice_id = 1;
+        s->def_ctx = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+        s->def_ctx->read_mac = (SPP_MAC*)malloc(sizeof(SPP_MAC));
+        s->def_ctx->read_ciph = (SPP_CIPH*)malloc(sizeof(SPP_CIPH));
 
 	return(s);
 err:
@@ -970,7 +973,8 @@ int SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY *proxie
     }
     return(SSL_connect(ssl));
 }
-int SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *)) {
+int SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next) {
+    *ssl_next = NULL;
     /* NOT IMPLEMENTED YET!!! */
     return -1;
 }
@@ -1000,8 +1004,7 @@ SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {
     slice = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
     slice->purpose = purpose;
     slice->slice_id = (s->_slice_id++);
-    slice->enc_read_ctx = NULL;
-    slice->enc_write_ctx = NULL;
+    slice->read_ciph = NULL;
     slice->read_access = 1;
     slice->read_mac = NULL;
     slice->write_mac = NULL;

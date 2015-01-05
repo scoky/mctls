@@ -33,6 +33,13 @@ int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send) {
     }
     return 1;
 }
+int spp_copy_ciph_state(SSL *s, SPP_CIPH *ciph, int send) {
+    if (send) {
+        s->enc_write_ctx = ciph->enc_write_ctx;
+    } else {
+        s->enc_read_ctx = ciph->enc_read_ctx;
+    }
+}
 
 SPP_PROXY* spp_get_next_proxy(SSL *s, int forward) {
     int i;

@@ -155,6 +155,12 @@ printf("\n");
         spp_ctx = &(ctx_tmp);
     }
     s->spp_read_ctx = spp_ctx;
+    if (slice != NULL) {
+        printf("Slice not NULL\n");
+        if (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL) {
+            printf("MD not NULL\n");
+        }
+    }
     /* r->length is now the compressed data plus mac */
     /* We can read this record */
     if ((sess != NULL) &&
@@ -162,6 +168,7 @@ printf("\n");
         (slice != NULL) &&
         (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
+            printf("Parsing new MAC\n");
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE*3];
             
@@ -212,7 +219,8 @@ printf("\n");
                 memcpy(spp_ctx->read_mac, mac, mac_size);
             } else {
                 spp_ctx->read_mac = mac;
-            }            
+            }
+            printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
             mac_size = spp_ctx->mac_length;
             spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
             spp_ctx->integrity_mac = &(spp_ctx->write_mac[mac_size]);
@@ -220,19 +228,24 @@ printf("\n");
             /* Compute the read mac, the only one we must be able to verify. */
             
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
-            if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
+            if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                 enc_err = -1;
-            if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size)
+                printf("Read mac fail, %d\n", i);
+            }
+            if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size) {
                 enc_err = -1;
-            
+                printf("Record too long\n");
+            }            
             
             /* Compare the write mac to see if there have been any illegal writes. */
             if (enc_err >= 0 && EVP_MD_CTX_md(slice->write_mac->read_hash) != NULL) {
                 spp_copy_mac_state(s, slice->write_mac, 0);
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
-                if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
+                if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
+                    printf("Write mac fail, %d\n", i);
                     enc_err = -1; 
+                }
             }
             /* Compare the end-to-end integrity mac to see if there have been any writes at all */
             if (enc_err >= 0 && s->i_mac != NULL && EVP_MD_CTX_md(s->i_mac->read_hash) != NULL) {
@@ -252,6 +265,8 @@ printf("\n");
             mac_size=EVP_MD_CTX_size(s->read_hash);
             OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
 
+            printf("Parsing old MAC\n");
+            
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
 
@@ -888,7 +903,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     sess = s->session;
 
     if (slice != NULL) {
-        s->enc_write_ctx = slice->enc_write_ctx;
+        s->enc_write_ctx = slice->read_ciph->enc_write_ctx;
         spp_copy_mac_state(s, slice->read_mac, 1);
     }
     if ((sess == NULL) ||
@@ -1022,7 +1037,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
         
         /* Compute the write hash. */
         if (slice->write_mac != NULL) {
-            spp_copy_mac_state(s, slice->write_mac, 0);
+            spp_copy_mac_state(s, slice->write_mac, 1);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + mac_size]),1) < 0)
                 goto err;
         } else {
@@ -1031,7 +1046,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
         }
         /* Must be an end point, write the integrity hash. */
         if (s->i_mac != NULL) {
-            spp_copy_mac_state(s, s->i_mac, 0);
+            spp_copy_mac_state(s, s->i_mac, 1);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + (mac_size*2)]),1) < 0)
                 goto err;            
         } else {

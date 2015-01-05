@@ -370,9 +370,6 @@ int spp_connect(SSL *s) {
                         s->s3->tmp.next_state=SSL3_ST_CR_FINISHED_A;
                 }
                                 
-                // Handshake finished, setup slices
-                if (spp_init_slices_st(s) <= 0)
-                    goto end;
                 // Store the values for end-to-end integrity checking
                 if (spp_init_integrity_st(s) <= 0)
                     goto end;

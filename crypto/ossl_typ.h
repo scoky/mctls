@@ -179,6 +179,7 @@ typedef struct spp_slice_st SPP_SLICE;
 typedef struct spp_read_st SPP_CTX;
 typedef struct spp_proxy_st SPP_PROXY;
 typedef struct spp_mac_st SPP_MAC;
+typedef struct spp_ciph_st SPP_CIPH;
 
 typedef struct X509_POLICY_NODE_st X509_POLICY_NODE;
 typedef struct X509_POLICY_LEVEL_st X509_POLICY_LEVEL;

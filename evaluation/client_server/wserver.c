@@ -320,7 +320,8 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 // 1) work with both SSL and SPP
 // 2) no usage of BIO APIs
 static int http_serve_new(SSL *ssl, int s, char *proto){
-  
+  	SPP_CTX *ctx;
+	SPP_SLICE *slice;
 	char *request; 
     int r; 
 	char buf[BUFSIZZ];
@@ -333,7 +334,7 @@ static int http_serve_new(SSL *ssl, int s, char *proto){
 	while(1){
 		if (strcmp(proto, "spp") == 0){
 			// ssl->spp_read_ctx???? 
-			r = SPP_read_record(ssl, buf, BUFSIZZ, ssl->slices, &ssl->spp_read_ctx);
+			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
 		}
 	
 		if (strcmp(proto, "ssl") == 0){
