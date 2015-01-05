@@ -284,8 +284,9 @@ static int http_request(SSL *ssl, char *filename, char *proto){
 			#ifdef DEBUG
 			printf("[DEBUG] SPP_read\n");
 			#endif 
-			// ssl->spp_read_ctx???? 
-			r = SPP_read_record(ssl, buf, BUFSIZZ, ssl->slices, &ssl->spp_read_ctx);	
+			SPP_SLICE *slice;		// slice for SPP_read
+			SPP_CTX *ctx;			// context pointer for SPP_read
+			r = SPP_read_record(ssl, buf, BUFSIZZ,&slice, &ctx);	
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					len = r;
@@ -564,11 +565,10 @@ int main(int argc, char **argv){
 		if(require_server_auth){
 	      check_cert(ssl, host);
 		}
- 
-	    // Make HTTP request -- TO DO:  extend by passing filename!
 	}
-	    http_request(ssl, file_requested, proto);
 
+	// Send HTTP request
+	http_request(ssl, file_requested, proto);
 
     // Shutdown the socket
     destroy_ctx(ctx);
