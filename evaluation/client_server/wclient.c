@@ -46,7 +46,7 @@ int read_proxy_count(char *file_name){
 	// Convert char into integer 
 	N = line[0] - '0';
 	#ifdef DEBUG
-	printf("Expected number of proxies is: %d\r\n", N);
+	printf("[DEBUG] Expected number of proxies is: %d\r\n", N);
 	#endif
 	
 	// Close file
@@ -77,9 +77,6 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies, SSL *ssl){
 	
 		// Remove trailing newline (NOTE: strtoK is not thread safe)
 		strtok(line, "\n");
-		#ifdef DEBUG
-		printf("Value read is: %s\r\n", line);
-		#endif 
 		
 		// Handle first line as a special case
 		if (firstLine){
@@ -140,7 +137,7 @@ int tcp_connect(char *host, int port){
 		berr_exit("Couldn't resolve host");
 	}
 	#ifdef DEBUG
-	printf("Host resolved\n"); 
+	printf("[DEBUG] Host %s resolved\n", host); 
 	#endif
 
 	memset(&addr, 0, sizeof(addr));
@@ -153,14 +150,14 @@ int tcp_connect(char *host, int port){
 		err_exit("Couldn't create socket");
 	}
 	#ifdef DEBUG
-	printf("Socket created\n"); 
+	printf("[DEBUG] Socket correctly created\n"); 
 	#endif
 
 	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0){
 		err_exit("Couldn't connect socket");
 	}
 	#ifdef DEBUG
-	printf("Socket connected\n"); 
+	printf("[DEBUG] Socket connected\n"); 
 	#endif
 	
    	/* Check solution below if we need to support a timeout -- to debug  
@@ -187,7 +184,9 @@ void check_cert(SSL *ssl, char *host){
   	
 	long res = SSL_get_verify_result(ssl);  
 	if ((res == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT) || (res == X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN)){
-		printf("[Matteo] Self signed certificate accepted\n"); 
+		#ifdef DEBUG
+		printf("[DEBUG] Self signed certificate accepted\n"); 
+		#endif
 	} else {
     	if(res != X509_V_OK)
 			berr_exit("Certificate doesn't verify\n");
@@ -202,11 +201,13 @@ void check_cert(SSL *ssl, char *host){
 	X509_NAME_get_text_by_NID (X509_get_subject_name(peer), NID_commonName, peer_CN, 256);
       
 	// WARNING NO VALIDATION Validate the hostname
+	/*
 	if (1) {
 		printf("Peer_CN = %s\n", peer_CN);
 		printf("Host = %s\n\n", host);
 		//err_exit("Common name doesn't match host name");
 	}
+	*/
 }
 
 // Check for SSL_write error (just write at this point) -- TO DO: check behavior per slice 
@@ -225,37 +226,23 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 }
 
 
-//HTTP REQUEST -- TO DO (check size calculation since I am sending more junk that I should)
-//static char *REQUEST_TEMPLATE = "GET / HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
-//static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\nUser-Agent:" "SVAClient\r\nHost: %s:%d\r\n\r\n";
-static char *REQUEST_TEMPLATE = "GET %s HTTP/1.0\r\n"
-								"User-Agent:SVAClient\r\n"
-     							"Content-type: application/x-www-form-urlencoded\r\n"
-     							"Content-length: %d\r\n"
-								"Host: %s:%d\r\n\r\n";
 static char *host=HOST;
 static int port=PORT;
 static int require_server_auth=1;
 
-// Make an HTTP request  -- add filename here 
+// Send HTTP get through SSL/SPP
 static int http_request(SSL *ssl, char *filename, char *proto){
-	char *request=0;
+	
+	char request[100];
 	char buf[BUFSIZZ];
 	int r;
 	int len, request_len;
     	
-	// Construct HTTP request 
-	request_len = strlen(REQUEST_TEMPLATE) + strlen(host) + strlen(filename) + 6;
-	if(!(request = (char *)malloc(request_len))){
-		err_exit("Couldn't allocate request");
-	}
-
-	// Write request_len bytes to request by replacing input into the template 
-	snprintf(request, request_len, REQUEST_TEMPLATE, filename, request_len, host, port);
-
-	// Find exact request_len
+	// Form the request 
+	memset(request, 0, sizeof request);
+	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVAClient\r\nHost: %s:%d\r\n\r\n", filename, host, port); 
 	request_len = strlen(request);
-
+	
 	// SPP write
 	if (strcmp(proto, "spp") == 0){
 		#ifdef DEBUG
@@ -284,8 +271,9 @@ static int http_request(SSL *ssl, char *filename, char *proto){
 			#ifdef DEBUG
 			printf("[DEBUG] SPP_read\n");
 			#endif 
-			// ssl->spp_read_ctx???? 
-			r = SPP_read_record(ssl, buf, BUFSIZZ, ssl->slices, &ssl->spp_read_ctx);	
+			SPP_SLICE *slice;		// slice for SPP_read
+			SPP_CTX *ctx;			// context pointer for SPP_read
+			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					len = r;
@@ -346,7 +334,6 @@ static int http_request(SSL *ssl, char *filename, char *proto){
     
 	done:
 		SSL_free(ssl);
-		free(request);
 		return(0);
 }
 
@@ -395,25 +382,23 @@ int main(int argc, char **argv){
         	// Port
 			case 'p':
 				if(! (port = atoi(optarg) ))
-					err_exit("Bogus port specified");
+					err_exit("Bogus port specified (port needs to be > 0)");
 				break;
 		
 			// Number of slices
 			case 's':
 				if(! (slices_len = atoi(optarg) ))
-					err_exit("Bogus number of slices specified");
+					err_exit("Bogus number of slices specified (no. of slices need to be > 0)");
 				break;
 		
 			// Number of proxies with read access (per slice)
 			case 'r':
-				if(! (r = atoi(optarg) ))
-					err_exit("Bogus number of read access specified");
+				r = atoi(optarg); 
 				break;
 
 			// Number of proxies with write access (per slice)
 			case 'w':
-				if(! (w = atoi(optarg) ))
-					err_exit("Bogus number of write access specified");
+				w = atoi(optarg); 
 				break;
 
         	// Integrity check requested 
@@ -443,22 +428,24 @@ int main(int argc, char **argv){
 
 	// Check that input parameters are correct 
 	#ifdef DEBUG
-	printf("Parameters count: %d\n", argc); 
+	printf("[DEBUG] Parameters count: %d\n", argc); 
 	#endif
 	if (argc == 1){
 		usage(); 
 	}
 	
 	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0)){
-		printf("Protocol type specified is not supported. Support proto are: spp, ssl\n"); 
+		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
 		usage(); 
 	}
 
 	// Read number of proxy from file 
 	N_proxies = read_proxy_count(filename); 
-	printf("INPUT host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s\n", host, port, slices_len, r, w, N_proxies, proto); 
+	#ifdef DEBUG
+	printf("[DEBUG] host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s\n", host, port, slices_len, r, w, N_proxies, proto); 
+	#endif 
 	if (r > N_proxies || w > N_proxies){
-		printf ("Check your values for r and w\n"); 
+		printf ("The values for r and w need to be <= than the number of proxies\n"); 
 		usage(); 
 	}
 
@@ -473,21 +460,21 @@ int main(int argc, char **argv){
 	read_proxy_list(filename, proxies, ssl);
 
 	// Print proxy list 
-	#ifdef DEBUG
-	print_proxy_list(proxies, N_proxies); 
-	#endif
+	if (N_proxies > 0){
+		print_proxy_list(proxies, N_proxies); 
+	}
 
 	// Connect TCP socket
 	#ifdef PROXY
 	// Following line can be an issue when we want common name to match hostname and a proxy is used 
 	// host = proxies[0]->address; 
 	#ifdef DEBUG 
-	printf("Opening socket to host: %s, port %d\n", proxies[0]->address, port);
+	printf("[DEBUG] Opening socket to host: %s, port %d\n", proxies[0]->address, port);
 	#endif
 	sock = tcp_connect(proxies[0]->address, port);
 	#else
 	#ifdef DEBUG 
-	printf("Opening socket to host: %s, port %d\n", host, port);
+	printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
 	#endif
 	sock = tcp_connect(host, port);
 	#endif
@@ -500,7 +487,7 @@ int main(int argc, char **argv){
 	int i; 
 	SPP_SLICE *slice_set[slices_len];
 	#ifdef DEBUG
-	printf("Generating %d slices\n", slices_len); 
+	printf("[DEBUG] Generating %d slices\n", slices_len); 
 	#endif
 	for (i = 0;  i < slices_len; i++){
 		char *newPurpose;  
@@ -510,11 +497,10 @@ int main(int argc, char **argv){
 		strcpy(newPurpose, str);
 		slice_set[i] = SPP_generate_slice(ssl, newPurpose); 
 		#ifdef DEBUG
-		printf("Generated slices %d with purpose %s\n", slice_set[i]->slice_id, slice_set[i]->purpose); 
+		printf("[DEBUG] Generated slices %d with purpose %s\n", slice_set[i]->slice_id, slice_set[i]->purpose); 
 		#endif
 	}
 
-		
 	// Assign write access to proxies for all slices 
 	// Find MAX between r and w
 	int MAX = r; 
@@ -523,12 +509,11 @@ int main(int argc, char **argv){
 		
 	// Iterate among proxies
 	for (i = 0; i < MAX ; i++){
-		
 		// assign read access if requested
 		if (i < r){
 			if (SPP_assign_proxy_read_slices(ssl, proxies[i], slice_set, slices_len) == 1 ) {
 				#ifdef DEBUG
-				printf ("Proxy %s correctly assigned read access to slice-set (READ_COUNT=%d)\n", proxies[i]->address, (i + 1)); 
+				printf ("[DEBUG] Proxy %s assigned read access to slice-set (READ_COUNT=%d)\n", proxies[i]->address, (i + 1)); 
 				#endif
 			}
 		}
@@ -546,7 +531,7 @@ int main(int argc, char **argv){
 	// SPP CONNECT 
 	if (strcmp(proto, "spp") == 0){
 		#ifdef DEBUG
-		printf("SPP_connect\n");
+		printf("[DEBUG] SPP_connect\n");
 		#endif 
 		if (SPP_connect(ssl, slice_set, slices_len, proxies, N_proxies) <= 0){
 			berr_exit("SPP connect error");
@@ -556,7 +541,7 @@ int main(int argc, char **argv){
 	// SSL CONNECT 
 	if (strcmp(proto, "ssl") == 0){
 		#ifdef DEBUG
-		printf("SSL_connect\n");
+		printf("[DEBUG] SSL_connect\n");
 		#endif
 		if(SSL_connect(ssl) <= 0)
 			berr_exit("SSL connect error");
@@ -564,14 +549,15 @@ int main(int argc, char **argv){
 		if(require_server_auth){
 	      check_cert(ssl, host);
 		}
- 
-	    // Make HTTP request -- TO DO:  extend by passing filename!
 	}
-	    http_request(ssl, file_requested, proto);
 
+	// Send HTTP request
+	http_request(ssl, file_requested, proto);
 
-    // Shutdown the socket
+	// Remove SSL context
     destroy_ctx(ctx);
+    
+	// Clode socket
     close(sock);
 
 	//Free memory 
@@ -582,7 +568,6 @@ int main(int argc, char **argv){
 		free(slice_set[i]); 
 	}
 	
-	// All done
-    exit(0);
+	// All good
+	return 0; 
   }
-
