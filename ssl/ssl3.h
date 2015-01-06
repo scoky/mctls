@@ -595,11 +595,18 @@ typedef struct ssl3_state_st
 #define SPP_ST_CR_PRXY_KEY_EXCH_A       (0x662|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_KEY_EXCH_B       (0x663|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_DONE_A           (0x664|SSL_ST_CONNECT)
-#define SPP_ST_CR_PRXY_DONE_B           (0x665|SSL_ST_CONNECT)        
+#define SPP_ST_CR_PRXY_DONE_B           (0x665|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_MAT_A            (0x666|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_MAT_B            (0x667|SSL_ST_CONNECT)
 #define SPP_ST_CW_PRXY_MAT_A            (0x668|SSL_ST_CONNECT)
 #define SPP_ST_CW_PRXY_MAT_B            (0x669|SSL_ST_CONNECT)
+#define SPP_ST_CW_PRXY_CERT_A           (0x670|SSL_ST_CONNECT)
+#define SPP_ST_CW_PRXY_CERT_B           (0x671|SSL_ST_CONNECT)
+#define SPP_ST_CW_PRXY_KEY_EXCH_A       (0x672|SSL_ST_CONNECT)
+#define SPP_ST_CW_PRXY_KEY_EXCH_B       (0x673|SSL_ST_CONNECT)
+#define SPP_ST_CW_PRXY_DONE_A           (0x674|SSL_ST_CONNECT)
+#define SPP_ST_CW_PRXY_DONE_B           (0x675|SSL_ST_CONNECT)
+
 
 /* write to server */
 #define SSL3_ST_CW_CERT_A		(0x170|SSL_ST_CONNECT)

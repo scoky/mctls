@@ -124,7 +124,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
     slice = SPP_get_slice_by_id(s, rr->slice_id);
-    printf("Receiving record slice %d\n", rr->slice_id);
+    //printf("Receiving record slice %d\n", rr->slice_id);
     /* Get slice from id if it can be found. */
     /*if (!slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
@@ -156,12 +156,12 @@ printf("\n");
         spp_ctx = &(ctx_tmp);
     }
     s->spp_read_ctx = spp_ctx;
-    if (slice != NULL) {
+    /*if (slice != NULL) {
         printf("Slice not NULL\n");
         if (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL) {
             printf("MD not NULL\n");
         }
-    }
+    }*/
     /* r->length is now the compressed data plus mac */
     /* We can read this record */
     if ((sess != NULL) &&
@@ -169,7 +169,7 @@ printf("\n");
         (slice != NULL) &&
         (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
-            printf("Parsing new MAC\n");
+            //printf("Parsing new MAC\n");
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE*3];
             
@@ -182,7 +182,7 @@ printf("\n");
                     
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
-            printf("orig_len=%d, length=%d\n", orig_len, rr->length);
+            //printf("orig_len=%d, length=%d\n", orig_len, rr->length);
 
             /* orig_len is the length of the record before any padding was
              * removed. This is public information, as is the MAC in use,
@@ -198,8 +198,8 @@ printf("\n");
                     goto f_err;
             }
 
-            printf("packet:");
-            spp_print_buffer(rr->data, rr->length);
+            //printf("packet:");
+            //spp_print_buffer(rr->data, rr->length);
             if (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE) {
                 /* We update the length so that the TLS header bytes
                  * can be constructed correctly but we need to extract
@@ -224,9 +224,9 @@ printf("\n");
             } else {
                 spp_ctx->read_mac = mac;
             }
-            printf("mac: ");
-            spp_print_buffer(mac, mac_size);
-            printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
+            //printf("mac: ");
+            //spp_print_buffer(mac, mac_size);
+            //printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
             mac_size = spp_ctx->mac_length;
             spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
             spp_ctx->integrity_mac = &(spp_ctx->write_mac[mac_size]);
@@ -234,15 +234,15 @@ printf("\n");
             /* Compute the read mac, the only one we must be able to verify. */
             
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
-            printf("md: ");
-            spp_print_buffer(md, mac_size);
+            //printf("md: ");
+            //spp_print_buffer(md, mac_size);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                 enc_err = -1;
                 printf("Read mac fail, %d\n", i);
             }
             if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size) {
                 enc_err = -1;
-                printf("Record too long\n");
+                //printf("Record too long\n");
             }            
             
             /* Compare the write mac to see if there have been any illegal writes. */
@@ -273,7 +273,7 @@ printf("\n");
             mac_size=EVP_MD_CTX_size(s->read_hash);
             OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
 
-            printf("Parsing old MAC\n");
+            //printf("Parsing old MAC\n");
             
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
@@ -997,7 +997,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* Write the slice ID as the 4th byte of the header. */
     wr->slice_id = slice == NULL ? 0 : slice->slice_id;
     *(p++)=wr->slice_id;
-    printf("Sending record slice %d\n", wr->slice_id);
+    //printf("Sending record slice %d\n", wr->slice_id);
     
     /* Explicit IV length, block ciphers and TLS version 1.1 or later */
     if (s->enc_write_ctx && s->version >= TLS1_1_VERSION) {

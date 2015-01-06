@@ -975,10 +975,13 @@ int SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY *proxie
     }
     return(SSL_connect(ssl));
 }
-int SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next) {
-    *ssl_next = NULL;
-    /* NOT IMPLEMENTED YET!!! */
-    return -1;
+int SPP_proxy(SSL *ssl, char* address, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next) {
+    int ret;
+    ssl->proxy_address = address;
+    ssl->proxy_func = connect_func;
+    ret=SSL_accept(ssl);
+    *ssl_next = ssl->other_ssl;
+    return ret;
 }
 int SPP_get_slices(SSL *ssl, SPP_SLICE **slices, int *slices_len) {
     *slices = ssl->slices;

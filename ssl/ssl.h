@@ -1477,6 +1477,11 @@ struct ssl_st
             
         /* Store the parameters negotiated for end-to-end communication (TLS handshake). */
         SPP_SLICE *def_ctx;
+        
+        /* Store the opposite SSL instance for proxies. */
+        SSL *other_ssl;
+        SSL* (*proxy_func)(SSL *, char *);
+        char *proxy_address;
 	};
 
 #endif
@@ -1968,7 +1973,7 @@ void	SSL_free(SSL *ssl);
 int 	SSL_accept(SSL *ssl);
 int 	SSL_connect(SSL *ssl);
 int     SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY* proxies[], int proxies_len);
-int     SPP_proxy(SSL *ssl, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next);
+int     SPP_proxy(SSL *ssl, char *address, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next);
 int     SPP_get_slices(SSL *ssl, SPP_SLICE **slices, int *slices_len);
 int     SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len);
 SPP_PROXY* SPP_generate_proxy(SSL *s, char* address);

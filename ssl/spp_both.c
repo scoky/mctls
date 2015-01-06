@@ -1133,3 +1133,24 @@ void spp_print_buffer(unsigned char *buf, int len) {
     }
     printf("\n");
 }
+
+long spp_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok) {
+    int ret;
+    ret=ssl3_get_message(s, st1, stn, mt, max, ok);
+    // Received a full message as a proxy
+    /*if (s->proxy && *ok) {
+        // Received message was a client hello, special case
+        // Cannot forward on a client hello until after state initialization.
+        if (mt != SSL3_MT_CLIENT_HELLO) {
+            
+        }
+        // Forward client hello on.
+                if ((address = spp_process_clienthello(s)) == NULL)
+                    goto end;
+                if ((next_st = s->proxy_func(s, address)) == NULL)
+                    goto end;
+                s->other_ssl = next_st;
+                next_st->other_ssl = s;
+    }*/
+    return ret;
+}

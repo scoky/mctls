@@ -646,7 +646,7 @@ const SSL_METHOD *func_name(void)  \
 		ssl3_shutdown, \
 		ssl3_renegotiate, \
 		ssl3_renegotiate_check, \
-		ssl3_get_message, \
+		spp_get_message, \
 		spp_read_bytes, \
 		spp_write_bytes, \
 		spp_dispatch_alert, \
@@ -1167,6 +1167,7 @@ int spp_change_cipher_state(SSL *s, int which);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
 int spp_write_bytes(SSL *s, int type, const void *buf, int len);
 int spp_dispatch_alert(SSL *s);
+long spp_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok);
 /* TODO: add other needed SPP internal methods here. */
 
 #ifndef OPENSSL_NO_ECDH

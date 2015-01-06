@@ -153,6 +153,7 @@ int spp_accept(SSL *s) 	{
                     ret=ssl3_get_client_hello(s);
                     printf("Received client hello\n");
                     if (ret <= 0) goto end;
+                    if (!spp_generate_slice_keys(s)) goto end;
                 }
 /* #ifndef OPENSSL_NO_SRP
                 {

@@ -95,6 +95,8 @@ int spp_connect(SSL *s) {
 
                 /* setup buffing BIO */
                 if (!ssl_init_wbio_buffer(s,0)) { ret= -1; goto end; }
+                
+                if (!spp_generate_slice_keys(s)) { ret = -1; goto end; }
 
                 /* don't push the buffering BIO quite yet */
 
