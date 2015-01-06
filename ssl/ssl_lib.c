@@ -388,9 +388,11 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->write_slice = NULL;
         s->read_slice = NULL;
         s->_proxy_id = 3;
-        s->_slice_id = 1;
+        s->_slice_id = 2;
         s->def_ctx = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+        s->def_ctx->slice_id = 1;
         s->def_ctx->read_mac = (SPP_MAC*)malloc(sizeof(SPP_MAC));
+        s->def_ctx->write_mac = s->def_ctx->read_mac;
         s->def_ctx->read_ciph = (SPP_CIPH*)malloc(sizeof(SPP_CIPH));
 
 	return(s);
@@ -1013,12 +1015,15 @@ SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {
 }
 SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id) {
     int i;
+    if (id == s->def_ctx->slice_id) {
+        return s->def_ctx;
+    }
     for (i = 0; i < s->slices_len; i++) {
         if (s->slices[i]->slice_id == id) {
             return s->slices[i];
         }
     }
-    return NULL;    
+    return NULL;
 }
 SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id) {
     int i;
@@ -1050,7 +1055,9 @@ long SSL_get_default_timeout(const SSL *s)
 	return(s->method->get_timeout());
 	}
 int SPP_read_record(SSL *s,void *buf,int num,SPP_SLICE **slice,SPP_CTX **ctx) {
+    //printf("Reading record\n");
     int c = SSL_read(s,buf,num);
+    //printf("Read record slice %d\n", s->read_slice->slice_id);
     *slice = s->read_slice;
     *ctx = s->spp_read_ctx;
     s->read_slice = NULL;
@@ -1091,7 +1098,9 @@ int SPP_write_record(SSL *s,const void *buf,int num,SPP_SLICE *slice) {
     int ret;
     s->write_slice = slice;
     s->spp_write_ctx = NULL;
+    printf("Writing record slice %d...", slice->slice_id);
     ret = SSL_write(s,buf,num);
+    printf("Wrote record\n");
     s->spp_write_ctx = NULL;
     s->write_slice = NULL;
     return ret;

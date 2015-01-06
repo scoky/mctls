@@ -121,11 +121,10 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
         goto f_err;
     }
 
-    printf("encrypted:");
-    spp_print_buffer(rr->input, rr->length);
     /* decrypt in place in 'rr->input' */
     rr->data=rr->input;
     slice = SPP_get_slice_by_id(s, rr->slice_id);
+    printf("Receiving record slice %d\n", rr->slice_id);
     /* Get slice from id if it can be found. */
     /*if (!slice) {
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
@@ -998,6 +997,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* Write the slice ID as the 4th byte of the header. */
     wr->slice_id = slice == NULL ? 0 : slice->slice_id;
     *(p++)=wr->slice_id;
+    printf("Sending record slice %d\n", wr->slice_id);
     
     /* Explicit IV length, block ciphers and TLS version 1.1 or later */
     if (s->enc_write_ctx && s->version >= TLS1_1_VERSION) {
@@ -1088,11 +1088,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* ssl3_enc can only have an error on read */
     /* This is a call to spp_enc which will encrypt or not 
      * depending upon whether we have the encryption material. */
-    printf("pre-encrypt:");
-    spp_print_buffer(wr->input, wr->length);
     s->method->ssl3_enc->enc(s,1);
-    printf("post-encrypt:");
-    spp_print_buffer(wr->input, wr->length);
 
     /* record length after mac and block padding */
     s2n(wr->length,plen);
@@ -1189,4 +1185,15 @@ int spp_write_bytes(SSL *s, int type, const void *buf_, int len) {
 	n-=i;
 	tot+=i;
     }
+}
+
+int spp_dispatch_alert(SSL *s) {
+    int ret;
+    // Switch to the default encryption context before sending alerts
+    SPP_SLICE *last = s->write_slice;
+    s->write_slice = s->def_ctx;
+    ret=ssl3_dispatch_alert(s);
+    // Revert to the previous encryption context
+    s->write_slice = last;
+    return ret;
 }

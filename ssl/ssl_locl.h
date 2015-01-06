@@ -649,7 +649,7 @@ const SSL_METHOD *func_name(void)  \
 		ssl3_get_message, \
 		spp_read_bytes, \
 		spp_write_bytes, \
-		ssl3_dispatch_alert, \
+		spp_dispatch_alert, \
 		ssl3_ctrl, \
 		ssl3_ctx_ctrl, \
 		ssl3_get_cipher_by_char, \
@@ -1166,6 +1166,7 @@ int spp_enc(SSL *s, int send);
 int spp_change_cipher_state(SSL *s, int which);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
 int spp_write_bytes(SSL *s, int type, const void *buf, int len);
+int spp_dispatch_alert(SSL *s);
 /* TODO: add other needed SPP internal methods here. */
 
 #ifndef OPENSSL_NO_ECDH
