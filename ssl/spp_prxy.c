@@ -37,6 +37,17 @@ char * spp_process_clienthello(SSL *s) {
     }
 }
 
+void spp_proxies_count(SSL *s, int *ahead, int *behind) {
+    int i;
+    for (i = 0; i < s->proxies_len; i++) {
+        if (s->proxies[i]->proxy_id == s->proxy_id) {
+            break;
+        }
+    }
+    *ahead = i;
+    *behind = s->proxies_len - i - 1;
+}
+
 int spp_forward_message(SSL *to, SSL*from) {
     unsigned char tBuf=(unsigned char *)to->init_buf->data;
     unsigned char *fBuf = (unsigned char *)from->init_buf->data;
@@ -55,13 +66,31 @@ int spp_duplicate_message(SSL *to, SSL*from) {
     return(ssl3_do_write(to,SSL3_RT_HANDSHAKE));
 }
 
+int get_proxy_msg(SSL *s, int st1, int stn) {
+    int n, ok;
+    n=s->method->ssl_get_message(s,
+        st1,
+        stn,
+        -1,
+        SSL3_RT_MAX_PLAIN_LENGTH,
+        &ok);
+    if (!ok) return n;
+    spp_forward_message(s->other_ssl, s);
+    
+    if (s->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
+        return 2;
+    }
+    return 1;
+}
+
 int spp_proxy_accept(SSL *s) {
     SSL *next_st;
     BUF_MEM *buf;
     char *address;
-    SPP_PROXY *proxy;
+    SPP_PROXY *proxy=NULL, *this_proxy;
     unsigned long alg_k,Time=(unsigned long)time(NULL);
     void (*cb)(const SSL *ssl,int type,int val)=NULL;
+    int ahead,behind;
     int ret= -1,i;
     int new_state,state,skip=0;
 
@@ -179,6 +208,7 @@ int spp_proxy_accept(SSL *s) {
                 // Process locally and call application to start new connection
                 if ((address = spp_process_clienthello(s)) == NULL)
                     goto end;
+                this_proxy = SPP_get_proxy_by_id(s, s->proxy_id);
                 if ((next_st = s->proxy_func(s, address)) == NULL)
                     goto end;
                 // Initialize the new SSL state
@@ -255,14 +285,14 @@ int spp_proxy_accept(SSL *s) {
                 if (s->s3->tmp.cert_req)
                     goto end;
                 else {
-                    s->state=SPP_ST_CW_PRXY_CERT_A;
+                    s->state=SPP_ST_PW_PRXY_CERT_A;
                 }
                 s->init_num=next_st->init_num=0;
 
                 break;
                 
-            case SPP_ST_CW_PRXY_CERT_A:
-            case SPP_ST_CW_PRXY_CERT_B:
+            case SPP_ST_PW_PRXY_CERT_A:
+            case SPP_ST_PW_PRXY_CERT_B:
                 /* Check if it is anon DH or anon ECDH, */
                 /* normal PSK or KRB5 or SRP */
                 if (!(s->s3->tmp.new_cipher->algorithm_auth & (SSL_aNULL|SSL_aKRB5|SSL_aSRP))
@@ -275,12 +305,12 @@ int spp_proxy_accept(SSL *s) {
                 } else
                     skip=1;
 
-                s->state=SPP_ST_CW_PRXY_KEY_EXCH_A;
+                s->state=SPP_ST_PW_PRXY_KEY_EXCH_A;
                 s->init_num=next_st->init_num=0;
                 break;
 
-            case SPP_ST_CW_PRXY_KEY_EXCH_A:
-            case SPP_ST_CW_PRXY_KEY_EXCH_B:
+            case SPP_ST_PW_PRXY_KEY_EXCH_A:
+            case SPP_ST_PW_PRXY_KEY_EXCH_B:
                 alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
                 /* clear this, it may get reset by
@@ -340,45 +370,89 @@ int spp_proxy_accept(SSL *s) {
                 else
                         skip=1;
 
-                s->state=SPP_ST_CW_PRXY_DONE_A;
+                s->state=SPP_ST_PW_PRXY_DONE_A;
                 s->init_num=next_st->init_num=0;
                 break;
                 
-            case SPP_ST_CW_PRXY_DONE_A:
-            case SPP_ST_CW_PRXY_DONE_B:
+            case SPP_ST_PW_PRXY_DONE_A:
+            case SPP_ST_PW_PRXY_DONE_B:
                 printf("Sending server done\n");
                 ret=ssl3_send_server_done(s);
                 printf("Sent server done\n");
                 if (ret <= 0) goto end;
                 ret=spp_duplicate_message(next_st, s);
                 if (ret <= 0) goto end;
-                
-                s->s3->tmp.next_state=SSL3_ST_SR_CERT_A;
+                                
                 s->state=SSL3_ST_SW_FLUSH;
                 s->init_num=next_st->init_num=0;
+                
+                // Receive and forward the certificates for proxies between us and the server
+                if ((proxy = spp_get_next_proxy(s, this_proxy, 1)) != NULL) {
+                    s->s3->tmp.next_state=SPP_ST_PR_BEHIND_A;
+                } else if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL) {
+                    s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
+                } else {
+                    s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
+                }
                 break;
 
-            /*case SSL3_ST_SW_SRVR_HELLO_A:
-            case SSL3_ST_SW_SRVR_HELLO_B:
-                printf("Sending server hello\n");
-                ret=ssl3_send_server_hello(s);
-                if (ret <= 0) goto end;
-#ifndef OPENSSL_NO_TLSEXT
-                if (s->hit) {
-                    if (s->tlsext_ticket_expected)
-                        s->state=SSL3_ST_SW_SESSION_TICKET_A;
-                    else
-                        s->state=SSL3_ST_SW_CHANGE_A;
+            case SPP_ST_PR_BEHIND_A:
+            case SPP_ST_PR_BEHIND_B:
+                printf("Waiting for proxy message\n");
+                while (proxy != NULL) {
+                    s->state=SPP_ST_PR_BEHIND_A;
+                    ret=get_proxy_msg(next_st, SPP_ST_PR_BEHIND_A, SPP_ST_PR_BEHIND_B);
+                    printf("Received proxy certificate\n");
+                    if (ret <= 0) goto end;
+                    s->init_num=next_st->init_num=0;
+                    if (ret == 2) {
+                        if ((proxy = spp_get_next_proxy(s, proxy, 1)) == NULL) {
+                            if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL)
+                                s->state=SPP_ST_PR_AHEAD_A;
+                            else
+                                s->state=SSL3_ST_SR_KEY_EXCH_A;
+                            break;
+                        }
+                    }
                 }
-#else
-                if (s->hit)
-                    s->state=SSL3_ST_SW_CHANGE_A;
-#endif
-                else
-                    s->state=SSL3_ST_SW_CERT_A;
-                s->init_num=0;
-                break;*/
-
+                
+                break;
+                
+            case SPP_ST_PR_AHEAD_A:
+            case SPP_ST_PR_AHEAD_B:
+                printf("Waiting for proxy message\n");
+                while (proxy != NULL) {
+                    s->state=SPP_ST_PR_AHEAD_A;
+                    ret=get_proxy_msg(s, SPP_ST_PR_AHEAD_A, SPP_ST_PR_AHEAD_B);
+                    printf("Received proxy certificate\n");
+                    if (ret <= 0) goto end;
+                    s->init_num=next_st->init_num=0;
+                    if (ret == 2) {
+                        if ((proxy = spp_get_next_proxy(s, proxy, 0)) == NULL) {
+                            s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
+                            break;
+                        } 
+                    }
+                }
+                
+                break;
+                
+            case SPP_ST_CR_PRXY_DONE_A:
+            case SPP_ST_CR_PRXY_DONE_B:
+                ret=spp_get_proxy_done(s, proxy);
+                printf("Received proxy done\n");
+                if (ret <= 0) goto end;
+                                
+                proxy = spp_get_next_proxy(s, proxy, 1);
+                if (proxy == NULL) {
+                    s->state=SSL3_ST_CW_KEY_EXCH_A;
+                } else {
+                    /* Go back and read the next proxy */
+                    s->state=SPP_ST_CR_PRXY_CERT_A;
+                }
+                s->init_num=0;                
+                break;
+                
             case SSL3_ST_SW_CERT_A:
             case SSL3_ST_SW_CERT_B:
                 /* Check if it is anon DH or anon ECDH, */
@@ -564,50 +638,9 @@ int spp_proxy_accept(SSL *s) {
                         ret=ssl3_get_client_certificate(s);
                         if (ret <= 0) goto end;
                     }
-                    proxy = spp_get_next_proxy(s, 0);
-                    if (proxy == NULL) {
-                        s->state=SSL3_ST_SR_KEY_EXCH_A;
-                    } else {
-                        s->state=SPP_ST_CR_PRXY_CERT_A;
-                    }
+                    s->state=SSL3_ST_SR_KEY_EXCH_A;
                     s->init_num=0;
                 }
-                break;
-                
-            case SPP_ST_CR_PRXY_CERT_A:
-            case SPP_ST_CR_PRXY_CERT_B:
-                printf("Waiting for proxy certificate\n");
-                ret=spp_get_proxy_certificate(s, proxy);
-                printf("Received proxy certificate\n");
-                if (ret <= 0) goto end;
-                s->state=SSL3_ST_CR_KEY_EXCH_A;
-                s->init_num=0;
-                break;
-                
-            /* Receive the hello messages from the proxies now. */
-            case SPP_ST_CR_PRXY_KEY_EXCH_A:
-            case SPP_ST_CR_PRXY_KEY_EXCH_B:
-                ret=spp_get_proxy_key_exchange(s, proxy);
-                printf("Received proxy key exchange\n");
-                if (ret <= 0) goto end;
-                s->state=SPP_ST_CR_PRXY_DONE_A;
-                s->init_num=0; 
-                break;
-                
-            case SPP_ST_CR_PRXY_DONE_A:
-            case SPP_ST_CR_PRXY_DONE_B:
-                ret=spp_get_proxy_done(s, proxy);
-                printf("Received proxy done\n");
-                if (ret <= 0) goto end;
-                                
-                proxy = spp_get_next_proxy(s, 1);
-                if (proxy == NULL) {
-                    s->state=SSL3_ST_SR_KEY_EXCH_A;
-                } else {
-                    /* Go back and read the next proxy */
-                    s->state=SPP_ST_CR_PRXY_CERT_A;
-                }
-                s->init_num=0;                
                 break;
                 
             case SSL3_ST_SR_KEY_EXCH_A:

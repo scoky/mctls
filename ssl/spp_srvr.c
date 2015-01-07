@@ -21,7 +21,7 @@ IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_server_method,
         
 int spp_accept(SSL *s) 	{
     BUF_MEM *buf;
-    SPP_PROXY *proxy;
+    SPP_PROXY *proxy=NULL;
     unsigned long alg_k,Time=(unsigned long)time(NULL);
     void (*cb)(const SSL *ssl,int type,int val)=NULL;
     int ret= -1,i;
@@ -387,7 +387,7 @@ int spp_accept(SSL *s) 	{
                         ret=ssl3_get_client_certificate(s);
                         if (ret <= 0) goto end;
                     }
-                    proxy = spp_get_next_proxy(s, 0);
+                    proxy = spp_get_next_proxy(s, proxy, 0);
                     if (proxy == NULL) {
                         s->state=SSL3_ST_SR_KEY_EXCH_A;
                     } else {
@@ -423,7 +423,7 @@ int spp_accept(SSL *s) 	{
                 printf("Received proxy done\n");
                 if (ret <= 0) goto end;
                                 
-                proxy = spp_get_next_proxy(s, 1);
+                proxy = spp_get_next_proxy(s, proxy, 1);
                 if (proxy == NULL) {
                     s->state=SSL3_ST_SR_KEY_EXCH_A;
                 } else {

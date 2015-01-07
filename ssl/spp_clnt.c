@@ -20,7 +20,7 @@ IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_client_method,
 
 int spp_connect(SSL *s) {
     BUF_MEM *buf=NULL;
-    SPP_PROXY* proxy;
+    SPP_PROXY* proxy=NULL;
     unsigned long Time=(unsigned long)time(NULL);
     void (*cb)(const SSL *ssl,int type,int val)=NULL;
     int ret= -1,i;
@@ -185,7 +185,7 @@ int spp_connect(SSL *s) {
                 if (s->s3->tmp.cert_req)
                     s->state=SSL3_ST_CW_CERT_A;
                 else {
-                    proxy = spp_get_next_proxy(s, 1);
+                    proxy = spp_get_next_proxy(s, proxy, 1);
                     if (proxy == NULL) {
                         s->state=SSL3_ST_CW_KEY_EXCH_A;
                     } else {
@@ -204,7 +204,7 @@ int spp_connect(SSL *s) {
                 printf("Sending client certificate\n");
                 if (ret <= 0) goto end;
 
-                proxy = spp_get_next_proxy(s, 1);
+                proxy = spp_get_next_proxy(s, proxy, 1);
                 if (proxy == NULL) {
                     s->state=SSL3_ST_CW_KEY_EXCH_A;
                 } else {
@@ -240,7 +240,7 @@ int spp_connect(SSL *s) {
                 printf("Received proxy done\n");
                 if (ret <= 0) goto end;
                                 
-                proxy = spp_get_next_proxy(s, 1);
+                proxy = spp_get_next_proxy(s, proxy, 1);
                 if (proxy == NULL) {
                     s->state=SSL3_ST_CW_KEY_EXCH_A;
                 } else {

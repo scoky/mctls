@@ -41,18 +41,30 @@ int spp_copy_ciph_state(SSL *s, SPP_CIPH *ciph, int send) {
     }
 }
 
-SPP_PROXY* spp_get_next_proxy(SSL *s, int forward) {
+SPP_PROXY* spp_get_next_proxy(SSL *s, SPP_PROXY* proxy, int forward) {
     int i;
+    if (s->proxies_len == 0) {
+        return NULL;
+    }
+    
     if (forward) {
-        for (i = 0; i < s->proxies_len; i++) {
-            if (s->proxies[i]->done == 0) {
-                return s->proxies[i];
+        // Return the first proxy
+        if (proxy == NULL) {
+            return s->proxies[0];
+        }
+        for (i = 0; i < s->proxies_len-1; i++) {
+            if (s->proxies[i]->proxy_id == proxy->proxy_id) {
+                return s->proxies[i+1];
             }
         }
     } else {
-        for (i = s->proxies_len - 1; i >= 0; i--) {
-            if (s->proxies[i]->done == 0) {
-                return s->proxies[i];
+        // Return the last one
+        if (proxy == NULL) {
+            return s->proxies[s->proxies_len-1];
+        }
+        for (i = s->proxies_len - 1; i >= 1; i--) {
+            if (s->proxies[i]->proxy_id == proxy->proxy_id) {
+                return s->proxies[i-1];
             }
         }
     }

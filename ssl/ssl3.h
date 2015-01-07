@@ -597,16 +597,21 @@ typedef struct ssl3_state_st
 #define SPP_ST_CR_PRXY_DONE_A           (0x664|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_DONE_B           (0x665|SSL_ST_CONNECT)
 #define SPP_ST_CR_PRXY_MAT_A            (0x666|SSL_ST_CONNECT)
-#define SPP_ST_CR_PRXY_MAT_B            (0x667|SSL_ST_CONNECT)
+#define SPP_ST_CR_PRXY_MAT_B            (0x667|SSL_ST_CONNECT)        
 #define SPP_ST_CW_PRXY_MAT_A            (0x668|SSL_ST_CONNECT)
 #define SPP_ST_CW_PRXY_MAT_B            (0x669|SSL_ST_CONNECT)
-#define SPP_ST_CW_PRXY_CERT_A           (0x670|SSL_ST_CONNECT)
-#define SPP_ST_CW_PRXY_CERT_B           (0x671|SSL_ST_CONNECT)
-#define SPP_ST_CW_PRXY_KEY_EXCH_A       (0x672|SSL_ST_CONNECT)
-#define SPP_ST_CW_PRXY_KEY_EXCH_B       (0x673|SSL_ST_CONNECT)
-#define SPP_ST_CW_PRXY_DONE_A           (0x674|SSL_ST_CONNECT)
-#define SPP_ST_CW_PRXY_DONE_B           (0x675|SSL_ST_CONNECT)
-
+        
+/* Proxy states */
+#define SPP_ST_PW_PRXY_CERT_A           (0x670|SSL_ST_ACCEPT)
+#define SPP_ST_PW_PRXY_CERT_B           (0x671|SSL_ST_ACCEPT)
+#define SPP_ST_PW_PRXY_KEY_EXCH_A       (0x672|SSL_ST_ACCEPT)
+#define SPP_ST_PW_PRXY_KEY_EXCH_B       (0x673|SSL_ST_ACCEPT)
+#define SPP_ST_PW_PRXY_DONE_A           (0x674|SSL_ST_ACCEPT)
+#define SPP_ST_PW_PRXY_DONE_B           (0x675|SSL_ST_ACCEPT)
+#define SPP_ST_PR_AHEAD_A               (0x676|SSL_ST_ACCEPT)
+#define SPP_ST_PR_AHEAD_B               (0x677|SSL_ST_ACCEPT)
+#define SPP_ST_PR_BEHIND_A              (0x678|SSL_ST_ACCEPT)
+#define SPP_ST_PR_BEHIND_B              (0x679|SSL_ST_ACCEPT)
 
 /* write to server */
 #define SSL3_ST_CW_CERT_A		(0x170|SSL_ST_CONNECT)
@@ -688,6 +693,17 @@ typedef struct ssl3_state_st
 #define SSL3_ST_SW_CERT_STATUS_A	(0x200|SSL_ST_ACCEPT)
 #define SSL3_ST_SW_CERT_STATUS_B	(0x201|SSL_ST_ACCEPT)
 
+#define SPP_ST_SR_PRXY_CERT_A           (0x761|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_CERT_B           (0x762|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_KEY_EXCH_A       (0x763|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_KEY_EXCH_B       (0x764|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_DONE_A           (0x765|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_DONE_B           (0x766|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_MAT_A            (0x767|SSL_ST_ACCEPT)
+#define SPP_ST_SR_PRXY_MAT_B            (0x768|SSL_ST_ACCEPT)        
+#define SPP_ST_SW_PRXY_MAT_A            (0x769|SSL_ST_ACCEPT)
+#define SPP_ST_SW_PRXY_MAT_B            (0x770|SSL_ST_ACCEPT)        
+        
 #define SSL3_MT_HELLO_REQUEST			0
 #define SSL3_MT_CLIENT_HELLO			1
 #define SSL3_MT_SERVER_HELLO			2
