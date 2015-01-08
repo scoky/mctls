@@ -156,6 +156,7 @@ void sendData(SSL *ssl, char *request, char *proto){
 			#ifdef DEBUG
 			printf("[sendData] Write record with slice [%d ; %s]\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
 			#endif
+			// currently writing same record -- differentiate per record in the future
 			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
 			check_SSL_write_error(ssl, r, request_len);
 		}
@@ -582,14 +583,15 @@ int main(int argc, char **argv){
 	SSL *ssl;
 	int r;
 	pid_t pid;
-	char *proto; 						// protocol type 
+	char *proto;                        //protocol type 
 	extern char *optarg;                // user input parameters
-	int c; 								// user iput from getopt
+	int c;                              // user iput from getopt
 	int temp;	 
-	bool testing = true; 				// testing handhshave vs data delivery 
+	bool testing = true;                // testing 200OK vs data delivery 
+	bool handshake_only = false;        // testing handhshake only (s_time)
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "c:t:")) != -1){
+	while((c = getopt(argc, argv, "c:t:o:")) != -1){
 		switch(c){
 			// Protocol 
 			case 'c':
@@ -603,13 +605,19 @@ int main(int argc, char **argv){
 				temp = atoi(optarg); 
 				testing = (temp == 1 ? true : false);
 				break; 
+		
+			// Handshake only (integrate with above and extend)
+			case 'o':
+				temp = atoi(optarg); 
+				handshake_only = (temp == 1 ? true : false);
+				break; 
 			}
 	}
 
 	// Check that input parameters are correct 
 	#ifdef DEBUG
 	printf("[DEBUG] Parameters count: %d\n", argc);
-	printf("[DEBUG] proto=%s ; testing=%s\n", proto, testing ? "true" : "false");
+	printf("[DEBUG] proto=%s ; testing=%s handshake_only=%s\n", proto, testing ? "true" : "false", handshake_only ? "true" : "false");
 	#endif 
 	if (argc == 1){
 		usage();
@@ -648,17 +656,19 @@ int main(int argc, char **argv){
 			}
     
 			// Serve some content here  (SPP)
-			if (strcmp(proto, "spp") == 0){ 
-				if (testing){
-					test_SPP(ssl, s, proto);
-				}else{
+			if (! handshake_only){
+				if (strcmp(proto, "spp") == 0){ 
+					if (testing){
+						test_SPP(ssl, s, proto);
+					}else{
+						http_serve_new(ssl, s, proto);
+					}
+				} 
+			
+				// Serve some content here  (SSL)
+				if (strcmp(proto, "ssl") == 0){ 
 					http_serve_new(ssl, s, proto);
 				}
-			} 
-			
-			// Serve some content here  (SSL)
-			if (strcmp(proto, "ssl") == 0){ 
-				http_serve_new(ssl, s, proto);
 			}
 	
 			// exit from process forked
