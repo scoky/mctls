@@ -103,7 +103,7 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies, SSL *ssl){
 	fclose(fp);
 }
 
-// Function to read a proxy list from file and populate array of proxies
+// Print proxy list 
 void print_proxy_list(SPP_PROXY **proxies, int N){
 	int i; 
 	
@@ -356,17 +356,17 @@ void usage(void){
 
 // Main function     
 int main(int argc, char **argv){
-	SSL_CTX *ctx;							// SSL context
-	SSL *ssl;								// SSL context
-	BIO *sbio;								// ?
-	int sock;								// socket
-	extern char *optarg;					// user input parameters
-	int c;									// user iput from getopt
-	int N_proxies = 0;						// number of proxies indicated
-	char *filename = "proxyList"; 			// filename for proxy
-	int slices_len = 0, r = 0, w = 0;		// slice related parameters
-	char *file_requested = "index.html";	// file requeste for HTTP GET
-	char *proto = "ssl"; 					// protocl of choice 
+	SSL_CTX *ctx;                          // SSL context
+	SSL *ssl;                              // SSL instance
+	BIO *sbio;
+	int sock;                              // socket descriptor 
+	extern char *optarg;                   // user input parameters
+	int c;                                 // user iput from getopt
+	int N_proxies = 0;                     // number of proxies indicated
+	char *filename = "proxyList";          // filename for proxy
+	int slices_len = 0, r = 0, w = 0;      // slice related parameters
+	char *file_requested = "index.html";   // file requeste for HTTP GET
+	char *proto = "ssl";                   // protocl of choice 
 
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:")) != -1){
