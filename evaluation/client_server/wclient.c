@@ -24,6 +24,9 @@
 //#define PROXY					// at least one proxy is physically available
 #define CONNECT_TIMEOUT 5		// socket connection timeout 
 
+static char *host=HOST;
+static int port=PORT;
+static int require_server_auth = 1;
 
 // Read counter of number of proxies in the provided list 
 int read_proxy_count(char *file_name){
@@ -226,42 +229,70 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 }
 
 
-static char *host=HOST;
-static int port=PORT;
-static int require_server_auth=1;
+// Perform a connect
+void doConnect (SSL *ssl, char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_set, SPP_PROXY **proxies){
+	// SPP CONNECT 
+	if (strcmp(proto, "spp") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] SPP_connect\n");
+		#endif 
+		if (SPP_connect(ssl, slice_set, slices_len, proxies, N_proxies) <= 0){
+			berr_exit("SPP connect error");
+		}
+	} 
+	
+	// SSL CONNECT 
+	if (strcmp(proto, "ssl") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] SSL_connect\n");
+		#endif
+		if(SSL_connect(ssl) <= 0)
+			berr_exit("SSL connect error");
+   	} 
+	/*
+	if(require_server_auth){
+	      check_cert(ssl, host);
+	}
+	*/
+}
+
 
 // Send HTTP get through SSL/SPP
-static int http_request(SSL *ssl, char *filename, char *proto){
+static int http_request(SSL *ssl, char *filename, char *proto, bool requestingFile){
 	
 	char request[100];
 	char buf[BUFSIZZ];
 	int r;
 	int len, request_len;
-    	
-	// Form the request 
-	memset(request, 0, sizeof request);
-	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVAClient\r\nHost: %s:%d\r\n\r\n", filename, host, port); 
-	request_len = strlen(request);
+
+	// Request file (simplify with function I wrote) -- TO DO     	
+	if (requestingFile){
+
+		// Form the request 
+		memset(request, 0, sizeof request);
+		sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVAClient\r\nHost: %s:%d\r\n\r\n", filename, host, port); 
+		request_len = strlen(request);
 	
-	// SPP write
-	if (strcmp(proto, "spp") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SPP_write\n");
-		#endif 
-		int i; 
-		for (i = 0; i < ssl->slices_len; i++){
-			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
+		// SPP write
+		if (strcmp(proto, "spp") == 0){
+			#ifdef DEBUG
+			printf("[DEBUG] SPP_write\n");
+			#endif 
+			int i; 
+			for (i = 0; i < ssl->slices_len; i++){
+				r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
+				check_SSL_write_error(ssl, r, request_len); 
+			}
+		} 
+	
+		// SSL write
+		if (strcmp(proto, "ssl") == 0){
+			#ifdef DEBUG
+			printf("[DEBUG] SSL_write\n");
+			#endif 
+			r = SSL_write(ssl, request, request_len);
 			check_SSL_write_error(ssl, r, request_len); 
 		}
-	} 
-	
-	// SSL write
-	if (strcmp(proto, "ssl") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SSL_write\n");
-		#endif 
-		r = SSL_write(ssl, request, request_len);
-		check_SSL_write_error(ssl, r, request_len); 
 	}
 
 	// Now read the server's response, assuming  that it's terminated by a close
@@ -349,7 +380,7 @@ void usage(void){
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
 	printf("-f:   file for http GET\n"); 
-	printf("-c:   protocol chosen (sll ; spp)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp)\n"); 
 	exit(-1);  
 }
 
@@ -362,14 +393,18 @@ int main(int argc, char **argv){
 	int sock;                              // socket descriptor 
 	extern char *optarg;                   // user input parameters
 	int c;                                 // user iput from getopt
-	int N_proxies = 0;                     // number of proxies indicated
 	char *filename = "proxyList";          // filename for proxy
-	int slices_len = 0, r = 0, w = 0;      // slice related parameters
+	int r = 0, w = 0;                      // slice related parameters
 	char *file_requested = "index.html";   // file requeste for HTTP GET
-	char *proto = "ssl";                   // protocl of choice 
+	char *proto = "ssl";                   // protocol to use (ssl ; spp)  
+	SPP_SLICE **slice_set;                 // slice array 
+	int slices_len = 0;                    // number of slices 
+	SPP_PROXY **proxies;                   // proxy array 
+	int N_proxies = 0;                     // number of proxies in path 
+	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file)
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:")) != -1){
+	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:o:")) != -1){
 			
 			switch(c){
 	
@@ -417,7 +452,12 @@ int main(int argc, char **argv){
 				if(! (file_requested = strdup(optarg) ))
 					err_exit("Out of memory");
 				break; 
-					
+
+			// Client/Server behavior 
+			case 'o':
+				action = atoi(optarg); 
+				break; 
+
 			// default case 
 			default:
 				usage(); 
@@ -426,6 +466,9 @@ int main(int argc, char **argv){
     }
 
 
+	// Read number of proxy from file 
+	N_proxies = read_proxy_count(filename); 
+	
 	// Check that input parameters are correct 
 	#ifdef DEBUG
 	printf("[DEBUG] Parameters count: %d\n", argc); 
@@ -433,28 +476,38 @@ int main(int argc, char **argv){
 	if (argc == 1){
 		usage(); 
 	}
-	
+	if (action < 1 || action > 3){
+		usage(); 
+	}
 	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0)){
 		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
 		usage(); 
 	}
-
-	// Read number of proxy from file 
-	N_proxies = read_proxy_count(filename); 
-	#ifdef DEBUG
-	printf("[DEBUG] host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s\n", host, port, slices_len, r, w, N_proxies, proto); 
-	#endif 
 	if (r > N_proxies || w > N_proxies){
 		printf ("The values for r and w need to be <= than the number of proxies\n"); 
 		usage(); 
 	}
 
-	// Allocate memory for proxies 	
-	SPP_PROXY *proxies[N_proxies]; 
-	
-    // Build SSL context
+	// Construct string for client/server behavior
+	char *temp_str = "undefined";
+	if (action == 1)
+		temp_str = "handshake_only";  
+	if (action == 2)
+		temp_str = "200_OK";  
+	if (action == 3)
+		temp_str = "serve_file";	
+
+	// Logging input parameters 
+	#ifdef DEBUG
+	printf("[DEBUG] host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
+	#endif 
+
+	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
 	ssl = SSL_new(ctx);
+
+	// Allocate memory for proxies 	
+	proxies  = malloc( N_proxies * sizeof (SPP_PROXY*));
 
 	// Read proxy list 
 	read_proxy_list(filename, proxies, ssl);
@@ -485,7 +538,8 @@ int main(int argc, char **argv){
 
 	// Create slices_n slices with incremental purpose 
 	int i; 
-	SPP_SLICE *slice_set[slices_len];
+	//SPP_SLICE *slice_set[slices_len];
+	slice_set  = malloc( slices_len * sizeof (SPP_SLICE*));
 	#ifdef DEBUG
 	printf("[DEBUG] Generating %d slices\n", slices_len); 
 	#endif
@@ -527,32 +581,35 @@ int main(int argc, char **argv){
 			}
 		}
 	}
-
-	// SPP CONNECT 
-	if (strcmp(proto, "spp") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SPP_connect\n");
-		#endif 
-		if (SPP_connect(ssl, slice_set, slices_len, proxies, N_proxies) <= 0){
-			berr_exit("SPP connect error");
-		}
-	} 
 	
-	// SSL CONNECT 
-	if (strcmp(proto, "ssl") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SSL_connect\n");
-		#endif
-		if(SSL_connect(ssl) <= 0)
-			berr_exit("SSL connect error");
-    
-		if(require_server_auth){
-	      check_cert(ssl, host);
-		}
+	// Let's connect
+	doConnect (ssl, proto, slices_len, N_proxies, slice_set, proxies); 
+	
+	// Switch across possible client-server behavior
+	// // NOTE: here we can add more complex strategies
+	switch(action){
+		// Handshake only 
+		case 1:  
+			break; 
+                
+		// Respond with 200 OK
+		case 2:  
+			// Send HTTP request
+			http_request(ssl, file_requested, proto, false);
+			break; 
+
+		// Serve some content 
+		case 3:  
+			// Send HTTP request
+			http_request(ssl, file_requested, proto, true);
+			break; 
+ 
+		// Unknown option 
+		default: 
+			usage();
+			break; 
 	}
 
-	// Send HTTP request
-	http_request(ssl, file_requested, proto);
 
 	// Remove SSL context
     destroy_ctx(ctx);
@@ -570,4 +627,4 @@ int main(int argc, char **argv){
 	
 	// All good
 	return 0; 
-  }
+}

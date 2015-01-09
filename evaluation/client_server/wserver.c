@@ -70,13 +70,13 @@ void load_dh_params(SSL_CTX *ctx, char *file){
 	}
 }
 
-// 
+// Generate ephemeral RSA key (check DH) 
 void generate_eph_rsa_key(ctx)
   SSL_CTX *ctx;
   {
     RSA *rsa;
 
-    rsa=RSA_generate_key(512,RSA_F4,NULL,NULL);
+    rsa = RSA_generate_key(512, RSA_F4, NULL, NULL);
     
     if (!SSL_CTX_set_tmp_rsa(ctx,rsa))
       berr_exit("Couldn't set RSA key");
@@ -154,7 +154,7 @@ void sendData(SSL *ssl, char *request, char *proto){
 	if (strcmp(proto, "spp") == 0){
 		for (i = 0; i < ssl->slices_len; i++){
 			#ifdef DEBUG
-			printf("[sendData] Write record with slice [%d ; %s]\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
+			printf("[DEBUG] Write record with slice [%d ; %s]\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
 			#endif
 			// currently writing same record -- differentiate per record in the future
 			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
@@ -168,25 +168,31 @@ void sendData(SSL *ssl, char *request, char *proto){
 }
 
 // Simple test for SPP handshake 
-static int test_SPP(SSL *ssl, int s, char *proto){
+static int http_simple_response(SSL *ssl, int s, char *proto){
 
 	int N_proxies, N_slices, i; 
 
 	#ifdef DEBUG
-	printf("[DEBUG] test_SPP called\n"); 
+	printf("[DEBUG] HTTP test simple response\n"); 
 	#endif 	
 	
-	// print proxies
-	N_proxies = ssl->proxies_len; 
-	for (i = 0; i < N_proxies; i++){
-		printf("Proxy: %s\n", ssl->proxies[i]->address); 
-	}
+	#ifdef DEBUG
+	printf("[DEBUG] Verify proxies and slices were correctly received\n"); 
 
-	// print slices
-	N_slices = ssl->slices_len; 
-	for (i = 0; i < N_slices; i++){
-		printf("Slice with ID %d and purpose %s\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
+	if (strcmp(proto, "spp") == 0){
+		// Print proxies
+		N_proxies = ssl->proxies_len; 
+		for (i = 0; i < N_proxies; i++){
+			printf("\t[DEBUG] Proxy: %s\n", ssl->proxies[i]->address); 
+		}
+
+		// print slices
+		N_slices = ssl->slices_len; 
+		for (i = 0; i < N_slices; i++){
+			printf("\t[DEBUG] Slice with ID %d and purpose %s\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
+		}
 	}
+	#endif 
 
 	// put 200 OK on the wire 
 	char *data = "HTTP/1.0 200 OK\r\n"; 
@@ -353,9 +359,8 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 
 // 1) work with both SSL and SPP
 // 2) no usage of BIO APIs
-static int http_serve_new(SSL *ssl, int s, char *proto){
+static int http_serve_request(SSL *ssl, int s, char *proto){
   
-	char *data; 
     int r; 
 	char buf[BUFSIZZ];
 	char *filename = "pippo.html"; 
@@ -388,32 +393,21 @@ static int http_serve_new(SSL *ssl, int s, char *proto){
 		}
 	}
 
-	// Parse filename from HTTP GET
-	filename = parse_http_get(buf); 
-
-	// Put 200 OK on the wire 
-	data = "HTTP/1.0 200 OK\r\n"; 
-	sendData(ssl, data, proto); 
-
-	/* Put server name on the wire
-	data = "Server: Svarvel\r\n\n"; 
-	sendData(ssl, data, proto); 
-
-	// Line for test page
-	data = "Server test page\r\n"; 
+	// Q: do we still want this? 
+	/* Put 200 OK on the wire 
+	char *data = "HTTP/1.0 200 OK\r\n"; 
 	sendData(ssl, data, proto); 
 	*/
 
+	// Parse filename from HTTP GET
+	filename = parse_http_get(buf); 
+	
 	// Serve requested file 
 	serveFile(ssl, filename, proto); 
+
 	// Shutdown SSL - TO DO (check what happens here) 
 	r = SSL_shutdown(ssl);
 	if( !r ){
-    /* If we called SSL_shutdown() first then
-         we always get return value of '0'. In
-         this case, try again, but first send a
-         TCP FIN to trigger the other side's
-         close_notify */
 		shutdown(s, 1);
 		r = SSL_shutdown(ssl);
     }
@@ -439,7 +433,7 @@ static int http_serve_new(SSL *ssl, int s, char *proto){
 }
 
 
-// SSL http serve
+// SSL http serve (almost original function) 
 static int http_serve_SSL(SSL *ssl, int s){
   
 	char buf[BUFSIZZ];
@@ -568,9 +562,9 @@ static int http_serve_SSL(SSL *ssl, int s){
 
 // Usage function 
 void usage(void){
-	printf("usage: wserver -f \n");
+	printf("usage: wserver -c -o \n");
 	printf("-c:   protocol requested: ssl, spp.\n");
-	printf("-t:   {1=test handshake ; 0=data delivery}\n");
+	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer}\n");
 	exit(-1);
 }
 
@@ -583,15 +577,13 @@ int main(int argc, char **argv){
 	SSL *ssl;
 	int r;
 	pid_t pid;
-	char *proto;                        //protocol type 
+	char *proto;                        // protocol type 
 	extern char *optarg;                // user input parameters
 	int c;                              // user iput from getopt
-	int temp;	 
-	bool testing = true;                // testing 200OK vs data delivery 
-	bool handshake_only = false;        // testing handhshake only (s_time)
+	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file) 
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "c:t:o:")) != -1){
+	while((c = getopt(argc, argv, "c:o:")) != -1){
 		switch(c){
 			// Protocol 
 			case 'c':
@@ -600,28 +592,34 @@ int main(int argc, char **argv){
 				}
 				break; 
 
-			// Testing choice
-			case 't':
-				temp = atoi(optarg); 
-				testing = (temp == 1 ? true : false);
-				break; 
-		
-			// Handshake only (integrate with above and extend)
+			// Client/Server behavior 
 			case 'o':
-				temp = atoi(optarg); 
-				handshake_only = (temp == 1 ? true : false);
+				action = atoi(optarg); 
 				break; 
 			}
 	}
 
 	// Check that input parameters are correct 
-	#ifdef DEBUG
-	printf("[DEBUG] Parameters count: %d\n", argc);
-	printf("[DEBUG] proto=%s ; testing=%s handshake_only=%s\n", proto, testing ? "true" : "false", handshake_only ? "true" : "false");
-	#endif 
 	if (argc == 1){
 		usage();
 	}
+	if (action < 1 || action > 3){
+		usage(); 
+	}
+	
+	// Logging input parameters 
+	#ifdef DEBUG
+	printf("[DEBUG] Parameters count: %d\n", argc);
+	//printf("[DEBUG] proto=%s ; testing=%s handshake_only=%s\n", proto, testing ? "true" : "false", handshake_only ? "true" : "false");
+	char *temp_str = "undefined"; 
+	if (action == 1)
+		temp_str = "handshake_only";  
+	if (action == 2)
+		temp_str = "200_OK";  
+	if (action == 3)
+		temp_str = "serve_file";  
+	printf("[DEBUG] proto=%s; action=%d (%s)\n", proto, action, temp_str); 
+	#endif 
 
 	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
@@ -654,26 +652,35 @@ int main(int argc, char **argv){
 				}
 				#endif
 			}
-    
-			// Serve some content here  (SPP)
-			if (! handshake_only){
-				if (strcmp(proto, "spp") == 0){ 
-					if (testing){
-						test_SPP(ssl, s, proto);
-					}else{
-						http_serve_new(ssl, s, proto);
-					}
-				} 
-			
-				// Serve some content here  (SSL)
-				if (strcmp(proto, "ssl") == 0){ 
-					http_serve_new(ssl, s, proto);
-				}
-			}
-	
-			// exit from process forked
-			exit(0);
+   			
+			// Switch across possible client-server behavior 
+			// NOTE: here we can add more complex strategies
+			switch(action){
+
+				// Handshake only 
+				case 1: 
+					break; 
+
+				// Respond with 200 OK
+				case 2: 
+					http_simple_response(ssl, s, proto);
+					break; 
+
+				// Serve some content 
+				case 3: 
+					http_serve_request(ssl, s, proto);
+					break;
+ 
+				// Unknown option 
+				default: 
+					usage();
+					break; 
+			} 
+
 		}
+	
+	// exit from process forked
+	exit(0);
 	}
 	
 	// Clean context
