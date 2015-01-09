@@ -1103,6 +1103,8 @@ SPP_MAC* spp_init_mac_st(SSL* s, SPP_MAC* mac, unsigned char* key, int which);
 int spp_init_integrity_st(SSL *s);
 int spp_init_slices_st(SSL *s, int which);
 int spp_store_defaults(SSL *s, int which);
+void spp_init_proxy(SPP_PROXY *proxy);
+void spp_init_slice(SPP_SLICE *slice);
 
 int dtls1_send_hello_request(SSL *s);
 int dtls1_send_server_hello(SSL *s);

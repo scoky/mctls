@@ -1156,9 +1156,13 @@ struct spp_slice_st
         int slice_id;
         char *purpose;
         unsigned char read_mat[EVP_MAX_KEY_LENGTH];
+        int read_mat_len;
         unsigned char other_read_mat[EVP_MAX_KEY_LENGTH];
+        int other_read_mat_len;
         unsigned char write_mat[EVP_MAX_KEY_LENGTH];
+        int write_mat_len;
         unsigned char other_write_mat[EVP_MAX_KEY_LENGTH];
+        int other_write_mat_len;
         };
         
 struct spp_proxy_st 
@@ -1469,11 +1473,11 @@ struct ssl_st
         int proxy_id;
         int proxy;      /* are we a proxy? */
         
-        struct
+        /*struct
             {
             SPP_PROXY *current_proxy;
             int done;
-            } spp_handshake;
+            } spp_handshake;*/
             
         /* Store the parameters negotiated for end-to-end communication (TLS handshake). */
         SPP_SLICE *def_ctx;

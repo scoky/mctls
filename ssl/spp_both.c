@@ -8,6 +8,25 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
+void spp_init_slice(SPP_SLICE *slice) {
+    slice->read_ciph = slice->read_mac = slice->write_mac = NULL;
+    slice->read_mat_len = slice->other_read_mat_len = slice->write_mat_len = slice->other_write_mat_len = 0;
+    slice->purpose = NULL;
+    slice->read_access = slice->write_access = 0;
+    memset(&(slice->read_mat[0]), 0, sizeof(slice->read_mat));
+    memset(&(slice->other_read_mat[0]), 0, sizeof(slice->other_read_mat));
+    memset(&(slice->write_mat[0]), 0, sizeof(slice->write_mat));
+    memset(&(slice->other_write_mat[0]), 0, sizeof(slice->other_write_mat));
+}
+
+void spp_init_proxy(SPP_PROXY *proxy) {
+    proxy->session = proxy->sess_cert = proxy->peer = NULL;
+    proxy->read_slice_ids_len = proxy->write_slice_ids_len = 0;
+    proxy->address = NULL;
+    proxy->done = 0;
+    proxy->proxy_id = 0;
+}
+
 int spp_generate_slice_keys(SSL *s) {
     int i;    
     for (i = 0; i < s->slices_len; i++) {
