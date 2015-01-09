@@ -1108,6 +1108,7 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                     n1s(sdata, s->slices_len);
                     for (i = 0; i < s->slices_len; i++) {
                         s->slices[i] = (SPP_SLICE *)malloc(sizeof(SPP_SLICE));
+                        spp_init_slice(s->slices[i]);
                         n1s(sdata, s->slices[i]->slice_id);
                         
                         n1s(sdata, char_len);
@@ -1121,6 +1122,7 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                     n1s(sdata, s->proxies_len);
                     for (i = 0; i < s->proxies_len; i++) {
                         s->proxies[i] = (SPP_PROXY *)malloc(sizeof(SPP_PROXY));
+                        spp_init_proxy(s->proxies[i]);
                         n1s(sdata, s->proxies[i]->proxy_id);
                         
                         n1s(sdata, char_len);
@@ -1141,7 +1143,9 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                         //printf("Decoded proxy %d with address %s, read %d write %d\n", s->proxies[i]->proxy_id, s->proxies[i]->address, s->proxies[i]->read_slice_ids_len, s->proxies[i]->write_slice_ids_len);
                     }  
                     if (sdata - data != size) {
+#ifdef TLS_DEBUG
                         printf("Error decoding proxy list\n");
+#endif
                         *al = TLS1_AD_DECODE_ERROR;
                         return 0;
                     }

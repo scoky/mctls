@@ -226,6 +226,7 @@ int spp_store_defaults(SSL *s, int which) {
         s->def_ctx->read_mac->read_mac_secret_size = s->s3->read_mac_secret_size;
         memcpy(&(s->def_ctx->read_mac->read_mac_secret[0]), &(s->s3->read_mac_secret[0]), s->s3->read_mac_secret_size);
         s->def_ctx->read_mac->read_hash = s->read_hash;
+        s->def_ctx->read_access = 1;
         
         // Encrypt ctx
         s->def_ctx->read_ciph->enc_read_ctx = s->enc_read_ctx;
@@ -235,6 +236,7 @@ int spp_store_defaults(SSL *s, int which) {
         s->def_ctx->read_mac->write_mac_secret_size = s->s3->write_mac_secret_size;
         memcpy(&(s->def_ctx->read_mac->write_mac_secret[0]), &(s->s3->write_mac_secret[0]), s->s3->write_mac_secret_size); 
         s->def_ctx->read_mac->write_hash = s->write_hash;
+        s->def_ctx->write_access = 1;
         
         // Encrypt ctx
         s->def_ctx->read_ciph->enc_write_ctx = s->enc_write_ctx;

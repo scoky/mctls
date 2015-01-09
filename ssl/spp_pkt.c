@@ -238,7 +238,9 @@ printf("\n");
             //spp_print_buffer(md, mac_size);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                 enc_err = -1;
+#ifdef TLS_DEBUG
                 printf("Read mac fail, %d\n", i);
+#endif
             }
             if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size) {
                 enc_err = -1;
@@ -251,7 +253,9 @@ printf("\n");
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
+#ifdef TLS_DEBUG
                     printf("Write mac fail, %d\n", i);
+#endif
                     enc_err = -1; 
                 }
             }

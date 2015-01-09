@@ -390,6 +390,7 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->_proxy_id = 3;
         s->_slice_id = 2;
         s->def_ctx = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+        spp_init_slice(s->def_ctx);
         s->def_ctx->slice_id = 1;
         s->def_ctx->read_mac = (SPP_MAC*)malloc(sizeof(SPP_MAC));
         s->def_ctx->write_mac = s->def_ctx->read_mac;
@@ -996,24 +997,17 @@ int SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len){
 SPP_PROXY* SPP_generate_proxy(SSL *s, char* address) {
     SPP_PROXY *prxy;
     prxy = (SPP_PROXY*)malloc(sizeof(SPP_PROXY));
+    spp_init_proxy(prxy);
     prxy->address = address;
     prxy->proxy_id = (s->_proxy_id++);
-    prxy->session = NULL;
-    prxy->read_slice_ids_len = 0;
-    prxy->write_slice_ids_len = 0;
-    prxy->done = 0;
     return prxy;
 }
 SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {
     SPP_SLICE *slice;
     slice = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+    spp_init_slice(slice);
     slice->purpose = purpose;
     slice->slice_id = (s->_slice_id++);
-    slice->read_ciph = NULL;
-    slice->read_access = 1;
-    slice->read_mac = NULL;
-    slice->write_mac = NULL;
-    slice->write_access = 1;
     return slice;
 }
 SPP_SLICE* SPP_get_slice_by_id(SSL *s, int id) {
@@ -1099,11 +1093,14 @@ int SSL_peek(SSL *s,void *buf,int num)
 	}
 int SPP_write_record(SSL *s,const void *buf,int num,SPP_SLICE *slice) {
     int ret;
-    s->write_slice = slice;
+    // Slice might be coming from the opposite state (s->other_ssl)
+    // Make sure we are using the right instance.
+    s->write_slice = SPP_get_slice_by_id(s, slice->slice_id);
     s->spp_write_ctx = NULL;
+#ifdef TLS_DEBUG
     printf("Writing record slice %d...", slice->slice_id);
+#endif
     ret = SSL_write(s,buf,num);
-    printf("Wrote record\n");
     s->spp_write_ctx = NULL;
     s->write_slice = NULL;
     return ret;
