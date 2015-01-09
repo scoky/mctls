@@ -1,0 +1,5 @@
+har_to_object_times.py requires har.py, in the web-profiler repo. It is
+included here as a submodule. To use it, run:
+
+git submodule init
+git submodule update
