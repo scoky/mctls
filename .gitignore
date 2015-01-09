@@ -26,3 +26,5 @@
 #Test files
 *test
 
+# OSX
+*.DS_Store
