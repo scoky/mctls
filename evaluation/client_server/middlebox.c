@@ -251,10 +251,73 @@ SSL* fake_SPP_connection(SSL *ssl)
 }
 
 
+
+int shut_down_both_connections(SSL* prev_ssl, SSL* next_ssl)
+{
+	int r;
+	int socket;
+
+	#ifdef DEBUG
+	printf("[middlebox ] Shutting down Both connections!\n");
+	#endif
+
+
+	// Shutdown SSL - TO DO (check what happens here) 
+
+
+	r = SSL_shutdown(prev_ssl);
+	if (r == 0)
+	{
+		shutdown(SSL_get_fd(prev_ssl), SHUT_WR);
+		r = SSL_shutdown(prev_ssl);
+	}
+	// Verify that all went good 
+	switch(r){  
+		case 1:
+		 	printf("Closed  connection with client\n");
+       		break; // Success
+		case 0:
+		case -1:
+		default: // Error 
+			printf("[middlebox-p] Shutdown failed\n");
+	}
+
+	socket =  SSL_get_fd(prev_ssl);
+	close(socket);
+    SSL_free(prev_ssl);
+
+
+
+
+	r = SSL_shutdown(next_ssl);
+	if (r == 0)
+	{
+		shutdown(SSL_get_fd(next_ssl), SHUT_WR);
+		r = SSL_shutdown(next_ssl);
+	}
+	// Verify that all went good 
+	switch(r){  
+		case 1:
+		 	printf("Closed  connection with server\n");
+       		break; // Success
+		case 0:
+		case -1:
+		default: // Error 
+			printf("[middlebox-n] Shutdown failed\n");
+	}
+
+	socket =  SSL_get_fd(next_ssl);
+	close(socket);
+    SSL_free(next_ssl);
+
+
+    return 0;
+}
+
 int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
 {  
 	
-    int r,w; 
+    int r,w, status; 
 	char buf[BUFSIZZ];
 
 	// Read HTTP GET (assuming a single read is enough)
@@ -268,13 +331,20 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
 		SPP_CTX *ctx;           
 		r = SPP_read_record(prev_ssl, buf, BUFSIZZ, &slice, &ctx);
 		#ifdef DEBUG
-		printf("[middlebox-p] Got data from previous hop!\n");
+		printf("[middlebox-p] Got data from previous hop r = %d\n",r);
 		#endif
 
 
-		if (SSL_get_error(prev_ssl, r) == SSL_ERROR_NONE){
-		} else {
-			berr_exit("[middlebox-p] SSL read problem (from previous hop)");
+
+		status = SSL_get_error(prev_ssl, r);
+		if (status ==  SSL_ERROR_ZERO_RETURN || status ==  SSL_ERROR_SYSCALL ){
+			#ifdef DEBUG
+			fprintf(stderr, "[middlebox-p] Connection closed, exiting next hop thread\n");
+			#endif
+			break;
+		}
+		else if  (status != SSL_ERROR_NONE){
+			berr_exit("[middlebox-p] SSL read problem");
 		}
 		
 		#ifdef DEBUG
@@ -293,6 +363,7 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
 		}
 	}
 
+	/*
 	#ifdef DEBUG
 	printf("[middlebox-p] Shutting down previous hop handler thread!\n");
 	#endif
@@ -311,7 +382,10 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
 
 	// free SSL 
     SSL_free(prev_ssl);
+    */
+
 	// All good 
+	shut_down_both_connections(prev_ssl, next_ssl);
     return(0);
 }
 
@@ -320,7 +394,7 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
 {  
     int r,w ; 
 	char buf[BUFSIZZ];
-
+	int status;
 	// Read HTTP GET (assuming a single read is enough)
 	while(1){
 
@@ -332,14 +406,23 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
 		SPP_CTX *ctx;           
 		r = SPP_read_record(next_ssl, buf, BUFSIZZ, &slice, &ctx);
 		#ifdef DEBUG
-		printf("[middlebox-n] Got data from next hop!\n");
+		printf("[middlebox-n] Got data from next hop. r = %d\n",r);
 		#endif
 
 
-		if (SSL_get_error(next_ssl, r) == SSL_ERROR_NONE){
-		} else {
-			berr_exit("[middlebox-n] SSL read problem (from next hop)");
+		status = SSL_get_error(next_ssl, r);
+		if (status ==  SSL_ERROR_ZERO_RETURN || status ==  SSL_ERROR_SYSCALL ){
+			#ifdef DEBUG
+			fprintf(stderr, "[middlebox-n] Connection closed, exiting next hop thread\n");
+			#endif
+			break;
 		}
+		else if  (status != SSL_ERROR_NONE){
+			berr_exit("[middlebox-n] SSL read problem");
+		}
+
+			
+
 		
 		#ifdef DEBUG
 		printf("[middlebox-n] Data received (from next hop):\n"); 
@@ -356,7 +439,8 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
 			break; 
 		}
 	}
-
+	
+	/*
 	#ifdef DEBUG
 	printf("[middlebox-n] Shutting down next hop handler thread!\n");
 	#endif
@@ -375,7 +459,8 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
 
 	// free SSL 
     SSL_free(next_ssl);
-
+    */
+    shut_down_both_connections(prev_ssl, next_ssl);
 
 	// All good 
     return(0);
@@ -388,24 +473,38 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
 int handle_data(SSL* prev_ssl, SSL* next_ssl)
 {
 	pid_t next_handler;
+	int status;
 
 	#ifdef DEBUG
 	printf("[middlebox] Initializing data handlers\n");
-		#endif
+	#endif
 
-	if( (next_handler = fork())) 
+	next_handler = fork();
+	if( next_handler == 0) 
 	{
+		//child process
 		// handle traffic from client
 		handle_previous_hop_data(prev_ssl, next_ssl);
+		#ifdef DEBUG
+		printf("[middlebox] Exiting previous hop handler\n");
+		#endif
 		//TODO: wait for child before returning
-
+		exit(0);
 	}
 	else 
 	{
-		//child 
+		//parent 
 		handle_next_hop_data(prev_ssl, next_ssl);
+		#ifdef DEBUG
+		printf("[middlebox] Exiting next hop handler\n");
+		#endif
 	}
 
+	#ifdef DEBUG
+	printf("[middlebox] Waiting previous hop handler to quit before quiting data handler\n");
+	#endif
+
+	wait(&status);
 
 	#ifdef DEBUG
 	printf("[middlebox] Exiting data handler!\n");
@@ -458,6 +557,7 @@ int main(int argc, char **argv){
 			print_ssl_debug_info(ssl);
 			#endif
 
+
 			SSL** ssl_next = NULL;
 			
 
@@ -472,6 +572,8 @@ int main(int argc, char **argv){
 			#ifdef DEBUG
 			printf("[middlebox] SPP_proxy done \n");
 			#endif
+
+			printf("socket before: %d\n", s);
 			handle_data(ssl, *ssl_next);
 
 			// Close socket
