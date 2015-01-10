@@ -16,13 +16,22 @@
  * proxies. 
  */
 
-#include <stdbool.h>			// to support boolean
+#include <stdbool.h>            // to support boolean
 #include "common.h"				// common library between client and server
-#define KEYFILE "client.pem"	// client certificate
-#define PASSWORD "password"		// unused now 	
-#define DEBUG					// verbose logging
-//#define PROXY					// at least one proxy is physically available
-#define CONNECT_TIMEOUT 5		// socket connection timeout 
+#include <pthread.h>            // thread support
+#define KEYFILE "client.pem"    // client certificate
+#define PASSWORD "password"     // unused now 	
+#define DEBUG                   // verbose logging
+//#define PROXY                 // at least one proxy is physically available
+#define CONNECT_TIMEOUT 5       // socket connection timeout 
+
+static char *host=HOST;
+static int port=PORT;
+static int require_server_auth = 1;
+// -- Moved up here just because of thread 
+static SSL *ssl;                              // SSL instance
+static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
+
 
 
 // Read counter of number of proxies in the provided list 
@@ -226,18 +235,39 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 }
 
 
-static char *host=HOST;
-static int port=PORT;
-static int require_server_auth=1;
-
-// Send HTTP get through SSL/SPP
-static int http_request(SSL *ssl, char *filename, char *proto){
+// Perform a connect
+void doConnect (SSL *ssl, char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_set, SPP_PROXY **proxies){
+	// SPP CONNECT 
+	if (strcmp(proto, "spp") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] SPP_connect\n");
+		#endif 
+		if (SPP_connect(ssl, slice_set, slices_len, proxies, N_proxies) <= 0){
+			berr_exit("SPP connect error");
+		}
+	} 
 	
+	// SSL CONNECT 
+	if (strcmp(proto, "ssl") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] SSL_connect\n");
+		#endif
+		if(SSL_connect(ssl) <= 0)
+			berr_exit("SSL connect error");
+   	} 
+	/*
+	if(require_server_auth){
+	      check_cert(ssl, host);
+	}
+	*/
+}
+
+// Form and send GET
+void sendRequest(char *filename){
+		
 	char request[100];
-	char buf[BUFSIZZ];
-	int r;
-	int len, request_len;
-    	
+	int request_len;
+	
 	// Form the request 
 	memset(request, 0, sizeof request);
 	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVAClient\r\nHost: %s:%d\r\n\r\n", filename, host, port); 
@@ -250,7 +280,7 @@ static int http_request(SSL *ssl, char *filename, char *proto){
 		#endif 
 		int i; 
 		for (i = 0; i < ssl->slices_len; i++){
-			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
+			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
 			check_SSL_write_error(ssl, r, request_len); 
 		}
 	} 
@@ -260,8 +290,193 @@ static int http_request(SSL *ssl, char *filename, char *proto){
 		#ifdef DEBUG
 		printf("[DEBUG] SSL_write\n");
 		#endif 
-		r = SSL_write(ssl, request, request_len);
+		int r = SSL_write(ssl, request, request_len);
 		check_SSL_write_error(ssl, r, request_len); 
+	}
+}
+
+
+
+// Read file line by line with timing information 
+static void *browser_replay(void *ptr){
+	char line[128];
+	int previous_time = 0;      // current/previous time
+	FILE *fp;                   // pointer to file
+
+	#ifdef DEBUG
+	printf("[DEBUG] Read file timing\n"); 
+	#endif 
+
+	// Retrive filename from (void *)
+	char *file_name = (char *)ptr;    
+
+	// Open file for reading
+    fp = fopen(file_name,"r");  
+   
+    // Check for errors while opening file
+    if( fp == NULL ){
+        printf("Error while opening file %s.\r\n", file_name);
+        return NULL; 
+    }
+	
+    // Read file line-by-line
+    while ( fgets ( line, sizeof line, fp ) != NULL ) {
+
+		double time;
+		//double duration; 
+		char file_request[128]; 
+	
+		// Remove trailing newline (NOTE: strtoK is not thread safe)
+        strtok(line, "\n");
+
+		#ifdef DEBUG
+		printf("[DEBUG] Read line is <<%s>>\n", line);
+		#endif 
+
+		// Parse line
+		//sscanf(line, "%lf %lf", &time, &duration); 
+		sscanf(line, "%lf %s", &time, file_request); 
+		
+		// Logging 
+		#ifdef DEBUG
+		//printf("[DEBUG] Extracted values are: %f -- %f\n", time, duration);
+		printf("[DEBUG] Extracted values are: %f -- %s\n", time, file_request);
+		#endif
+		
+		// Compute sleeping time 
+		double time_to_sleep = time - previous_time; 
+		#ifdef DEBUG
+		printf("[DEBUG] Sleeping for %f\n", time_to_sleep); 
+		#endif 
+    	sleep(time_to_sleep);
+		
+		// Here send timed HTTP GET 
+		#ifdef DEBUG
+		printf("[DEBUG] Sending GET request for file <<%s>>\n", file_request); 
+		#endif 
+		sendRequest(file_request); 
+		
+		// Save current time
+		previous_time = time;  
+	}
+
+	#ifdef DEBUG
+	printf("[DEBUG] Closing file\n"); 
+	#endif 
+    
+	// Close file
+    fclose(fp);
+
+	// All good
+	return NULL;  
+}
+
+
+// Emulate browser behavior based on some input traces 
+static int http_complex(SSL *ssl, char *proto){
+
+	char buf[BUFSIZZ];
+	int r, len;
+	char *fn = "actionList"; 
+
+	// Thread for browser-like behavior 
+	pthread_t reading_thread;
+	if(pthread_create(&reading_thread, NULL, browser_replay, fn)) {
+		fprintf(stderr, "Error creating thread\n");
+		return -1;
+	}else{
+		#ifdef DEBUG
+		printf("[DEBUG] Reading thread started!\n"); 
+		#endif
+	}
+
+	// Now read the server's response, assuming  that it's terminated by a close
+	while(1){
+		// SPP read
+		if (strcmp(proto, "spp") == 0){
+			#ifdef DEBUG
+			printf("[DEBUG] Waiting on SPP_read...\n");
+			#endif 
+			SPP_SLICE *slice;		// slice for SPP_read
+			SPP_CTX *ctx;			// context pointer for SPP_read
+			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
+			switch(SSL_get_error(ssl, r)){
+				case SSL_ERROR_NONE:
+					len = r;
+					break;
+
+				case SSL_ERROR_ZERO_RETURN:
+					goto shutdown;
+
+				case SSL_ERROR_SYSCALL: 
+					fprintf(stderr, "SSL Error: Premature close\n");
+					goto done;
+
+				default:
+					berr_exit("SSL read problem");
+			}
+		} 
+	
+		// SSL read
+		if (strcmp(proto, "ssl") == 0){
+			#ifdef DEBUG
+			printf("[DEBUG] Waiting on SSL_read...\n");
+			#endif 
+			r = SSL_read(ssl, buf, BUFSIZZ);
+			switch(SSL_get_error(ssl, r)){
+				case SSL_ERROR_NONE:
+					len = r;
+					break;
+
+				case SSL_ERROR_ZERO_RETURN:
+					goto shutdown;
+
+				case SSL_ERROR_SYSCALL: 
+					fprintf(stderr, "SSL Error: Premature close\n");
+					goto done;
+
+				default:
+					berr_exit("SSL read problem");
+			}
+		}
+		
+		// Write buf to stdout
+		fwrite(buf, 1, len, stdout);
+    }
+    
+	shutdown:
+		r = SSL_shutdown(ssl);
+		#ifdef DEBUG
+		printf("[DEBUG] Shutdown was requested\n"); 
+		#endif 
+
+	switch(r){
+		case 1:
+			break; // Success 
+		case 0:
+
+		case -1:
+
+		default:
+			berr_exit("Shutdown failed");
+	}
+    
+	done:
+		SSL_free(ssl);
+		return(0);
+}
+
+	
+// Send HTTP get and wait for response (SSL/SPP)
+static int http_request(SSL *ssl, char *filename, char *proto, bool requestingFile){
+	
+	char buf[BUFSIZZ];
+	int r;
+	int len; 
+
+	// Request file (simplify with function I wrote) -- TO DO     	
+	if (requestingFile){
+		sendRequest(filename); 
 	}
 
 	// Now read the server's response, assuming  that it's terminated by a close
@@ -319,6 +534,9 @@ static int http_request(SSL *ssl, char *filename, char *proto){
     }
     
 	shutdown:
+		#ifdef DEBUG
+		printf("[DEBUG] Shutdown was requested\n"); 
+		#endif 
 		r = SSL_shutdown(ssl);
 
 	switch(r){
@@ -349,7 +567,7 @@ void usage(void){
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
 	printf("-f:   file for http GET\n"); 
-	printf("-c:   protocol chosen (sll ; spp)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp)\n"); 
 	exit(-1);  
 }
 
@@ -357,19 +575,22 @@ void usage(void){
 // Main function     
 int main(int argc, char **argv){
 	SSL_CTX *ctx;                          // SSL context
-	SSL *ssl;                              // SSL instance
+	//SSL *ssl;                              // SSL instance
 	BIO *sbio;
 	int sock;                              // socket descriptor 
 	extern char *optarg;                   // user input parameters
 	int c;                                 // user iput from getopt
-	int N_proxies = 0;                     // number of proxies indicated
 	char *filename = "proxyList";          // filename for proxy
-	int slices_len = 0, r = 0, w = 0;      // slice related parameters
+	int r = 0, w = 0;                      // slice related parameters
 	char *file_requested = "index.html";   // file requeste for HTTP GET
-	char *proto = "ssl";                   // protocl of choice 
+	SPP_SLICE **slice_set;                 // slice array 
+	int slices_len = 0;                    // number of slices 
+	SPP_PROXY **proxies;                   // proxy array 
+	int N_proxies = 0;                     // number of proxies in path 
+	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file)
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:")) != -1){
+	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:o:")) != -1){
 			
 			switch(c){
 	
@@ -417,7 +638,12 @@ int main(int argc, char **argv){
 				if(! (file_requested = strdup(optarg) ))
 					err_exit("Out of memory");
 				break; 
-					
+
+			// Client/Server behavior 
+			case 'o':
+				action = atoi(optarg); 
+				break; 
+
 			// default case 
 			default:
 				usage(); 
@@ -426,6 +652,9 @@ int main(int argc, char **argv){
     }
 
 
+	// Read number of proxy from file 
+	N_proxies = read_proxy_count(filename); 
+	
 	// Check that input parameters are correct 
 	#ifdef DEBUG
 	printf("[DEBUG] Parameters count: %d\n", argc); 
@@ -433,28 +662,40 @@ int main(int argc, char **argv){
 	if (argc == 1){
 		usage(); 
 	}
-	
+	if (action < 1 || action > 4){
+		usage(); 
+	}
 	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0)){
 		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
 		usage(); 
 	}
-
-	// Read number of proxy from file 
-	N_proxies = read_proxy_count(filename); 
-	#ifdef DEBUG
-	printf("[DEBUG] host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s\n", host, port, slices_len, r, w, N_proxies, proto); 
-	#endif 
 	if (r > N_proxies || w > N_proxies){
 		printf ("The values for r and w need to be <= than the number of proxies\n"); 
 		usage(); 
 	}
 
-	// Allocate memory for proxies 	
-	SPP_PROXY *proxies[N_proxies]; 
-	
-    // Build SSL context
+	// Construct string for client/server behavior
+	char *temp_str = "undefined";
+	if (action == 1)
+		temp_str = "handshake_only";  
+	if (action == 2)
+		temp_str = "200_OK";  
+	if (action == 3)
+		temp_str = "serve_file";	
+	if (action == 4)
+		temp_str = "browser_like";	
+
+	// Logging input parameters 
+	#ifdef DEBUG
+	printf("[DEBUG] host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
+	#endif 
+
+	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
 	ssl = SSL_new(ctx);
+
+	// Allocate memory for proxies 	
+	proxies  = malloc( N_proxies * sizeof (SPP_PROXY*));
 
 	// Read proxy list 
 	read_proxy_list(filename, proxies, ssl);
@@ -485,7 +726,8 @@ int main(int argc, char **argv){
 
 	// Create slices_n slices with incremental purpose 
 	int i; 
-	SPP_SLICE *slice_set[slices_len];
+	//SPP_SLICE *slice_set[slices_len];
+	slice_set  = malloc( slices_len * sizeof (SPP_SLICE*));
 	#ifdef DEBUG
 	printf("[DEBUG] Generating %d slices\n", slices_len); 
 	#endif
@@ -527,32 +769,38 @@ int main(int argc, char **argv){
 			}
 		}
 	}
-
-	// SPP CONNECT 
-	if (strcmp(proto, "spp") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SPP_connect\n");
-		#endif 
-		if (SPP_connect(ssl, slice_set, slices_len, proxies, N_proxies) <= 0){
-			berr_exit("SPP connect error");
-		}
-	} 
 	
-	// SSL CONNECT 
-	if (strcmp(proto, "ssl") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SSL_connect\n");
-		#endif
-		if(SSL_connect(ssl) <= 0)
-			berr_exit("SSL connect error");
-    
-		if(require_server_auth){
-	      check_cert(ssl, host);
-		}
+	// Let's connect
+	doConnect (ssl, proto, slices_len, N_proxies, slice_set, proxies); 
+	
+	// Switch across possible client-server behavior
+	// // NOTE: here we can add more complex strategies
+	switch(action){
+		// Handshake only 
+		case 1:  
+			break; 
+                
+		// Send simple request, wait for 200 OK
+		case 2:  
+			http_request(ssl, file_requested, proto, false);
+			break; 
+
+		// Send HTTP GET request and wait for file to be received
+		case 3:  		
+			http_request(ssl, file_requested, proto, true);
+			break; 
+
+		// Send several GET request following a browser-like behavior  
+		case 4:  
+			http_complex(ssl, proto);
+			break; 
+ 
+		// Unknown option 
+		default: 
+			usage();
+			break; 
 	}
 
-	// Send HTTP request
-	http_request(ssl, file_requested, proto);
 
 	// Remove SSL context
     destroy_ctx(ctx);
@@ -570,4 +818,4 @@ int main(int argc, char **argv){
 	
 	// All good
 	return 0; 
-  }
+}
