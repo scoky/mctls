@@ -31,6 +31,17 @@ def main():
                 obj.tcp_handshake,\
                 obj.ssl_handshake,\
                 obj.url))
+    
+    # write a simpler "action list" for Matteo's client
+    # fields:
+    # time size new_connection?
+    out_path = os.path.splitext(args.har)[0] + '.actions'
+    with open(out_path, 'w') as f:
+        for obj in har.objects:
+            f.write('%f %d %s\n' %\
+                ((obj.object_start_time - har.page_start_time).total_seconds(),\
+                obj.size,\
+                obj.tcp_handshake))
 
 
 if __name__ == '__main__':
