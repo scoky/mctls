@@ -281,12 +281,12 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 		// Check for end of file
 		if (i <= 0){
 			#ifdef DEBUG
-			printf("Done reading file %s\n", filename); 	
+			printf("[DEBUG] Done reading file %s\n", filename); 	
 			#endif
 			break; 
 		}else{
 			#ifdef DEBUG
-			printf("Read %d bytes from file\n", toSend); 	
+			printf("[DEBUG] Read %d bytes from file\n", toSend); 	
 			#endif
 		}
 
@@ -359,11 +359,12 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 
 // 1) work with both SSL and SPP
 // 2) no usage of BIO APIs
-static int http_serve_request(SSL *ssl, int s, char *proto){
+static int http_serve_request(SSL *ssl, int s, char *proto, bool shut){
   
     int r; 
 	char buf[BUFSIZZ];
-	char *filename = "pippo.html"; 
+	char *filename = ""; 
+	int ret_value = 0; 
 
 	// Read HTTP GET (assuming a single read is enough)
 	while(1){
@@ -393,43 +394,62 @@ static int http_serve_request(SSL *ssl, int s, char *proto){
 		}
 	}
 
-	// Q: do we still want this? 
-	/* Put 200 OK on the wire 
+	// Q: do we still want to put Put 200 OK on the wire?
+	/*
 	char *data = "HTTP/1.0 200 OK\r\n"; 
 	sendData(ssl, data, proto); 
 	*/
 
 	// Parse filename from HTTP GET
 	filename = parse_http_get(buf); 
-	
-	// Serve requested file 
-	serveFile(ssl, filename, proto); 
 
-	// Shutdown SSL - TO DO (check what happens here) 
-	r = SSL_shutdown(ssl);
-	if( !r ){
-		shutdown(s, 1);
-		r = SSL_shutdown(ssl);
-    }
-
-	// Verify that all went good 
-	switch(r){  
-		case 1:
-       		break; // Success
-		case 0:
-		case -1:
-		default: // Error 
-			berr_exit("Shutdown failed");
+	// Simple trick to end 
+	if (strcmp(filename, "end.html") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] Client requested to end session\n");
+		#endif 
+		ret_value = -1; 
+		shut = true;  	
+	}else{
+		// Serve requested file 
+		serveFile(ssl, filename, proto); 
 	}
 
-	// free SSL 
-    SSL_free(ssl);
+	// Do not shutdown TLS for browser-like behavior 
+	if (shut){
+		#ifdef DEBUG
+		printf("[DEBUG] Shutdown SSL connection\n");
+		#endif 
+		// Shutdown SSL - TO DO (check what happens here) 
+		r = SSL_shutdown(ssl);
+		if( !r ){
+			shutdown(s, 1);
+			r = SSL_shutdown(ssl);
+	    }
+
+		// Verify that all went good 
+		switch(r){  
+			case 1:
+    	   		break; // Success
+			case 0:
+			case -1:
+			default: // Error 
+				berr_exit("Shutdown failed");
+		}
+
+		// free SSL 
+    	SSL_free(ssl);
 	
-	// Close socket
-    close(s);
+		// Close socket
+    	close(s);
+	}else{
+		#ifdef DEBUG
+		printf("[DEBUG] No shutdown since SSL connection might still be used\n");
+		#endif
+	}
 
 	// All good 
-    return(0);
+    return ret_value; 
 }
 
 
@@ -580,7 +600,7 @@ int main(int argc, char **argv){
 	char *proto;                        // protocol type 
 	extern char *optarg;                // user input parameters
 	int c;                              // user iput from getopt
-	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file) 
+	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
 
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "c:o:")) != -1){
@@ -603,14 +623,13 @@ int main(int argc, char **argv){
 	if (argc == 1){
 		usage();
 	}
-	if (action < 1 || action > 3){
+	if (action < 1 || action > 4){
 		usage(); 
 	}
 	
 	// Logging input parameters 
 	#ifdef DEBUG
 	printf("[DEBUG] Parameters count: %d\n", argc);
-	//printf("[DEBUG] proto=%s ; testing=%s handshake_only=%s\n", proto, testing ? "true" : "false", handshake_only ? "true" : "false");
 	char *temp_str = "undefined"; 
 	if (action == 1)
 		temp_str = "handshake_only";  
@@ -628,13 +647,24 @@ int main(int argc, char **argv){
 	// Socket in listen state
 	sock = tcp_listen();
 
+	// Wait for client request 
 	while(1){
+		#ifdef DEBUG
+		printf("[DEBUG] Waiting on accept...\n"); 
+		#endif
 		if((s = accept(sock, 0, 0)) < 0){
 			err_exit("Problem socket accept\n");
+		}else{
+			#ifdef DEBUG
+			printf("[DEBUG] Accepted new connection %d\n", sock); 
+			#endif
 		}
 		// fork a new proces 
 		if((pid = fork())){
-			close(s);
+			#ifdef DEBUG
+			printf("[DEBUG] Closing socket?\n"); 
+			#endif
+			//close(s);
 		} else {
 			sbio = BIO_new_socket(s, BIO_NOCLOSE);
 			ssl = SSL_new(ctx);
@@ -668,7 +698,21 @@ int main(int argc, char **argv){
 
 				// Serve some content 
 				case 3: 
-					http_serve_request(ssl, s, proto);
+					http_serve_request(ssl, s, proto, true);
+					break;
+				
+				// Serve a browser like behavior 
+				case 4:
+					/* NOTE
+					* This can only serve one connection at a time. 
+					* Here we would need to fire a new thread 
+					* (or re-think the code) to support multiple SSL connections 
+					*/
+					while(1){
+						if (http_serve_request(ssl, s, proto, false) < 0){
+							break; 
+						}
+					}
 					break;
  
 				// Unknown option 
@@ -677,15 +721,18 @@ int main(int argc, char **argv){
 					break; 
 			} 
 
+		/* exit from process forked -- THIS CAUSE PREMATURE CLOSE ON CLIENT SIDE? 
+		#ifdef DEBUG
+		printf("[DEBUG] Exit from forked process\n"); 
+		#endif
+		exit(0);
+		*/
 		}
-	
-	// exit from process forked
-	exit(0);
 	}
 	
-	// Clean context
-	destroy_ctx(ctx);
+// Clean context
+destroy_ctx(ctx);
 	
-	// Exit
-	exit(0);
-  }
+// Exit
+exit(0);
+}

@@ -2,7 +2,7 @@ CC=gcc
 #CFLAG=-g -Wall -static
 # (static give some warnings)
 CFLAG=-g -Wall
-LD= -L/usr/local/ssl/lib -lssl -lcrypto -ldl
+LD= -L/usr/local/ssl/lib -lssl -lcrypto -ldl -lpthread
 #LD= -lssl -lcrypto
 # (compile with system-wise libraries)
 
@@ -11,16 +11,15 @@ CFLAGS= $(INCLUDES) $(CFLAG)
 #CFLAGS= -DMONOLITH $(INCLUDES) $(CFLAG)
 # (what is DMONOLITH doing?)
 
-all:  wclient wserver test
+all:  wclient wserver mbox
 
 wclient: wclient.o common.o 
 	$(CC) $(INCLUDES) $(CFLAG) wclient.o  common.o  -o wclient $(LD)
 wserver:  wserver.o common.o 
 	#$(CC) wserver.o  common.o -o wserver $(LD)
 	$(CC) $(INCLUDES) $(CFLAG) wserver.o  common.o  -o wserver $(LD)
-
-test: test.o common.o 
-	$(CC) $(INCLUDES) $(CFLAG) test.o  common.o  -o test  $(LD)
+mbox: middlebox.o common.o 
+	$(CC) $(INCLUDES) $(CFLAG) middlebox.o  common.o  -o mbox $(LD)
 clean:	
-	rm *.o wclient wserver test
+	rm *.o wclient wserver mbox
 
