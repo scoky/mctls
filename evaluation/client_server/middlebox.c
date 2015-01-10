@@ -161,6 +161,10 @@ void usage(void){
 
 
 SSL* SPP_Callback(SSL *ssl, char *address){
+	#ifdef DEBUG
+    printf("Callback called with address: %s\n", address);
+    #endif
+
 	SSL_CTX *ctx;							// SSL context
 	SSL *new_ssl;								// SSL context
 	BIO *sbio;								// ?
@@ -426,7 +430,7 @@ int main(int argc, char **argv){
 
 	proto = "spp";
 	
-	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
+	ctx = initialize_ctx(KEYFILE, PASSWORD, "middlebox");
 	load_dh_params(ctx,DHFILE);
    
 	// Socket in listen state
@@ -456,21 +460,25 @@ int main(int argc, char **argv){
 			#ifdef DEBUG
 			printf("[middlebox] GOT SSL CONNECTION. PRINTING SPP DEBUG INFO: \n");
 			print_ssl_debug_info(ssl);
+			printf("[middlebox] Calling SPP_PROXY\n");
 			#endif
 
+
 			SSL** ssl_next = NULL;
-			
+			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
+			SPP_proxy(ssl, "127.0.0.1:8423", connect_func, ssl_next);
+
 
 			//WARNING, THIS SHOULD BE ENABLED !!!
 			//SPP_proxy(ssl, "127.0.0.1:8423" , &SPP_Callback, ssl_next);
 
 
 			//*this fakes the callback and the data...
-			SSL* fake_ssl = (fake_SPP_connection(ssl));
-			ssl_next = &fake_ssl;
+			//SSL* fake_ssl = (fake_SPP_connection(ssl));
+			//ssl_next = &fake_ssl;
 
 			#ifdef DEBUG
-			printf("[middlebox] SPP_proxy done \n");
+			printf("[middlebox] SPP_proxy done, staring data handlers \n");
 			#endif
 			handle_data(ssl, *ssl_next);
 
