@@ -98,6 +98,12 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice, int which) {
             if ((slice->read_mac=spp_init_mac_st(s, slice->read_mac, key, which)) == NULL) {
                 goto err;
             }
+        } else {
+            if (slice->read_ciph == NULL) {
+                if ((slice->read_ciph=OPENSSL_malloc(sizeof(SPP_CIPH))) == NULL)
+                    goto err;
+            }
+            slice->read_ciph->enc_read_ctx = NULL;
         }
         if (slice->write_access) {
             xor_array(key, slice->write_mat, slice->other_write_mat, EVP_MAX_KEY_LENGTH);
@@ -134,6 +140,12 @@ int spp_init_slice_st(SSL *s, SPP_SLICE *slice, int which) {
             if ((slice->read_mac=spp_init_mac_st(s, slice->read_mac, key, which)) == NULL) {
                 goto err;
             }
+        } else {
+            if (slice->read_ciph == NULL) {
+                if ((slice->read_ciph=OPENSSL_malloc(sizeof(SPP_CIPH))) == NULL)
+                    goto err;
+            }
+            slice->read_ciph->enc_write_ctx = NULL;
         }
         if (slice->write_access) {            
             xor_array(key, slice->write_mat, slice->other_write_mat, EVP_MAX_KEY_LENGTH);
