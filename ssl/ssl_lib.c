@@ -1032,19 +1032,43 @@ SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id) {
     return NULL;
 }
 int SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE *slices[], int slices_len) {
-    int i;
+    int i,j,found;
+    if (slices_len > MAX_SPP_SLICES)
+        return -1;
+    
     proxy->write_slice_ids_len = slices_len;
     for (i = 0; i < slices_len; i++) {
         proxy->write_slice_ids[i] = slices[i]->slice_id;
+        /*
+        // Check if the slice is in the read list
+        found = 0;
+        for (j = 0; j < proxy->read_slice_ids_len; j++) {
+            if (proxy->read_slice_ids[j] == slices[i]->slice_id) {
+                found = 1;
+                break;
+            }
+        }
+        // Not present, add the slice to read if it will not cause an overflow
+        if (!found) {
+            if (proxy->read_slice_ids_len >= MAX_SPP_SLICES)
+                return -1;
+            proxy->read_slice_ids[proxy->read_slice_ids_len++] = slices[i]->slice_id;
+        }*/
     }
     return 1;
 }
 int SPP_assign_proxy_read_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE *slices[], int slices_len) {
-    int i;
+    int i,j,found;
+    if (slices_len > MAX_SPP_SLICES) 
+        return -1;
     proxy->read_slice_ids_len = slices_len;
     for (i = 0; i < slices_len; i++) {
         proxy->read_slice_ids[i] = slices[i]->slice_id;
     }
+    /*// Check that all slices with write access are still in read list
+    for (i = 0; i < proxy->write_slice_ids_len; i++) {
+        
+    }*/
     return 1;
 }
 long SSL_get_default_timeout(const SSL *s)

@@ -394,18 +394,18 @@ int spp_get_proxy_key_exchange(SSL *s, SPP_PROXY* proxy)
 
 #ifndef OPENSSL_NO_RSA
 		if (alg_a & SSL_aRSA)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
+			pkey=X509_get_pubkey(proxy->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
 #else
 		if (0)
 			;
 #endif
 #ifndef OPENSSL_NO_DSA
 		else if (alg_a & SSL_aDSS)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_DSA_SIGN].x509);
+			pkey=X509_get_pubkey(proxy->sess_cert->peer_pkeys[SSL_PKEY_DSA_SIGN].x509);
 #endif
 		/* else anonymous DH, so no certificate or pkey. */
 
-		s->session->sess_cert->peer_dh_tmp=dh;
+		proxy->sess_cert->peer_dh_tmp=dh;
 		dh=NULL;
 		}
 	else if ((alg_k & SSL_kDHr) || (alg_k & SSL_kDHd))
@@ -509,15 +509,15 @@ int spp_get_proxy_key_exchange(SSL *s, SPP_PROXY* proxy)
 		if (0) ;
 #ifndef OPENSSL_NO_RSA
 		else if (alg_a & SSL_aRSA)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
+			pkey=X509_get_pubkey(proxy->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
 #endif
 #ifndef OPENSSL_NO_ECDSA
 		else if (alg_a & SSL_aECDSA)
-			pkey=X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_ECC].x509);
+			pkey=X509_get_pubkey(proxy->sess_cert->peer_pkeys[SSL_PKEY_ECC].x509);
 #endif
 		/* else anonymous ECDH, so no certificate or pkey. */
 		EC_KEY_set_public_key(ecdh, srvr_ecpoint);
-		s->session->sess_cert->peer_ecdh_tmp=ecdh;
+		proxy->sess_cert->peer_ecdh_tmp=ecdh;
 		ecdh=NULL;
 		BN_CTX_free(bn_ctx);
 		bn_ctx = NULL;
@@ -714,265 +714,60 @@ int spp_get_proxy_done(SSL *s, SPP_PROXY* proxy) {
 }
 
 int spp_get_proxy_key_material(SSL *s, SPP_PROXY* proxy) { 
-    
-    return -1;
+    /* This method does nothing. The client/server just read these messages 
+     * which are actually intended for the proxies, and added them to the 
+     * Finished message digest. The message contents should be ignored. */
+    int n, ok;
+    n=s->method->ssl_get_message(s,
+        SPP_ST_CR_PRXY_MAT_A,
+        SPP_ST_CR_PRXY_MAT_B,
+        SPP_MT_PROXY_KEY_MATERIAL,
+        SSL3_RT_MAX_PLAIN_LENGTH,
+        &ok);
+    if (!ok) return n;
+    return 1;
 }
 
 int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
     unsigned char *p,*d;
-    int n;
-    unsigned long alg_k;
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *clnt_ecdh = NULL;
-    const EC_POINT *srvr_ecpoint = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-    int encoded_pt_len = 0;
-    BN_CTX * bn_ctx = NULL;
-#endif
-    struct sess_cert_st *sess_cert = NULL;
+    int n,i,j,found;
+    SPP_SLICE *slice;
 
     if (s->state == SPP_ST_CW_PRXY_MAT_A) {
         d=(unsigned char *)s->init_buf->data;
         p= &(d[4]);
-
-        alg_k=s->s3->tmp.new_cipher->algorithm_mkey;
-
-        /* Fool emacs indentation */
-        if (0) {}
-#ifndef OPENSSL_NO_DH
-        else if (alg_k & (SSL_kEDH|SSL_kDHr|SSL_kDHd)) {
-            DH *dh_srvr,*dh_clnt;
-
-            if (sess_cert == NULL)  {
-                ssl3_send_alert(s,SSL3_AL_FATAL,SSL_AD_UNEXPECTED_MESSAGE);
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,SSL_R_UNEXPECTED_MESSAGE);
+        
+        n = 0;
+        s1n(proxy->proxy_id, p);
+        for (i = 0; i < proxy->read_slice_ids_len; i++) {
+            slice = SPP_get_slice_by_id(s, proxy->read_slice_ids[i]);
+            if (slice == NULL)
                 goto err;
-            }
-
-            if (sess_cert->peer_dh_tmp != NULL)
-                dh_srvr=sess_cert->peer_dh_tmp;
-            else {
-                /* we get them from the cert */
-                ssl3_send_alert(s,SSL3_AL_FATAL,SSL_AD_HANDSHAKE_FAILURE);
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,SSL_R_UNABLE_TO_FIND_DH_PARAMETERS);
-                goto err;
-            }
-
             
-
-            /* use the 'p' output buffer for the DH key, but
-             * make sure to clear it out afterwards */
-
-            n=DH_compute_key(p,dh_srvr->pub_key,dh_clnt);
-
-            if (n <= 0) {
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,ERR_R_DH_LIB);
-                DH_free(dh_clnt);
-                goto err;
+            s1n(slice->slice_id, p);
+            s2n(EVP_MAX_KEY_LENGTH, p);
+            memcpy(p, slice->read_mat, EVP_MAX_KEY_LENGTH);
+            p += EVP_MAX_KEY_LENGTH;
+            
+            found = 0;
+            for (j = 0; j < proxy->write_slice_ids_len; j++) {
+                if (proxy->write_slice_ids[j] == slice->slice_id) {
+                    found=1;
+                    break;
+                }
             }
-
-            /* generate master key from the result */
-            s->session->master_key_length=
-                s->method->ssl3_enc->generate_master_secret(s,
-                    s->session->master_key,p,n);
-            /* clean up */
-            memset(p,0,n);
-
-            /* send off the data */
-            n=BN_num_bytes(dh_clnt->pub_key);
-            s2n(n,p);
-            BN_bn2bin(dh_clnt->pub_key,p);
-            n+=2;
-
-            DH_free(dh_clnt);
-        }
-#endif
-
-#ifndef OPENSSL_NO_ECDH 
-        else if (alg_k & (SSL_kEECDH|SSL_kECDHr|SSL_kECDHe)) {
-            const EC_GROUP *srvr_group = NULL;
-            EC_KEY *tkey;
-            int ecdh_clnt_cert = 0;
-            int field_size = 0;
-
-            if (s->session->sess_cert == NULL)  {
-                ssl3_send_alert(s,SSL3_AL_FATAL,SSL_AD_UNEXPECTED_MESSAGE);
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,SSL_R_UNEXPECTED_MESSAGE);
-                goto err;
-            }
-
-            /* Did we send out the client's
-             * ECDH share for use in premaster
-             * computation as part of client certificate?
-             * If so, set ecdh_clnt_cert to 1.
-             */
-            if ((alg_k & (SSL_kECDHr|SSL_kECDHe)) && (s->cert != NULL)) {
-                /* XXX: For now, we do not support client
-                 * authentication using ECDH certificates.
-                 * To add such support, one needs to add
-                 * code that checks for appropriate 
-                 * conditions and sets ecdh_clnt_cert to 1.
-                 * For example, the cert have an ECC
-                 * key on the same curve as the server's
-                 * and the key should be authorized for
-                 * key agreement.
-                 *
-                 * One also needs to add code in ssl3_connect
-                 * to skip sending the certificate verify
-                 * message.
-                 *
-                 * if ((s->cert->key->privatekey != NULL) &&
-                 *     (s->cert->key->privatekey->type ==
-                 *      EVP_PKEY_EC) && ...)
-                 * ecdh_clnt_cert = 1;
-                 */
-            }
-
-            if (s->session->sess_cert->peer_ecdh_tmp != NULL) {
-                tkey = s->session->sess_cert->peer_ecdh_tmp;
+            // Write permission, so add the write key
+            if (found) {
+                s2n(EVP_MAX_KEY_LENGTH, p);
+                memcpy(p, slice->write_mat, EVP_MAX_KEY_LENGTH);
+                p += EVP_MAX_KEY_LENGTH;
             } else {
-                /* Get the Server Public Key from Cert */
-                srvr_pub_pkey = X509_get_pubkey(s->session-> \
-                    sess_cert->peer_pkeys[SSL_PKEY_ECC].x509);
-                if ((srvr_pub_pkey == NULL) ||
-                    (srvr_pub_pkey->type != EVP_PKEY_EC) ||
-                    (srvr_pub_pkey->pkey.ec == NULL)) {
-                    SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,
-                        ERR_R_INTERNAL_ERROR);
-                    goto err;
-                }
-
-                tkey = srvr_pub_pkey->pkey.ec;
+                // No write permission, write a 0
+                s2n(0, p);
             }
-
-            srvr_group   = EC_KEY_get0_group(tkey);
-            srvr_ecpoint = EC_KEY_get0_public_key(tkey);
-
-            if ((srvr_group == NULL) || (srvr_ecpoint == NULL)) {
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,
-                    ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-
-            if ((clnt_ecdh=EC_KEY_new()) == NULL) {
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,ERR_R_MALLOC_FAILURE);
-                goto err;
-            }
-
-            if (!EC_KEY_set_group(clnt_ecdh, srvr_group)) {
-                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,ERR_R_EC_LIB);
-                goto err;
-            }
-            if (ecdh_clnt_cert) { 
-                /* Reuse key info from our certificate
-                 * We only need our private key to perform
-                 * the ECDH computation.
-                 */
-                const BIGNUM *priv_key;
-                tkey = s->cert->key->privatekey->pkey.ec;
-                priv_key = EC_KEY_get0_private_key(tkey);
-                if (priv_key == NULL) {
-                    SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,ERR_R_MALLOC_FAILURE);
-                    goto err;
-                }
-                if (!EC_KEY_set_private_key(clnt_ecdh, priv_key)) {
-                    SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,ERR_R_EC_LIB);
-                    goto err;
-                }
-            } else {
-                /* Generate a new ECDH key pair */
-                if (!(EC_KEY_generate_key(clnt_ecdh))) {
-                    SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE, ERR_R_ECDH_LIB);
-                    goto err;
-                }
-                        }
-
-                /* use the 'p' output buffer for the ECDH key, but
-                 * make sure to clear it out afterwards
-                 */
-
-                field_size = EC_GROUP_get_degree(srvr_group);
-                if (field_size <= 0)
-                        {
-                        SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE, 
-                               ERR_R_ECDH_LIB);
-                        goto err;
-                        }
-                n=ECDH_compute_key(p, (field_size+7)/8, srvr_ecpoint, clnt_ecdh, NULL);
-                if (n <= 0)
-                        {
-                        SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE, 
-                               ERR_R_ECDH_LIB);
-                        goto err;
-                        }
-
-                /* generate master key from the result */
-                s->session->master_key_length = s->method->ssl3_enc \
-                    -> generate_master_secret(s, 
-                        s->session->master_key,
-                        p, n);
-
-                memset(p, 0, n); /* clean up */
-
-                if (ecdh_clnt_cert) 
-                        {
-                        /* Send empty client key exch message */
-                        n = 0;
-                        }
-                else 
-                        {
-                        /* First check the size of encoding and
-                         * allocate memory accordingly.
-                         */
-                        encoded_pt_len = 
-                            EC_POINT_point2oct(srvr_group, 
-                                EC_KEY_get0_public_key(clnt_ecdh), 
-                                POINT_CONVERSION_UNCOMPRESSED, 
-                                NULL, 0, NULL);
-
-                        encodedPoint = (unsigned char *) 
-                            OPENSSL_malloc(encoded_pt_len * 
-                                sizeof(unsigned char)); 
-                        bn_ctx = BN_CTX_new();
-                        if ((encodedPoint == NULL) || 
-                            (bn_ctx == NULL)) 
-                                {
-                                SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,ERR_R_MALLOC_FAILURE);
-                                goto err;
-                                }
-
-                        /* Encode the public key */
-                        n = EC_POINT_point2oct(srvr_group, 
-                            EC_KEY_get0_public_key(clnt_ecdh), 
-                            POINT_CONVERSION_UNCOMPRESSED, 
-                            encodedPoint, encoded_pt_len, bn_ctx);
-
-                        *p = n; /* length of encoded point */
-                        /* Encoded point will be copied here */
-                        p += 1; 
-                        /* copy the point */
-                        memcpy((unsigned char *)p, encodedPoint, n);
-                        /* increment n to account for length field */
-                        n += 1; 
-                        }
-
-                /* Free allocated memory */
-                BN_CTX_free(bn_ctx);
-                if (encodedPoint != NULL) OPENSSL_free(encodedPoint);
-                if (clnt_ecdh != NULL) 
-                         EC_KEY_free(clnt_ecdh);
-                EVP_PKEY_free(srvr_pub_pkey);
         }
-#endif /* !OPENSSL_NO_ECDH */
-        else {
-            ssl3_send_alert(s, SSL3_AL_FATAL,
-                SSL_AD_HANDSHAKE_FAILURE);
-            SSLerr(SSL_F_SSL3_SEND_CLIENT_KEY_EXCHANGE,
-                ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-
+        n = p-d-4;
+        
         *(d++)=SPP_MT_PROXY_KEY_MATERIAL;
         l2n3(n,d);
 
@@ -985,13 +780,6 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
     /* SPP_ST_CW_PRXY_MAT_B */
     return(ssl3_do_write(s,SSL3_RT_HANDSHAKE));
 err:
-#ifndef OPENSSL_NO_ECDH
-    BN_CTX_free(bn_ctx);
-    if (encodedPoint != NULL) OPENSSL_free(encodedPoint);
-    if (clnt_ecdh != NULL) 
-            EC_KEY_free(clnt_ecdh);
-    EVP_PKEY_free(srvr_pub_pkey);
-#endif
     return(-1);
 }
 
@@ -1104,7 +892,7 @@ int spp_get_end_key_material(SSL *s) {
 
     param=p=(unsigned char *)s->init_msg;
     /* Server or client identifier */
-    printf("Message header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
+    //printf("Message header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
     n1s(p, id);
     if (id != 1 && id != 2) {
         goto err;
@@ -1113,7 +901,7 @@ int spp_get_end_key_material(SSL *s) {
     /* More to read */
     while (p-param < n) {
         n1s(p, slice_id);
-        printf("Slice %d received\n", slice_id);
+        //printf("Slice %d received\n", slice_id);
         slice = SPP_get_slice_by_id(s, slice_id);
         if (slice == NULL)            
             goto err;

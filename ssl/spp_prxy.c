@@ -53,6 +53,8 @@ int spp_initialize_ssl(SSL *s, SSL *n) {
     
     n->version=SPP_VERSION;
     n->type=SSL_ST_CONNECT;
+    
+    if (!SSL_in_init(n) || SSL_in_before(n)) SSL_clear(n);
 
     if (n->init_buf == NULL) {
         if ((buf=BUF_MEM_new()) == NULL) {
@@ -133,276 +135,222 @@ int get_proxy_msg(SSL *s, int st1, int stn, int msg) {
         &ok);
     if (!ok) return n;
     spp_forward_message(s->other_ssl, s);
-    
+
     return 1;
 }
 
-int spp_process_server_hello(SSL *s)
-	{
-	STACK_OF(SSL_CIPHER) *sk;
-	const SSL_CIPHER *c;
-	unsigned char *p,*d;
-	int i,al,ok;
-	unsigned int j;
-	long n;
+int spp_process_server_hello(SSL *s) {
+    STACK_OF(SSL_CIPHER) *sk;
+    const SSL_CIPHER *c;
+    unsigned char *p,*d;
+    int i,al;
+    unsigned int j;
+    long n;
 #ifndef OPENSSL_NO_COMP
-	SSL_COMP *comp;
+    SSL_COMP *comp;
 #endif
 
-	n=s->method->ssl_get_message(s,
-		SSL3_ST_CR_SRVR_HELLO_A,
-		SSL3_ST_CR_SRVR_HELLO_B,
-		-1,
-		20000, /* ?? */
-		&ok);
+    n=s->init_num;
 
-	if (!ok) return((int)n);
+    if ( s->s3->tmp.message_type != SSL3_MT_SERVER_HELLO) {
+        al=SSL_AD_UNEXPECTED_MESSAGE;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_BAD_MESSAGE_TYPE);
+        goto f_err;
+    }
 
-	if ( SSL_version(s) == DTLS1_VERSION || SSL_version(s) == DTLS1_BAD_VER)
-		{
-		if ( s->s3->tmp.message_type == DTLS1_MT_HELLO_VERIFY_REQUEST)
-			{
-			if ( s->d1->send_cookie == 0)
-				{
-				s->s3->tmp.reuse_message = 1;
-				return 1;
-				}
-			else /* already sent a cookie */
-				{
-				al=SSL_AD_UNEXPECTED_MESSAGE;
-				SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_BAD_MESSAGE_TYPE);
-				goto f_err;
-				}
-			}
-		}
-	
-	if ( s->s3->tmp.message_type != SSL3_MT_SERVER_HELLO)
-		{
-		al=SSL_AD_UNEXPECTED_MESSAGE;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_BAD_MESSAGE_TYPE);
-		goto f_err;
-		}
+    d=p=(unsigned char *)s->init_msg;
 
-	d=p=(unsigned char *)s->init_msg;
+    /* Read the version number */
+    if ((p[0] != (s->version>>8)) || (p[1] != (s->version&0xff))) {
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_SSL_VERSION);
+        s->version=(s->version&0xff00)|p[1];
+        al=SSL_AD_PROTOCOL_VERSION;
+        goto f_err;
+    }
+    p+=2;
 
-	if ((p[0] != (s->version>>8)) || (p[1] != (s->version&0xff)))
-		{
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_SSL_VERSION);
-		s->version=(s->version&0xff00)|p[1];
-		al=SSL_AD_PROTOCOL_VERSION;
-		goto f_err;
-		}
-	p+=2;
+    /* load the server hello data */
+    /* load the server random */
+    memcpy(s->s3->server_random,p,SSL3_RANDOM_SIZE);
+    memcpy(s->other_ssl->s3->server_random,p,SSL3_RANDOM_SIZE);
+    p+=SSL3_RANDOM_SIZE;
 
-	/* load the server hello data */
-	/* load the server random */
-	memcpy(s->s3->server_random,p,SSL3_RANDOM_SIZE);
-	p+=SSL3_RANDOM_SIZE;
+    /* get the session-id */
+    j= *(p++);
 
-	/* get the session-id */
-	j= *(p++);
-
-	if ((j > sizeof s->session->session_id) || (j > SSL3_SESSION_ID_SIZE))
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_SSL3_SESSION_ID_TOO_LONG);
-		goto f_err;
-		}
+    if ((j > sizeof s->session->session_id) || (j > SSL3_SESSION_ID_SIZE)) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_SSL3_SESSION_ID_TOO_LONG);
+        goto f_err;
+    }
 
 #ifndef OPENSSL_NO_TLSEXT
 	/* check if we want to resume the session based on external pre-shared secret */
-	if (s->version >= TLS1_VERSION && s->tls_session_secret_cb)
-		{
-		SSL_CIPHER *pref_cipher=NULL;
-		s->session->master_key_length=sizeof(s->session->master_key);
-		if (s->tls_session_secret_cb(s, s->session->master_key,
-					     &s->session->master_key_length,
-					     NULL, &pref_cipher,
-					     s->tls_session_secret_cb_arg))
-			{
-			s->session->cipher = pref_cipher ?
-				pref_cipher : ssl_get_cipher_by_char(s, p+j);
-	    		s->s3->flags |= SSL3_FLAGS_CCS_OK;
-			}
-		}
+    if (s->version >= TLS1_VERSION && s->tls_session_secret_cb) {
+        SSL_CIPHER *pref_cipher=NULL;
+        s->session->master_key_length=sizeof(s->session->master_key);
+        if (s->tls_session_secret_cb(s, s->session->master_key,
+                &s->session->master_key_length,
+                NULL, &pref_cipher,
+                s->tls_session_secret_cb_arg)) {
+                    s->session->cipher = pref_cipher ?
+                        pref_cipher : ssl_get_cipher_by_char(s, p+j);
+                    s->s3->flags |= SSL3_FLAGS_CCS_OK;
+                    s->other_ssl->s3->flags |= SSL3_FLAGS_CCS_OK;
+        }
+        s->other_ssl->session->master_key_length=s->session->master_key_length;
+        s->other_ssl->session->cipher=s->session->cipher;
+    }
 #endif /* OPENSSL_NO_TLSEXT */
 
-	if (j != 0 && j == s->session->session_id_length
-	    && memcmp(p,s->session->session_id,j) == 0)
-	    {
-	    if(s->sid_ctx_length != s->session->sid_ctx_length
-	       || memcmp(s->session->sid_ctx,s->sid_ctx,s->sid_ctx_length))
-		{
-		/* actually a client application bug */
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_ATTEMPT_TO_REUSE_SESSION_IN_DIFFERENT_CONTEXT);
-		goto f_err;
-		}
-	    s->s3->flags |= SSL3_FLAGS_CCS_OK;
-	    s->hit=1;
-	    }
-	else	/* a miss or crap from the other end */
-		{
-		/* If we were trying for session-id reuse, make a new
-		 * SSL_SESSION so we don't stuff up other people */
-		s->hit=0;
-		if (s->session->session_id_length > 0)
-			{
-			if (!ssl_get_new_session(s,0))
-				{
-				al=SSL_AD_INTERNAL_ERROR;
-				goto f_err;
-				}
-			}
-		s->session->session_id_length=j;
-		memcpy(s->session->session_id,p,j); /* j could be 0 */
-		}
-	p+=j;
-	c=ssl_get_cipher_by_char(s,p);
-	if (c == NULL)
-		{
-		/* unknown cipher */
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_UNKNOWN_CIPHER_RETURNED);
-		goto f_err;
-		}
-	/* TLS v1.2 only ciphersuites require v1.2 or later */
-	if ((c->algorithm_ssl & SSL_TLSV1_2) && 
-		(TLS1_get_version(s) < TLS1_2_VERSION))
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_CIPHER_RETURNED);
-		goto f_err;
-		}
+    if (j != 0 && j == s->session->session_id_length
+        && memcmp(p,s->session->session_id,j) == 0) {
+            if(s->sid_ctx_length != s->session->sid_ctx_length
+               || memcmp(s->session->sid_ctx,s->sid_ctx,s->sid_ctx_length)) {
+                /* actually a client application bug */
+                al=SSL_AD_ILLEGAL_PARAMETER;
+                SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_ATTEMPT_TO_REUSE_SESSION_IN_DIFFERENT_CONTEXT);
+                goto f_err;
+            }
+            s->other_ssl->s3->flags |= SSL3_FLAGS_CCS_OK;
+            s->s3->flags |= SSL3_FLAGS_CCS_OK;
+            s->hit=s->other_ssl->hit=1;
+    } else {
+        /* a miss or crap from the other end */
+        /* If we were trying for session-id reuse, make a new
+         * SSL_SESSION so we don't stuff up other people */
+        s->hit=s->other_ssl->hit=0;
+        if (s->session->session_id_length > 0) {
+            if (!ssl_get_new_session(s,0)) {
+                al=SSL_AD_INTERNAL_ERROR;
+                goto f_err;
+            }
+            s->other_ssl->session=s->session;
+        }
+        s->session->session_id_length=j;
+        memcpy(s->session->session_id,p,j); /* j could be 0 */
+    }
+    p+=j;
+    
+    
+    c=ssl_get_cipher_by_char(s,p);
+    if (c == NULL) {
+        /* unknown cipher */
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_UNKNOWN_CIPHER_RETURNED);
+        goto f_err;
+    }
+    /* TLS v1.2 only ciphersuites require v1.2 or later */
+    if ((c->algorithm_ssl & SSL_TLSV1_2) && (TLS1_get_version(s) < TLS1_2_VERSION)) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_CIPHER_RETURNED);
+        goto f_err;
+    }
 #ifndef OPENSSL_NO_SRP
-	if (((c->algorithm_mkey & SSL_kSRP) || (c->algorithm_auth & SSL_aSRP)) &&
-		    !(s->srp_ctx.srp_Mask & SSL_kSRP))
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_CIPHER_RETURNED);
-		goto f_err;
-		}
+    if (((c->algorithm_mkey & SSL_kSRP) || (c->algorithm_auth & SSL_aSRP)) && !(s->srp_ctx.srp_Mask & SSL_kSRP)) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_CIPHER_RETURNED);
+        goto f_err;
+    }
 #endif /* OPENSSL_NO_SRP */
-	p+=ssl_put_cipher_by_char(s,NULL,NULL);
+    p+=ssl_put_cipher_by_char(s,NULL,NULL);
+    sk=ssl_get_ciphers_by_id(s);
+    i=sk_SSL_CIPHER_find(sk,c);
+    if (i < 0) {
+        /* we did not say we would use this cipher */
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_CIPHER_RETURNED);
+        goto f_err;
+    }
 
-	sk=ssl_get_ciphers_by_id(s);
-	i=sk_SSL_CIPHER_find(sk,c);
-	if (i < 0)
-		{
-		/* we did not say we would use this cipher */
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_WRONG_CIPHER_RETURNED);
-		goto f_err;
-		}
-
-	/* Depending on the session caching (internal/external), the cipher
-	   and/or cipher_id values may not be set. Make sure that
-	   cipher_id is set and use it for comparison. */
-	if (s->session->cipher)
-		s->session->cipher_id = s->session->cipher->id;
-	if (s->hit && (s->session->cipher_id != c->id))
-		{
-/* Workaround is now obsolete */
+    /* Depending on the session caching (internal/external), the cipher
+     * and/or cipher_id values may not be set. Make sure that
+     * cipher_id is set and use it for comparison. */
+    if (s->session->cipher)
+        s->session->cipher_id = s->session->cipher->id;
+    if (s->hit && (s->session->cipher_id != c->id)) {
+        /* Workaround is now obsolete */
 #if 0
-		if (!(s->options &
-			SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG))
+        if (!(s->options &
+            SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG))
 #endif
-			{
-			al=SSL_AD_ILLEGAL_PARAMETER;
-			SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_OLD_SESSION_CIPHER_NOT_RETURNED);
-			goto f_err;
-			}
-		}
-	s->s3->tmp.new_cipher=c;
-	/* Don't digest cached records if TLS v1.2: we may need them for
-	 * client authentication.
-	 */
-	if (TLS1_get_version(s) < TLS1_2_VERSION && !ssl3_digest_cached_records(s))
-		{
-		al = SSL_AD_INTERNAL_ERROR;
-		goto f_err;
-		}
-	/* lets get the compression algorithm */
-	/* COMPRESSION */
+        {
+            al=SSL_AD_ILLEGAL_PARAMETER;
+            SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_OLD_SESSION_CIPHER_NOT_RETURNED);
+            goto f_err;
+        }
+    }
+    s->s3->tmp.new_cipher=s->other_ssl->s3->tmp.new_cipher=c;
+    /* lets get the compression algorithm */
+    /* COMPRESSION */
 #ifdef OPENSSL_NO_COMP
-	if (*(p++) != 0)
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_UNSUPPORTED_COMPRESSION_ALGORITHM);
-		goto f_err;
-		}
-	/* If compression is disabled we'd better not try to resume a session
-	 * using compression.
-	 */
-	if (s->session->compress_meth != 0)
-		{
-		al=SSL_AD_INTERNAL_ERROR;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_INCONSISTENT_COMPRESSION);
-		goto f_err;
-		}
+    if (*(p++) != 0) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_UNSUPPORTED_COMPRESSION_ALGORITHM);
+        goto f_err;
+    }
+    /* If compression is disabled we'd better not try to resume a session
+     * using compression.
+     */
+    if (s->session->compress_meth != 0) {
+        al=SSL_AD_INTERNAL_ERROR;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_INCONSISTENT_COMPRESSION);
+        goto f_err;
+    }
 #else
-	j= *(p++);
-	if (s->hit && j != s->session->compress_meth)
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_OLD_SESSION_COMPRESSION_ALGORITHM_NOT_RETURNED);
-		goto f_err;
-		}
-	if (j == 0)
-		comp=NULL;
-	else if (s->options & SSL_OP_NO_COMPRESSION)
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_COMPRESSION_DISABLED);
-		goto f_err;
-		}
-	else
-		comp=ssl3_comp_find(s->ctx->comp_methods,j);
+    j= *(p++);
+    if (s->hit && j != s->session->compress_meth) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_OLD_SESSION_COMPRESSION_ALGORITHM_NOT_RETURNED);
+        goto f_err;
+    }
+    
+    if (j == 0)
+        comp=NULL;
+    else if (s->options & SSL_OP_NO_COMPRESSION) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_COMPRESSION_DISABLED);
+        goto f_err;
+    } else
+        comp=ssl3_comp_find(s->ctx->comp_methods,j);
 	
-	if ((j != 0) && (comp == NULL))
-		{
-		al=SSL_AD_ILLEGAL_PARAMETER;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_UNSUPPORTED_COMPRESSION_ALGORITHM);
-		goto f_err;
-		}
-	else
-		{
-		s->s3->tmp.new_compression=comp;
-		}
+    if ((j != 0) && (comp == NULL)) {
+        al=SSL_AD_ILLEGAL_PARAMETER;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_UNSUPPORTED_COMPRESSION_ALGORITHM);
+        goto f_err;
+    } else {
+        s->s3->tmp.new_compression=s->other_ssl->s3->tmp.new_compression=comp;
+    }
 #endif
 
 #ifndef OPENSSL_NO_TLSEXT
-	/* TLS extensions*/
-	if (s->version >= SSL3_VERSION)
-		{
-		if (!ssl_parse_serverhello_tlsext(s,&p,d,n, &al))
-			{
-			/* 'al' set by ssl_parse_serverhello_tlsext */
-			SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_PARSE_TLSEXT);
-			goto f_err; 
-			}
-		if (ssl_check_serverhello_tlsext(s) <= 0)
-			{
-			SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_SERVERHELLO_TLSEXT);
-				goto err;
-			}
-		}
+    /* TLS extensions*/
+    if (s->version >= SSL3_VERSION) {
+        if (!ssl_parse_serverhello_tlsext(s,&p,d,n, &al)) {
+            /* 'al' set by ssl_parse_serverhello_tlsext */
+            SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_PARSE_TLSEXT);
+            goto f_err; 
+        }
+        if (ssl_check_serverhello_tlsext(s) <= 0) {
+            SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_SERVERHELLO_TLSEXT);
+            goto err;
+        }
+    }
 #endif
 
-	if (p != (d+n))
-		{
-		/* wrong packet length */
-		al=SSL_AD_DECODE_ERROR;
-		SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_BAD_PACKET_LENGTH);
-		goto f_err;
-		}
+    if (p != (d+n)) {
+        /* wrong packet length */
+        al=SSL_AD_DECODE_ERROR;
+        SSLerr(SSL_F_SSL3_GET_SERVER_HELLO,SSL_R_BAD_PACKET_LENGTH);
+        goto f_err;
+    }
 
-	return(1);
+    return(1);
 f_err:
-	ssl3_send_alert(s,SSL3_AL_FATAL,al);
+    ssl3_send_alert(s,SSL3_AL_FATAL,al);
 err:
-	return(-1);
-	}
+    return(-1);
+}
 
 int get_proxy_material(SSL *s, int server) {
     int slice_id, proxy_id, len;
@@ -452,6 +400,9 @@ int get_proxy_material(SSL *s, int server) {
             if (server) {
                 memcpy(slice->other_write_mat, p, len);
                 memcpy(slice2->other_write_mat, p, len);
+            } else {
+                memcpy(slice->write_mat, p, len);
+                memcpy(slice2->write_mat, p, len);
             }
             p += len;
             slice->write_access = 1;
@@ -504,11 +455,10 @@ int spp_proxy_accept(SSL *s) {
      * already got and don't await it anymore, because
      * Heartbeats don't make sense during handshakes anyway.
      */
-    if (s->tlsext_hb_pending)
-            {
-            s->tlsext_hb_pending = 0;
-            s->tlsext_hb_seq++;
-            }
+    if (s->tlsext_hb_pending) {
+        s->tlsext_hb_pending = 0;
+        s->tlsext_hb_seq++;
+    }
 #endif
 
     for (;;) {
@@ -526,7 +476,6 @@ int spp_proxy_accept(SSL *s) {
                 printf("Before state\n");
                 s->server = 1;
                 s->proxy = 1;
-                //s->proxy_id = 2;
 
                 if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_START,1);
 
@@ -606,8 +555,9 @@ int spp_proxy_accept(SSL *s) {
                 if (ret <= 0) goto end;
                 
                 s->renegotiate = 2;
+                next_st->renegotiate = 0;
                 s->state=SSL3_ST_CR_SRVR_HELLO_A;
-                s->init_num=0;
+                s->init_num=next_st->init_num=0;
                 break;
                 
             case SSL3_ST_CR_SRVR_HELLO_A:
@@ -616,9 +566,9 @@ int spp_proxy_accept(SSL *s) {
                 ret=get_proxy_msg(next_st, SSL3_ST_CR_SRVR_HELLO_A, SSL3_ST_CR_SRVR_HELLO_B, SSL3_MT_SERVER_HELLO);
                 printf("Received server hello\n");
                 if (ret <= 0) goto end;
-                ret=spp_process_server_hello(next_st);                
+                ret=spp_process_server_hello(next_st);
 		if (ret <= 0) goto end;
-                
+
                 s->state=SSL3_ST_CR_CERT_A;
                 s->init_num=next_st->init_num=0;
                 break;
@@ -628,7 +578,7 @@ int spp_proxy_accept(SSL *s) {
                 ret=get_proxy_msg(next_st, SSL3_ST_CR_CERT_A, SSL3_ST_CR_CERT_B, SSL3_MT_CERTIFICATE);
                 printf("Received server certificate\n");
                 if (ret <= 0) goto end;
-                
+
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
                 s->init_num=next_st->init_num=0;
                 break;
@@ -649,7 +599,7 @@ int spp_proxy_accept(SSL *s) {
                     goto end;
                 }
                 break;
-                
+
             case SSL3_ST_CR_SRVR_DONE_A:
             case SSL3_ST_CR_SRVR_DONE_B:
                 ret=get_proxy_msg(next_st, SSL3_ST_CR_SRVR_DONE_A, SSL3_ST_CR_SRVR_DONE_B, SSL3_MT_SERVER_DONE);
@@ -672,7 +622,7 @@ int spp_proxy_accept(SSL *s) {
                 if (!(s->s3->tmp.new_cipher->algorithm_auth & (SSL_aNULL|SSL_aKRB5|SSL_aSRP))
                     && !(s->s3->tmp.new_cipher->algorithm_mkey & SSL_kPSK)) {
                         printf("Sending certificate\n");
-                        ret=ssl3_send_server_certificate(s);                        
+                        ret=ssl3_send_server_certificate(s); //OK
                         if (ret <= 0) goto end;
                         ret=spp_duplicate_message(next_st, s);
                         if (ret <= 0) goto end;
@@ -736,7 +686,7 @@ int spp_proxy_accept(SSL *s) {
                     )
                         {
                         printf("Sending server key exchange\n");
-                        ret=ssl3_send_server_key_exchange(s);
+                        ret=ssl3_send_server_key_exchange(s); //OK
                         if (ret <= 0) goto end;
                         ret=spp_duplicate_message(next_st, s);
                         if (ret <= 0) goto end;
@@ -751,21 +701,23 @@ int spp_proxy_accept(SSL *s) {
             case SPP_ST_PW_PRXY_DONE_A:
             case SPP_ST_PW_PRXY_DONE_B:
                 printf("Sending server done\n");
-                ret=ssl3_send_server_done(s);
+                ret=ssl3_send_server_done(s); //OK
                 printf("Sent server done\n");
                 if (ret <= 0) goto end;
                 ret=spp_duplicate_message(next_st, s);
                 if (ret <= 0) goto end;
-                                
-                s->state=SSL3_ST_SW_FLUSH;
+
                 s->init_num=next_st->init_num=0;
                 
                 // Receive and forward the certificates for proxies between us and the server
                 if ((proxy = spp_get_next_proxy(s, this_proxy, 1)) != NULL) {
-                    s->s3->tmp.next_state=SPP_ST_PR_BEHIND_A;
+                    s->state=SPP_ST_PR_BEHIND_A;
                 } else if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL) {
+                    // Need to flush
+                    s->state=SSL3_ST_SW_FLUSH;
                     s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
                 } else {
+                    s->state=SSL3_ST_SW_FLUSH;
                     s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
                 }
                 break;
@@ -782,13 +734,14 @@ int spp_proxy_accept(SSL *s) {
                     if (next_st->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
                         if ((proxy = spp_get_next_proxy(s, proxy, 1)) == NULL) {
                             if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL)
-                                s->state=SPP_ST_PR_AHEAD_A;
+                                s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
                             else
-                                s->state=SSL3_ST_SR_KEY_EXCH_A;
+                                s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
                             break;
                         }
                     }
                 }
+                s->state=SSL3_ST_SW_FLUSH;
                 
                 break;
                 
@@ -808,6 +761,7 @@ int spp_proxy_accept(SSL *s) {
                         } 
                     }
                 }
+                s->state=SSL3_ST_SW_FLUSH;
                 
                 break;
 		
@@ -858,7 +812,7 @@ int spp_proxy_accept(SSL *s) {
                     s->state = SPP_ST_CR_PRXY_MAT_A;
                     ret=get_proxy_msg(s, SPP_ST_CR_PRXY_MAT_A, SPP_ST_CR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL);
                     if (ret <= 0) goto end;
-                    ret=get_proxy_material(s, 0);
+                    ret=get_proxy_material(s, 0); // From client
                     if (ret <= 0) goto end;
                 }
                 
@@ -875,7 +829,7 @@ int spp_proxy_accept(SSL *s) {
                     s->state = SPP_ST_SR_PRXY_MAT_A;
                     ret=get_proxy_msg(next_st, SPP_ST_SR_PRXY_MAT_A, SPP_ST_SR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL);
                     if (ret <= 0) goto end;
-                    ret=get_proxy_material(next_st, 1);
+                    ret=get_proxy_material(next_st, 1); // From server
                     if (ret <= 0) goto end;
                 }
                 
@@ -919,8 +873,14 @@ int spp_proxy_accept(SSL *s) {
                     s->state=SSL3_ST_CR_FINISHED_A;
                 s->init_num=next_st->init_num=0;
                 
-                // Change cipher state BEFORE receiving finished message
-                if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_WRITE)) {
+                /* Cipher state should actually be changed before the finished message.
+                 * Since proxies do not actually validate the Finished message, however,
+                 * it may be done after. */
+                if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_READ)) {
+                    ret= -1;
+                    goto end;
+                }
+                if (!next_st->method->ssl3_enc->change_cipher_state(next_st, SSL3_CHANGE_CIPHER_CLIENT_WRITE)) {
                     ret= -1;
                     goto end;
                 }
@@ -944,33 +904,54 @@ int spp_proxy_accept(SSL *s) {
                 else
                     s->state=SSL_ST_OK;
                 s->init_num=next_st->init_num=0;
+                
+                if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_WRITE)) {
+                    ret= -1;
+                    goto end;
+                }
+                if (!next_st->method->ssl3_enc->change_cipher_state(next_st, SSL3_CHANGE_CIPHER_CLIENT_READ)) {
+                    ret= -1;
+                    goto end;
+                }
                 break;
 
             case SSL_ST_OK:
+                next_st->state=SSL_ST_OK;
                 /* clean a few things up */
                 ssl3_cleanup_key_block(s);
+                ssl3_cleanup_key_block(next_st);
 
                 BUF_MEM_free(s->init_buf);
                 s->init_buf=NULL;
+                BUF_MEM_free(next_st->init_buf);
+                next_st->init_buf=NULL;
 
                 /* remove buffering on output */
                 ssl_free_wbio_buffer(s);
+                if (!(next_st->s3->flags & SSL3_FLAGS_POP_BUFFER))
+                ssl_free_wbio_buffer(next_st);
 
                 s->init_num=0;
 
-                if (s->renegotiate == 2) /* skipped if we just sent a HelloRequest */
-                        {
-                        s->renegotiate=0;
-                        s->new_session=0;
+                /* skipped if we just sent a HelloRequest */
+                if (s->renegotiate == 2) {
+                    s->renegotiate=0;
+                    s->new_session=0;
 
-                        ssl_update_cache(s,SSL_SESS_CACHE_SERVER);
+                    ssl_update_cache(s,SSL_SESS_CACHE_SERVER);
 
-                        s->ctx->stats.sess_accept_good++;
-                        /* s->server=1; */
-                        s->handshake_func=ssl3_accept;
+                    s->ctx->stats.sess_accept_good++;
+                    /* s->server=1; */
+                    s->handshake_func=spp_proxy_accept;
 
-                        if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_DONE,1);
-                        }
+                    if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_DONE,1);
+                }
+                
+                next_st->init_num=0;
+                next_st->renegotiate=0;
+                next_st->new_session=0;
+
+                next_st->handshake_func=NULL;
 
                 ret = 1;
                 goto end;
@@ -988,7 +969,6 @@ int spp_proxy_accept(SSL *s) {
                 if ((ret=BIO_flush(s->wbio)) <= 0)
                     goto end;
             }
-
 
             if ((cb != NULL) && (s->state != state)) {
                 new_state=s->state;

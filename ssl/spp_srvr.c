@@ -686,7 +686,7 @@ int spp_accept(SSL *s) 	{
 				
 				s->ctx->stats.sess_accept_good++;
 				/* s->server=1; */
-				s->handshake_func=ssl3_accept;
+				s->handshake_func=spp_accept;
 
 				if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_DONE,1);
 				}

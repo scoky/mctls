@@ -445,7 +445,7 @@ int spp_connect(SSL *s) {
 
                 ret=1;
                 /* s->server=0; */
-                s->handshake_func=ssl3_connect;
+                s->handshake_func=spp_connect;
                 s->ctx->stats.sess_connect_good++;
 
                 if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_DONE,1);
