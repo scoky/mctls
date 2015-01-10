@@ -113,7 +113,7 @@ void spp_proxies_count(SSL *s, int *ahead, int *behind) {
  * The read and write calls provided by openssl for handshake messages 
  * are inconsistent in whether the 4 byte header is included or not. */
 int spp_forward_message(SSL *to, SSL*from) {
-    unsigned char tBuf=(unsigned char *)to->init_buf->data;
+    unsigned char *tBuf=(unsigned char *)to->init_buf->data;
     unsigned char *fBuf = (unsigned char *)from->init_buf->data;
     // When receiving a message, the helper functions automatically strip the header.
     to->init_num = from->init_num + 4;
@@ -557,6 +557,7 @@ int spp_proxy_accept(SSL *s) {
                 
                 spp_initialize_ssl(s, next_st);
                 this_proxy = SPP_get_proxy_by_id(s, s->proxy_id);
+                next_st->in_handshake++;
                 
                 // Forward the message on.
                 ret=spp_forward_message(next_st, s);

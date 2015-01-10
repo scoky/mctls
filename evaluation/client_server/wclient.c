@@ -710,7 +710,9 @@ int main(int argc, char **argv){
 
 	// Connect TCP socket
 	if (N_proxies > 0){
-		char* proxy_host = strtok(proxies[0]->address, ":"); 
+		char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
+		memcpy(address, proxies[0]->address, strlen(proxies[0]->address)+1);
+		char* proxy_host = strtok(address, ":"); 
 		int proxy_port = atoi(strtok(NULL, ":"));
 		#ifdef DEBUG 
 		printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
