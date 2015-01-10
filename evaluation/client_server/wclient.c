@@ -22,7 +22,6 @@
 #define KEYFILE "client.pem"    // client certificate
 #define PASSWORD "password"     // unused now 	
 #define DEBUG                   // verbose logging
-//#define PROXY                 // at least one proxy is physically available
 #define CONNECT_TIMEOUT 5       // socket connection timeout 
 
 static char *host=HOST;
@@ -352,7 +351,8 @@ static void *browser_replay(void *ptr){
 		
 		// Here send timed HTTP GET 
 		#ifdef DEBUG
-		printf("[DEBUG] Sending GET request for file <<%s>>\n", file_request); 
+		//printf("[DEBUG] Sending GET request for file <<%s>>\n", file_request); 
+		printf("[DEBUG] Sending GET request for <<%s>> bytes of data\n", file_request); 
 		#endif 
 		sendRequest(file_request); 
 		
@@ -441,7 +441,10 @@ static int http_complex(SSL *ssl, char *proto){
 		}
 		
 		// Write buf to stdout
-		fwrite(buf, 1, len, stdout);
+		#ifdef DEBUG
+		printf("[DEBUG] Received:\n%s\n\n", buf); 
+		//fwrite(buf, 1, len, stdout);
+		#endif 
     }
     
 	shutdown:
@@ -706,20 +709,20 @@ int main(int argc, char **argv){
 	}
 
 	// Connect TCP socket
-	#ifdef PROXY
-	// Following line can be an issue when we want common name to match hostname and a proxy is used 
-	// host = proxies[0]->address; 
-	#ifdef DEBUG 
-	printf("[DEBUG] Opening socket to host: %s, port %d\n", proxies[0]->address, port);
-	#endif
-	sock = tcp_connect(proxies[0]->address, port);
-	#else
-	#ifdef DEBUG 
-	printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
-	#endif
-	sock = tcp_connect(host, port);
-	#endif
-	
+	if (N_proxies > 0){
+		char* proxy_host = strtok(proxies[0]->address, ":"); 
+		int proxy_port = atoi(strtok(NULL, ":"));
+		#ifdef DEBUG 
+		printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
+		#endif
+		sock = tcp_connect(proxy_host, proxy_port);
+	}else{
+		#ifdef DEBUG 
+		printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
+		#endif
+		sock = tcp_connect(host, port);
+	}
+
 	// Connect the SSL socket 
 	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
     SSL_set_bio(ssl, sbio, sbio);

@@ -145,12 +145,15 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 }
 
 // Send a resonse (SSL and SPP) 
-void sendData(SSL *ssl, char *request, char *proto){
+void sendData(SSL *ssl, char *request, char *proto, int request_len){
 
-	int request_len; 
 	int i, r;  
 
-	request_len = strlen(request);
+	// logging
+	#ifdef DEBUG
+	printf("[DEBUG] sendData with length %d\n", request_len); 
+	#endif 
+	
 	if (strcmp(proto, "spp") == 0){
 		for (i = 0; i < ssl->slices_len; i++){
 			#ifdef DEBUG
@@ -196,7 +199,8 @@ static int http_simple_response(SSL *ssl, int s, char *proto){
 
 	// put 200 OK on the wire 
 	char *data = "HTTP/1.0 200 OK\r\n"; 
-	sendData(ssl, data, proto); 
+	int request_len = strlen(data);
+	sendData(ssl, data, proto, request_len); 
 
 	// Shutdown SSL - TO DO (check what happens here) 
 	int r = SSL_shutdown(ssl);
@@ -235,7 +239,56 @@ char* parse_http_get(char *buf){
 }
 
 // Serve a file -- solution extracted from original s_client (modified not to use BIO)
-// TO DO -- extend for SPP (questions...) 
+int serveData(SSL *ssl, int data_size, char *proto){ 
+	
+	//char buf[BUFSIZZ] = {0};   // buffer for data to send
+	
+	// Logging
+	#ifdef DEBUG
+	printf ("[DEBUG] Requested data with size %d\n", data_size); 
+	#endif 
+	// Send data via SPP/SSL
+	int still_to_send = data_size; 
+	for (;;){
+		// Derive min between how much to send and max buffer size 
+		int toSend = BUFSIZZ; 
+		if (still_to_send < toSend){
+			toSend = still_to_send; 
+		}
+
+		//Allocate buffer with size to sens and fill with zeros
+		char *buf = (char*) malloc(sizeof(char) * toSend);
+		memset(buf, '!', sizeof(char) * toSend);	
+		printf ("[DEBUG] Buffer=\n%s\n", buf); 
+		
+		// Send <<buf>> on SPP/SSL connection 
+		if (strcmp(proto, "spp") == 0){
+			sendData(ssl, buf, proto, sizeof(char) * toSend); 
+		}
+		if (strcmp(proto, "ssl") == 0){
+			int r = SSL_write(ssl, buf, toSend);
+			check_SSL_write_error(ssl, r, toSend);
+		}
+		
+		// Update how much content is still to send 
+		still_to_send -= toSend;
+		if (still_to_send == 0){
+			printf ("[DEBUG] No more data to send\n"); 
+			break; 	
+		}
+
+		// Free buffer
+		free(buf); 
+	}
+
+	// All good
+	return 0; 
+}	
+
+
+
+
+// Serve a file -- solution extracted from original s_client (modified not to use BIO)
 int serveFile(SSL *ssl, char *filename, char *proto){ 
 	
  	FILE *fp;				// file descriptot 
@@ -249,7 +302,8 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 		printf ("File <<%s>> do not exist\n", filename); 
 		#endif 
 		char *data = "Error opening file\r\n"; 
-		sendData(ssl, data, proto); 
+		int request_len = strlen(data);
+		sendData(ssl, data, proto, request_len); 
 		fclose(fp); 
 		return -1; 
 	}else{
@@ -302,7 +356,8 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 		
 		// Send <<buf>> on SPP/SSL connection 
 		if (strcmp(proto, "spp") == 0){
-			sendData(ssl, buf, proto); 
+			int request_len = strlen(buf);
+			sendData(ssl, buf, proto, request_len); 
 		}
 		if (strcmp(proto, "ssl") == 0){
 			int r = SSL_write(ssl, buf, toSend);
@@ -359,7 +414,7 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 
 // 1) work with both SSL and SPP
 // 2) no usage of BIO APIs
-static int http_serve_request(SSL *ssl, int s, char *proto, bool shut){
+static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int action){
   
     int r; 
 	char buf[BUFSIZZ];
@@ -404,7 +459,7 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut){
 	filename = parse_http_get(buf); 
 
 	// Simple trick to end 
-	if (strcmp(filename, "end.html") == 0){
+	if (strcmp(filename, "-1") == 0){
 		#ifdef DEBUG
 		printf("[DEBUG] Client requested to end session\n");
 		#endif 
@@ -412,10 +467,20 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut){
 		shut = true;  	
 	}else{
 		// Serve requested file 
-		serveFile(ssl, filename, proto); 
+		if (action == 3){
+			serveFile(ssl, filename, proto); 
+		}
+		if (action == 4){
+			// convert filename into data size 
+			int data_size; 
+			sscanf(filename, "%d", &data_size); 
+
+			// serve data with size above 
+			serveData(ssl, data_size, proto); 
+		}
 	}
 
-	// Do not shutdown TLS for browser-like behavior 
+	// Do not shutdown TLS for browser-like behavior unless requested
 	if (shut){
 		#ifdef DEBUG
 		printf("[DEBUG] Shutdown SSL connection\n");
@@ -698,7 +763,7 @@ int main(int argc, char **argv){
 
 				// Serve some content 
 				case 3: 
-					http_serve_request(ssl, s, proto, true);
+					http_serve_request(ssl, s, proto, true, action);
 					break;
 				
 				// Serve a browser like behavior 
@@ -709,7 +774,7 @@ int main(int argc, char **argv){
 					* (or re-think the code) to support multiple SSL connections 
 					*/
 					while(1){
-						if (http_serve_request(ssl, s, proto, false) < 0){
+						if (http_serve_request(ssl, s, proto, false, action) < 0){
 							break; 
 						}
 					}

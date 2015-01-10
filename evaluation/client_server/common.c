@@ -58,11 +58,14 @@ SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
     /* Create our context*/
 	if (strcmp(proto, "ssl") == 0){		
 		meth = SSLv23_method();
-	} else {
-		meth = SPP_method(); 
-		//printf("!!!Due to a bug, temporary using SSLv23_method() despite requested SPP (line 62, common.c)\n"); 
-		//meth = SSLv23_method();
+	} else if (strcmp(proto, "middlebox") == 0){  
+   		printf("Using SPP_Proxy_method (only middleboxes should use this)\n");  
+		meth = SPP_proxy_method();
 	}
+	else {
+		meth = SPP_method(); 
+	}
+
     ctx = SSL_CTX_new(meth);
 
     /* Load our keys and certificates*/
