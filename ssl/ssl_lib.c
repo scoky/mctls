@@ -395,6 +395,7 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->def_ctx->read_mac = (SPP_MAC*)malloc(sizeof(SPP_MAC));
         s->def_ctx->write_mac = s->def_ctx->read_mac;
         s->def_ctx->read_ciph = (SPP_CIPH*)malloc(sizeof(SPP_CIPH));
+        s->spp_server_address = NULL;
 
 	return(s);
 err:
@@ -965,15 +966,24 @@ int SSL_connect(SSL *s)
 	return(s->method->ssl_connect(s));
 	}
 int SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY *proxies[], int proxies_len) {
-    int i;    
+    int i;
+    if (slices_len < 1) {
+        printf("Too few slices defined!\n");
+        return -1;
+    }
     ssl->slices_len = slices_len;
     for (i = 0; i < slices_len; i++) {
         ssl->slices[i] = slices[i];
-    }    
-    ssl->proxies_len = proxies_len;
-    for (i = 0; i < proxies_len; i++) {
+    }
+    if (proxies_len < 1) {
+        printf("Too few proxies defined!\n");
+        return -1;
+    }
+    ssl->proxies_len = proxies_len-1;
+    for (i = 0; i < proxies_len-1; i++) {
         ssl->proxies[i] = proxies[i];
     }
+    ssl->spp_server_address = proxies[proxies_len-1]->address;
     return(SSL_connect(ssl));
 }
 int SPP_proxy(SSL *ssl, char* address, SSL* (*connect_func)(SSL *, char *), SSL **ssl_next) {

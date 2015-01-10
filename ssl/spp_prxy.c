@@ -31,7 +31,7 @@ char * spp_next_proxy_address(SSL *s) {
         return s->proxies[i+1]->address;
     } else if (i == s->proxies_len-1) {
         // Last proxy, return server
-        return s->tlsext_hostname;
+        return s->spp_server_address;
     } else {
         return NULL;
     }

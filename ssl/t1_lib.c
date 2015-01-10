@@ -410,7 +410,7 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
                 char_len=strlen(s->proxies[i]->address);
                 s1n(char_len, ret);
                 memcpy(ret, s->proxies[i]->address, char_len);
-                ret+=char_len;                               
+                ret+=char_len;                              
                 
                 s1n(s->proxies[i]->read_slice_ids_len, ret);
                 for (n = 0; n < s->proxies[i]->read_slice_ids_len; n++) {
@@ -422,6 +422,12 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
                     s1n(s->proxies[i]->write_slice_ids[n], ret);
                 }
             }
+            
+            /* Write the server address last */
+            char_len=strlen(s->spp_server_address);
+            s1n(char_len, ret);
+            memcpy(ret, s->spp_server_address, char_len);
+            ret+=char_len;
             
             /* Now go back and fill in length */
             s2n(ret-len_pt-2, len_pt);
@@ -1141,7 +1147,14 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                         }
                         
                         //printf("Decoded proxy %d with address %s, read %d write %d\n", s->proxies[i]->proxy_id, s->proxies[i]->address, s->proxies[i]->read_slice_ids_len, s->proxies[i]->write_slice_ids_len);
-                    }  
+                    }
+                    
+                    n1s(sdata, char_len);
+                    s->spp_server_address = (char *)malloc(char_len+1);
+                    memcpy(s->spp_server_address, sdata, char_len);
+                    s->spp_server_address[char_len] = '\0';
+                    sdata += char_len;
+                    
                     if (sdata - data != size) {
 #ifdef TLS_DEBUG
                         printf("Error decoding proxy list\n");

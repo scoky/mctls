@@ -1486,6 +1486,7 @@ struct ssl_st
         SSL *other_ssl;
         SSL* (*proxy_func)(SSL *, char *);
         char *proxy_address;
+        char *spp_server_address;
 	};
 
 #endif
