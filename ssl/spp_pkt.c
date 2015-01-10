@@ -248,7 +248,7 @@ printf("\n");
             }            
             
             /* Compare the write mac to see if there have been any illegal writes. */
-            if (enc_err >= 0 && EVP_MD_CTX_md(slice->write_mac->read_hash) != NULL) {
+            if (enc_err >= 0 && slice->write_mac != NULL && EVP_MD_CTX_md(slice->write_mac->read_hash) != NULL) {
                 spp_copy_mac_state(s, slice->write_mac, 0);
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
