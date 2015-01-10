@@ -20,19 +20,25 @@ IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_proxy_method,
 
 char * spp_next_proxy_address(SSL *s) {
     int i;
+    printf("Searching for proxy (%s) in proxy list %d\n", s->proxy_address, (int)s->proxies_len);
     for (i = 0; i < s->proxies_len; i++) {
+        printf("Comparing with %s ...\n", s->proxies[i]->address);
         if (strcmp(s->proxies[i]->address, s->proxy_address) == 0) {
+            printf("Match\n");
             s->proxy_id = s->proxies[i]->proxy_id;
             break;
         }
     }
     // End the proxy list
     if (i < s->proxies_len-1) {
+        printf("Found next proxy %s\n", s->proxies[i+1]->address);
         return s->proxies[i+1]->address;
     } else if (i == s->proxies_len-1) {
         // Last proxy, return server
+        printf("Found server %s\n", s->spp_server_address);
         return s->spp_server_address;
     } else {
+        printf("Not found\n");
         return NULL;
     }
 }
@@ -537,18 +543,20 @@ int spp_proxy_accept(SSL *s) {
                 s->shutdown=0;
                 if (s->rwstate != SSL_X509_LOOKUP) {
                     ret=ssl3_get_client_hello(s);
-                    printf("Received client hello\n");
+                    printf("Proxy received client hello\n");
                     if (ret <= 0) goto end;
                 }
                 
                 // Process locally and call application to start new connection
                 if ((address = spp_next_proxy_address(s)) == NULL)
                     goto end;
-                this_proxy = SPP_get_proxy_by_id(s, s->proxy_id);
+                printf("Next address is %s\n", address);
                 if ((next_st = s->proxy_func(s, address)) == NULL)
                     goto end;
+                printf("Callback returned\n");
                 
                 spp_initialize_ssl(s, next_st);
+                this_proxy = SPP_get_proxy_by_id(s, s->proxy_id);
                 
                 // Forward the message on.
                 ret=spp_forward_message(next_st, s);
@@ -990,4 +998,3 @@ end:
             cb(s,SSL_CB_ACCEPT_EXIT,ret);
     return(ret);
 }
-

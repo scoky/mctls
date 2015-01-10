@@ -449,6 +449,7 @@ int main(int argc, char **argv){
 			SSL_set_bio(ssl, sbio, sbio);
 
 			// SSL Accept 
+/*			// Proxies use SPP_proxy instead of SSL_accept to perform the handshake
 			if((r = SSL_accept(ssl) <= 0)){
 				berr_exit("SPP accept error");
 			} else {
@@ -457,17 +458,24 @@ int main(int argc, char **argv){
 				#endif
 			}
 
+*/
+
+			SSL** ssl_next = NULL;
+			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
+			const char *prxy_address = "localhost:8423";
+			if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
+				berr_exit("SPP proxy error");
+			} else {
+				#ifdef DEBUG            
+                                        printf("SPP proxy OK\n"); 
+                                #endif
+			}
+
 			#ifdef DEBUG
 			printf("[middlebox] GOT SSL CONNECTION. PRINTING SPP DEBUG INFO: \n");
 			print_ssl_debug_info(ssl);
 			printf("[middlebox] Calling SPP_PROXY\n");
 			#endif
-
-
-			SSL** ssl_next = NULL;
-			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
-			SPP_proxy(ssl, "127.0.0.1:8423", connect_func, ssl_next);
-
 
 			//WARNING, THIS SHOULD BE ENABLED !!!
 			//SPP_proxy(ssl, "127.0.0.1:8423" , &SPP_Callback, ssl_next);
