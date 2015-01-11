@@ -177,7 +177,7 @@ SSL* SPP_Callback(SSL *ssl, char *address){
     printf("Connecting to next hop: %s %d\n", ipv4, port);
     #endif
 
-	ctx = initialize_ctx(KEYFILE, PASSWORD, "spp");
+	ctx = initialize_ctx(KEYFILE, PASSWORD, "middlebox");
 	new_ssl = SSL_new(ctx);
 	sock = tcp_connect(ipv4, port);
 	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
@@ -460,10 +460,10 @@ int main(int argc, char **argv){
 
 */
 
-			SSL** ssl_next = NULL;
+			SSL* ssl_next;
 			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
 			const char *prxy_address = "localhost:8423";
-			if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
+			if ((r = SPP_proxy(ssl, prxy_address, connect_func, &ssl_next)) <= 0) {
 				berr_exit("SPP proxy error");
 			} else {
 				#ifdef DEBUG            
@@ -488,7 +488,7 @@ int main(int argc, char **argv){
 			#ifdef DEBUG
 			printf("[middlebox] SPP_proxy done, staring data handlers \n");
 			#endif
-			handle_data(ssl, *ssl_next);
+			handle_data(ssl, ssl_next);
 
 			// Close socket
     		close(s);
