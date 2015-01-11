@@ -380,11 +380,10 @@ static void *browser_replay(void *ptr){
 
 
 // Emulate browser behavior based on some input traces 
-static int http_complex(SSL *ssl, char *proto){
+static int http_complex(SSL *ssl, char *proto, char *fn){
 
 	char buf[BUFSIZZ];
 	int r, len;
-	char *fn = "actionList"; 
 
 	// Thread for browser-like behavior 
 	pthread_t reading_thread;
@@ -568,10 +567,7 @@ static int http_request(SSL *ssl, char *filename, char *proto, bool requestingFi
 
 // Usage function 
 void usage(void){
-	printf("usage: wclient -h -p -s -r -w -i -f -o\n"); 
-	printf("[default host=localhost ; default port=4433]\n"); 
-	printf("-h:   name of host to connect to\n"); 
-	printf("-p:   port of host to connect to\n"); 
+	printf("usage: wclient -s -r -w -i -f -o -a\n"); 
 	printf("-s:   number of slices requested\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
@@ -598,25 +594,14 @@ int main(int argc, char **argv){
 	int slices_len = 0;                    // number of slices 
 	SPP_PROXY **proxies;                   // proxy array 
 	int N_proxies = 0;                     // number of proxies in path 
-	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file)
+	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file, browser-like)
+	char *file_action = NULL;              // file action to use for browser-liek behavior
 	
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:o:")) != -1){
+	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:")) != -1){
 			
 			switch(c){
 	
-			// Hostname
-			case 'h':
-				if(! (host = strdup(optarg) ))
-					err_exit("Out of memory");
-				break; 
-
-        	// Port
-			case 'p':
-				if(! (port = atoi(optarg) ))
-					err_exit("Bogus port specified (port needs to be > 0)");
-				break;
-		
 			// Number of slices
 			case 's':
 				if(! (slices_len = atoi(optarg) ))
@@ -655,6 +640,13 @@ int main(int argc, char **argv){
 				action = atoi(optarg); 
 				break; 
 
+			// Action file 
+			// NOTE: necessary only if  -o 4, i.e., browser-like behavior
+			case 'a':
+				if(! (file_action = strdup(optarg) ))
+					err_exit("Out of memory");
+				break; 
+			
 			// default case 
 			default:
 				usage(); 
@@ -687,6 +679,12 @@ int main(int argc, char **argv){
 	if (r > N_proxies || w > N_proxies){
 		printf ("The values for r and w need to be <= than the number of proxies\n"); 
 		usage(); 
+	}
+	if(action == 4){
+		if (file_action == NULL){
+			printf ("Action file (-a path_to_file) is required with -o 4\n"); 
+			usage(); 
+		}
 	}
 
 	// Generate a clientID
@@ -826,7 +824,7 @@ int main(int argc, char **argv){
 
 		// Send several GET request following a browser-like behavior  
 		case 4:  
-			http_complex(ssl, proto);
+			http_complex(ssl, proto, file_action);
 			break; 
  
 		// Unknown option 
