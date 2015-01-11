@@ -23,10 +23,13 @@
 #define PASSWORD "password"     // unused now 	
 #define DEBUG                   // verbose logging
 #define CONNECT_TIMEOUT 5       // socket connection timeout 
+#define MAX_CONC_CLIENT 100     // max concurrent clients
 
 static char *host=HOST;
 static int port=PORT;
 static int require_server_auth = 1;
+static int clientID=0; 
+
 // -- Moved up here just because of thread 
 static SSL *ssl;                              // SSL instance
 static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
@@ -97,14 +100,16 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies, SSL *ssl){
 		newLine = (char *)malloc(strlen(line));    
 		strcpy(newLine, line);
 		proxies[count] = SPP_generate_proxy(ssl, newLine);
+		count++; 
+		/*
 		#ifdef DEBUG
 		printf("Proxy %d stored has address: %s\r\n", count, proxies[count]->address);
-		count++; 
 		int j; 
 		for (j = 0; j < count; j++){
 			printf("Previous proxy was %s\r\n",  proxies[j]->address);
-		#endif
 		}
+		#endif
+		*/
 	}
 	
 	// Close file
@@ -114,12 +119,14 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies, SSL *ssl){
 // Print proxy list 
 void print_proxy_list(SPP_PROXY **proxies, int N){
 	int i; 
-	
-	#ifdef DEBUG	
-	printf("Print proxy list. There are %d available proxies.\r\n", N);	
-	#endif 
+
+	if (N == 1){	
+		printf("[DEBUG] There is %d available proxy (the final server):\r\n", N);	
+	}else{
+		printf("[DEBUG] There are %d available proxies:\r\n", N);	
+	}
 	for (i = 0; i < N; i++){
-		printf("Proxy %d -- %s\r\n", i, proxies[i]->address);
+		printf("\t[PROXY] Proxy %d with address %s\r\n", i, proxies[i]->address);
 	}
 }
 
@@ -269,7 +276,7 @@ void sendRequest(char *filename){
 	
 	// Form the request 
 	memset(request, 0, sizeof request);
-	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVAClient\r\nHost: %s:%d\r\n\r\n", filename, host, port); 
+	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\r\n\r\n", filename, clientID, host, port); 
 	request_len = strlen(request);
 	
 	// SPP write
@@ -561,16 +568,17 @@ static int http_request(SSL *ssl, char *filename, char *proto, bool requestingFi
 
 // Usage function 
 void usage(void){
-	printf("usage: wclient -h -p -s -r -w -i -f\n"); 
-	printf("[default host=localhost ; default port=4433]"); 
+	printf("usage: wclient -h -p -s -r -w -i -f -o\n"); 
+	printf("[default host=localhost ; default port=4433]\n"); 
 	printf("-h:   name of host to connect to\n"); 
 	printf("-p:   port of host to connect to\n"); 
 	printf("-s:   number of slices requested\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
-	printf("-f:   file for http GET\n"); 
 	printf("-c:   protocol chosen (ssl ; spp)\n"); 
+	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
+	printf("-f:   file for http GET (needed when -o 3)\n"); 
 	exit(-1);  
 }
 
@@ -591,7 +599,7 @@ int main(int argc, char **argv){
 	SPP_PROXY **proxies;                   // proxy array 
 	int N_proxies = 0;                     // number of proxies in path 
 	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file)
-
+	
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "h:p:s:r:w:i:f:c:o:")) != -1){
 			
@@ -672,10 +680,19 @@ int main(int argc, char **argv){
 		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
 		usage(); 
 	}
+	if (N_proxies == 0){
+		printf ("At least one proxy needs to be defined, i.e., the final server\n"); 
+		usage(); 
+	}
 	if (r > N_proxies || w > N_proxies){
 		printf ("The values for r and w need to be <= than the number of proxies\n"); 
 		usage(); 
 	}
+
+	// Generate a clientID
+	time_t t;
+	srand((unsigned) time(&t));
+	clientID = rand() % MAX_CONC_CLIENT; 
 
 	// Construct string for client/server behavior
 	char *temp_str = "undefined";
@@ -690,7 +707,7 @@ int main(int argc, char **argv){
 
 	// Logging input parameters 
 	#ifdef DEBUG
-	printf("[DEBUG] host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
+	printf("[DEBUG] CLIENT-ID=%d host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", clientID, host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
 	#endif 
 
 	// Build SSL context
@@ -704,10 +721,21 @@ int main(int argc, char **argv){
 	read_proxy_list(filename, proxies, ssl);
 
 	// Print proxy list 
-	if (N_proxies > 0){
-		print_proxy_list(proxies, N_proxies); 
-	}
+	#ifdef DEBUG
+	print_proxy_list(proxies, N_proxies); 
+	#endif
 
+	// Connect TCP socket
+	char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
+	memcpy(address, proxies[0]->address, strlen(proxies[0]->address)+1);
+	char* proxy_host = strtok(address, ":"); 
+	int proxy_port = atoi(strtok(NULL, ":"));
+	#ifdef DEBUG 
+	printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
+	#endif
+	sock = tcp_connect(proxy_host, proxy_port);
+	
+	/*
 	// Connect TCP socket
 	if (N_proxies > 0){
 		char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
@@ -724,6 +752,7 @@ int main(int argc, char **argv){
 		#endif
 		sock = tcp_connect(host, port);
 	}
+	*/
 
 	// Connect the SSL socket 
 	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
@@ -744,7 +773,7 @@ int main(int argc, char **argv){
 		strcpy(newPurpose, str);
 		slice_set[i] = SPP_generate_slice(ssl, newPurpose); 
 		#ifdef DEBUG
-		printf("[DEBUG] Generated slices %d with purpose %s\n", slice_set[i]->slice_id, slice_set[i]->purpose); 
+		printf("\t[DEBUG] Generated slices %d with purpose %s\n", slice_set[i]->slice_id, slice_set[i]->purpose); 
 		#endif
 	}
 

@@ -238,10 +238,8 @@ char* parse_http_get(char *buf){
 	return fn; 
 }
 
-// Serve a file -- solution extracted from original s_client (modified not to use BIO)
+// Serve a given amount of data 
 int serveData(SSL *ssl, int data_size, char *proto){ 
-	
-	//char buf[BUFSIZZ] = {0};   // buffer for data to send
 	
 	// Logging
 	#ifdef DEBUG
@@ -285,10 +283,8 @@ int serveData(SSL *ssl, int data_size, char *proto){
 	return 0; 
 }	
 
-
-
-
-// Serve a file -- solution extracted from original s_client (modified not to use BIO)
+// Serve a file -- solution extracted from original s_client 
+// NOTES: (1) modified not to use BIO ; (2) re-negotiation currently not used
 int serveFile(SSL *ssl, char *filename, char *proto){ 
 	
  	FILE *fp;				// file descriptot 
@@ -649,7 +645,7 @@ static int http_serve_SSL(SSL *ssl, int s){
 void usage(void){
 	printf("usage: wserver -c -o \n");
 	printf("-c:   protocol requested: ssl, spp.\n");
-	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer}\n");
+	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	exit(-1);
 }
 
@@ -727,9 +723,9 @@ int main(int argc, char **argv){
 		// fork a new proces 
 		if((pid = fork())){
 			#ifdef DEBUG
-			printf("[DEBUG] Closing socket?\n"); 
+			printf("[DEBUG] Parent process close socket (PID=%d)\n", pid); 
 			#endif
-			//close(s);
+			close(s);
 		} else {
 			sbio = BIO_new_socket(s, BIO_NOCLOSE);
 			ssl = SSL_new(ctx);
