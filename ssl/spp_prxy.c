@@ -681,14 +681,14 @@ int spp_proxy_accept(SSL *s) {
                 if (s->s3->tmp.cert_req)
                     goto end;
                 else {
-                    s->state=SPP_ST_PW_PRXY_CERT_A;
+                    s->state=SSL3_ST_SW_CERT_A;
                 }
                 s->init_num=next_st->init_num=0;
 
                 break;
                 
-            case SPP_ST_PW_PRXY_CERT_A:
-            case SPP_ST_PW_PRXY_CERT_B:
+            case SSL3_ST_SW_CERT_A:
+            case SSL3_ST_SW_CERT_B:
                 /* Check if it is anon DH or anon ECDH, */
                 /* normal PSK or KRB5 or SRP */
                 if (!(s->s3->tmp.new_cipher->algorithm_auth & (SSL_aNULL|SSL_aKRB5|SSL_aSRP))
@@ -701,12 +701,12 @@ int spp_proxy_accept(SSL *s) {
                 } else
                     skip=1;
 
-                s->state=SPP_ST_PW_PRXY_KEY_EXCH_A;
+                s->state=SSL3_ST_SW_KEY_EXCH_A;
                 s->init_num=next_st->init_num=0;
                 break;
 
-            case SPP_ST_PW_PRXY_KEY_EXCH_A:
-            case SPP_ST_PW_PRXY_KEY_EXCH_B:
+            case SSL3_ST_SW_KEY_EXCH_A:
+            case SSL3_ST_SW_KEY_EXCH_B:
                 alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
                 /* clear this, it may get reset by
@@ -766,12 +766,12 @@ int spp_proxy_accept(SSL *s) {
                 else
                         skip=1;
 
-                s->state=SPP_ST_PW_PRXY_DONE_A;
+                s->state=SSL3_ST_SW_SRVR_DONE_A;
                 s->init_num=next_st->init_num=0;
                 break;
                 
-            case SPP_ST_PW_PRXY_DONE_A:
-            case SPP_ST_PW_PRXY_DONE_B:
+            case SSL3_ST_SW_SRVR_DONE_A:
+            case SSL3_ST_SW_SRVR_DONE_B:
                 printf("Sending proxy done\n");
                 ret=ssl3_send_server_done(s); //OK
                 printf("Sent proxy done\n");
@@ -882,7 +882,7 @@ int spp_proxy_accept(SSL *s) {
                 // Receive proxy key material for each proxy and the server
                 // Pass all messages on
                 for (i = 0; i <= s->proxies_len; i++) {
-                    s->state = SPP_ST_CR_PRXY_MAT_A;
+                    s->state = next_st->state = SPP_ST_CR_PRXY_MAT_A;
                     ret=get_proxy_msg(s, SPP_ST_CR_PRXY_MAT_A, SPP_ST_CR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL);
                     if (ret <= 0) goto end;
                     ret=get_proxy_material(s, 0); // From client
@@ -899,7 +899,7 @@ int spp_proxy_accept(SSL *s) {
                 // Receive proxy key material for each proxy and the server
                 // Pass all messages on
                 for (i = 0; i <= s->proxies_len; i++) {
-                    s->state = SPP_ST_SR_PRXY_MAT_A;
+                    s->state = next_st->state = SPP_ST_SR_PRXY_MAT_A;
                     ret=get_proxy_msg(next_st, SPP_ST_SR_PRXY_MAT_A, SPP_ST_SR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL);
                     if (ret <= 0) goto end;
                     ret=get_proxy_material(next_st, 1); // From server
