@@ -23,6 +23,7 @@ function compute()
 		sum = $2
 		delete array 
 		array[count] = $2
+		count = count + 1
 		S += 1
 	}
 }

@@ -21,7 +21,7 @@
 #include <pthread.h>            // thread support
 #define KEYFILE "client.pem"    // client certificate
 #define PASSWORD "password"     // unused now 	
-#define DEBUG                   // verbose logging
+//#define DEBUG                   // verbose logging
 #define CONNECT_TIMEOUT 5       // socket connection timeout 
 #define MAX_CONC_CLIENT 100     // max concurrent clients
 
@@ -459,16 +459,19 @@ static int http_complex(char *proto, char *fn){
 		printf("[DEBUG] Shutdown was requested\n"); 
 		#endif 
 
-	switch(r){
-		case 1:
-			break; // Success 
-		case 0:
+		switch(r){
+			case 1:
+				break; // Success 
+			case 0:
+	
+			case -1:
 
-		case -1:
-
-		default:
-			berr_exit("Shutdown failed");
-	}
+			default:
+				#ifdef DEBUG 
+				printf ("Shutdown failed with code %d\n", r);
+				#endif 
+				berr_exit("Shutdown failed"); 
+		}
     
 	done:
 		SSL_free(ssl);
@@ -493,7 +496,7 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 		// SPP read
 		if (strcmp(proto, "spp") == 0){
 			#ifdef DEBUG
-			printf("[DEBUG] SPP_read\n");
+			//printf("[DEBUG] SPP_read\n");
 			#endif 
 			SPP_SLICE *slice;		// slice for SPP_read
 			SPP_CTX *ctx;			// context pointer for SPP_read
@@ -518,7 +521,7 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 		// SSL read
 		if (strcmp(proto, "ssl") == 0){
 			#ifdef DEBUG
-			printf("[DEBUG] SSL_read\n");
+			//printf("[DEBUG] SSL_read\n");
 			#endif 
 			r = SSL_read(ssl, buf, BUFSIZZ);
 			switch(SSL_get_error(ssl, r)){
@@ -548,15 +551,18 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 		#endif 
 		r = SSL_shutdown(ssl);
 
-	switch(r){
-		case 1:
-			break; // Success 
-		case 0:
+		switch(r){
+			case 1:
+				break; // Success 
+			case 0:
 
-		case -1:
+			case -1:
 
-		default:
-			berr_exit("Shutdown failed");
+			default:
+				#ifdef DEBUG 
+				printf ("Shutdown failed with code %d\n", r);
+				#endif 
+				berr_exit("Shutdown failed"); 
 	}
     
 	done:
@@ -736,15 +742,11 @@ int main(int argc, char **argv){
 	// Connect TCP socket
 	char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
 	memcpy(address, proxies[0]->address, strlen(proxies[0]->address)+1);
-	//char* proxy_host = strtok(address, ":"); 
 	host = strtok(address, ":");
-	//int proxy_port = atoi(strtok(NULL, ":"));
 	port = atoi(strtok(NULL, ":")); 
 	#ifdef DEBUG 
-	//printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
 	printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
 	#endif
-	//sock = tcp_connect(proxy_host, proxy_port);
 	sock = tcp_connect(host, port);
 	
 	// Connect the SSL socket 
@@ -761,7 +763,7 @@ int main(int argc, char **argv){
 	for (i = 0;  i < slices_len; i++){
 		char *newPurpose;  
 		char str[30]; 
-		sprintf (str, "slices_%d", i); 
+		sprintf (str, "slices_%d", (i + 2)); 
 		newPurpose = (char *)malloc(strlen(str));    
 		strcpy(newPurpose, str);
 		slice_set[i] = SPP_generate_slice(ssl, newPurpose); 
@@ -797,7 +799,7 @@ int main(int argc, char **argv){
 		}
 	}
 	
-	// Let's connect
+	// Let's connect + measuring duration 
 	gettimeofday(&tvBegin, NULL);
 	doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
 	gettimeofday(&tvEnd, NULL);
@@ -847,7 +849,7 @@ int main(int argc, char **argv){
 	}
 
 	// Report handshake duration 
-	printf("No_Slices %d Handshake_Dur: %ld.%06ld\n", slices_len, tvDiff.tv_sec, tvDiff.tv_usec);	
+	printf("\nNo_Slices %d Handshake_Dur: %ld.%06ld\n", slices_len, tvDiff.tv_sec, tvDiff.tv_usec);	
 
 	// All good
 	return 0; 
