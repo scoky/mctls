@@ -2,11 +2,11 @@ CC=gcc
 #CFLAG=-g -Wall -static
 # (static give some warnings)
 CFLAG=-g -Wall
-LD= -L/home/scoky/Downloads/spp-test-build/lib -lssl -lcrypto -ldl -lpthread
+LD= -L/usr/local/ssl/lib -lssl -lcrypto -ldl -lpthread
 #LD= -lssl -lcrypto
 # (compile with system-wise libraries)
 
-INCLUDES= -I/home/scoky/Downloads/spp-test-build/include
+INCLUDES= -I/usr/local/ssl/include
 CFLAGS= $(INCLUDES) $(CFLAG)
 #CFLAGS= -DMONOLITH $(INCLUDES) $(CFLAG)
 # (what is DMONOLITH doing?)

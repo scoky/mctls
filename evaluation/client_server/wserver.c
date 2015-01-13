@@ -22,8 +22,10 @@
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
 #include <openssl/e_os2.h>
-
 #define DEBUG
+#define MAX_PACKET 16384 
+
+static char *strategy = "uni";
 
 // Listen TCP socket
 int tcp_listen(){
@@ -144,26 +146,62 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
     }
 }
 
-// Send a resonse (SSL and SPP) 
+// splitting 
+void splitting (SSL *ssl, char *request, int request_len){
+	int beginIndex = 0; 
+	int i; 
+	int inc = request_len / (ssl->slices_len - 1); 
+		
+	// Slicing happens here  
+	for (i = 1; i < ssl->slices_len; i++){
+		
+		char* dest = (char*) malloc(inc); 
+		#ifdef DEBUG
+		printf("[DEBUG] Write sub-record with slice [%d ; %s]. [S1 is for handshake ; S2 is for the client]\n"\
+			"[DEBUG] Sub-record size is %d (beginIndex=%d -- endIndex=%d)\n", \
+			ssl->slices[i]->slice_id, ssl->slices[i]->purpose, inc, beginIndex, (beginIndex + inc)); 
+		#endif
+    	memset(dest, 0, inc);
+		memcpy(dest, request + beginIndex,  inc); 
+		printf("%s\n", dest); 
+		int r = SPP_write_record(ssl, dest, inc, ssl->slices[i]);
+		check_SSL_write_error(ssl, r, inc);
+		
+		// Move pointers
+		beginIndex += inc;
+
+		// Increase pointer for last slice  
+		if ( i == (ssl->slices_len - 2)){
+			inc = request_len - beginIndex; 
+		} else if (strcmp(strategy, "exp") == 0){
+			inc = 2 * inc; 
+		}
+	
+		// free memory 
+		free (dest); 
+	}
+}
+
+// Send some data (SSL and SPP) 
 void sendData(SSL *ssl, char *request, char *proto, int request_len){
 
-	int i, r;  
+	int r; 
+
+	//mmmm  
+	//request_len--; 
 
 	// logging
 	#ifdef DEBUG
 	printf("[DEBUG] sendData with length %d\n", request_len); 
 	#endif 
 	
+	// SPP
 	if (strcmp(proto, "spp") == 0){
-		for (i = 0; i < ssl->slices_len; i++){
-			#ifdef DEBUG
-			printf("[DEBUG] Write record with slice [%d ; %s]\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
-			#endif
-			// currently writing same record -- differentiate per record in the future
-			r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
-			check_SSL_write_error(ssl, r, request_len);
-		}
+		// TO DO implement further splitting here 
+		splitting(ssl, request, request_len); 
 	}
+		
+	// SSL
 	if (strcmp(proto, "ssl") == 0){
 		r = SSL_write(ssl, request, request_len); 
 		check_SSL_write_error(ssl, r, request_len);
@@ -216,9 +254,12 @@ static int http_simple_response(SSL *ssl, int s, char *proto){
 		case 0:
 		case -1:
 		default: // Error 
+			#ifdef DEBUG 
+			printf ("Shutdown failed with code %d\n", r); 
+			#endif 
 			berr_exit("Shutdown failed");
 	}
-
+	
 	// free SSL 
     SSL_free(ssl);
 	
@@ -288,6 +329,65 @@ int serveData(SSL *ssl, int data_size, char *proto){
 int serveFile(SSL *ssl, char *filename, char *proto){ 
 	
  	FILE *fp;				// file descriptot 
+	int file_size = 0;		// size of file being sent 
+ 
+	// Open requested file for reading
+ 	if ((fp = fopen(filename,"r")) == NULL){
+		#ifdef DEBUG
+		printf ("File <<%s>> do not exist\n", filename); 
+		#endif 
+		char *data = "Error opening file\r\n"; 
+		int request_len = strlen(data);
+		sendData(ssl, data, proto, request_len); 
+		fclose(fp); 
+		return -1; 
+	}else{
+		// Calculate file size 
+		// Seek  to the end of the file and ask for position 
+		fseek(fp, 0L, SEEK_END);
+		file_size = ftell(fp);
+		// Seek to the beginning of the file 
+		fseek(fp, 0L, SEEK_SET);
+		
+		#ifdef DEBUG
+		printf ("[DEBUG] File requested is <<%s>> with size <<%d bytes>>\n", filename, file_size); 
+		#endif 
+	}
+
+	// Allocate buffer for data to send 
+	char* buf = (char*) malloc (file_size); 
+	
+	// Read "toSend" content from file 
+	int i = fread(buf, file_size, 1, fp);
+
+	// Check for end of file
+	if (i <= 0){
+		#ifdef DEBUG
+		printf("[DEBUG] Done reading file %s\n", filename); 	
+		#endif
+	}else{
+		#ifdef DEBUG
+		printf("[DEBUG] Still some data to read? (read result = %d)\n", i); 	
+		#endif
+	}
+
+	// Send <<buf>> on SPP/SSL connection 
+	sendData(ssl, buf, proto, file_size); 
+		
+	// Close file
+	fclose(fp); 
+
+	// All good
+	return 0; 
+}	
+
+
+
+// Serve a file -- solution extracted from original s_client 
+// NOTES: (1) modified not to use BIO ; (2) re-negotiation currently not used
+int serveFile_old(SSL *ssl, char *filename, char *proto){ 
+	
+ 	FILE *fp;				// file descriptot 
 	char buf[BUFSIZZ];		// buffer for data to send
 	int file_size = 0;		// size of file being sent 
 	int still_to_send; 		// amount of data from file still to be sent 
@@ -339,13 +439,6 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 			printf("[DEBUG] Read %d bytes from file\n", toSend); 	
 			#endif
 		}
-
-		/* Verbose logging for debug 
-		#ifdef DEBUG
-		printf("Content read is:\n%s\n", buf); 	
-		printf("Result from fread is: %d\n", i); 	
-		#endif
-		*/
 
 		// Update how much content is still to send 
 		still_to_send -= (i * toSend);
@@ -453,6 +546,16 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 
 	// Parse filename from HTTP GET
 	filename = parse_http_get(buf); 
+	int fSize = atoi(filename);
+	if (fSize != 0 || filename[0] == '0'){
+		#ifdef DEBUG
+		printf("[DEBUG] File requested by size <<%d>>\n", fSize);
+		#endif
+	} else {
+		#ifdef DEBUG
+		printf("[DEBUG] File requested by name <<%s>>\n", filename); 
+		#endif
+	}
 
 	// Simple trick to end 
 	if (strcmp(filename, "-1") == 0){
@@ -462,9 +565,13 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 		ret_value = -1; 
 		shut = true;  	
 	}else{
-		// Serve requested file 
+		// Serve requested file either by name or by size  
 		if (action == 3){
-			serveFile(ssl, filename, proto); 
+			if (fSize == 0){
+				serveFile(ssl, filename, proto); 
+			} else {
+				serveData(ssl, fSize, proto); 
+			}
 		}
 		if (action == 4){
 			// convert filename into data size 
@@ -495,6 +602,9 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 			case 0:
 			case -1:
 			default: // Error 
+				#ifdef DEBUG 
+				printf ("Shutdown failed with code %d\n", r); 
+				#endif 
 				berr_exit("Shutdown failed");
 		}
 
@@ -508,7 +618,6 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 		printf("[DEBUG] No shutdown since SSL connection might still be used\n");
 		#endif
 	}
-
 	// All good 
     return ret_value; 
 }
@@ -631,7 +740,10 @@ static int http_serve_SSL(SSL *ssl, int s){
 			case 0:
 			case -1:
 			default:
-			berr_exit("Shutdown failed");
+				#ifdef DEBUG 
+				printf ("Shutdown failed with code %d\n", r); 
+				#endif 
+				berr_exit("Shutdown failed");
 		}
     } // end for loop 
 
@@ -643,9 +755,10 @@ static int http_serve_SSL(SSL *ssl, int s){
 
 // Usage function 
 void usage(void){
-	printf("usage: wserver -c -o \n");
+	printf("usage: wserver -c -o -s\n");
 	printf("-c:   protocol requested: ssl, spp.\n");
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
+	printf("-s:   content slicing strategy {uni; exp}\n");
 	exit(-1);
 }
 
@@ -664,7 +777,7 @@ int main(int argc, char **argv){
 	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "c:o:")) != -1){
+	while((c = getopt(argc, argv, "c:o:s:")) != -1){
 		switch(c){
 			// Protocol 
 			case 'c':
@@ -677,6 +790,13 @@ int main(int argc, char **argv){
 			case 'o':
 				action = atoi(optarg); 
 				break; 
+
+			// Control slicing strategy
+			case 's':
+				if(! (strategy = strdup(optarg) )){
+					err_exit("Out of memory");
+				}
+				break;
 			}
 	}
 
