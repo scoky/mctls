@@ -1,5 +1,23 @@
-har_to_object_times.py requires har.py, in the web-profiler repo. It is
+Before running
+--------------
+
+`har_to_object_times.py` requires  `har.py`, in the web-profiler repo. It is
 included here as a submodule. To use it, run:
 
 git submodule init
 git submodule update
+
+
+Output
+------
+
+`har_to_object_times.py` outputs two files for each har: a `.actions` file and
+a `.csv` file. The CSV file contains details about each object (like size
+before/after compression, the server hostname, the full URL, etc.). The actions
+file is simpler and meant for Matteo's client. It contains four fields,
+separated by spaces:
+
+* Request start time (sec)
+* Request slice sizes (tab-separated list of byte counts)
+* Response slice sizes (tab-separated list of byte counts)
+* Connection number
