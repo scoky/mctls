@@ -94,8 +94,8 @@ extern "C" {
 
 #if !(defined(VMS) || defined(__VMS)) /* VMS uses logical names instead */
 #if defined(HEADER_CRYPTLIB_H) && !defined(OPENSSLDIR)
-#define ENGINESDIR "/usr/local/ssl/lib/engines"
-#define OPENSSLDIR "/usr/local/ssl"
+#define ENGINESDIR "/home/scoky/Downloads/spp-test-build/lib/engines"
+#define OPENSSLDIR "/home/scoky/Downloads/spp-test-build/ssl"
 #endif
 #endif
 

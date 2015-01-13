@@ -1,4 +1,4 @@
-prefix=/usr/local/ssl
+prefix=/home/scoky/Downloads/spp-test-build
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

@@ -68,7 +68,7 @@ int read_proxy_count(char *file_name){
 
 		
 // Function to read a proxy list from file and populate array of proxies
-void read_proxy_list(char *file_name, SPP_PROXY **proxies){
+void read_proxy_list(char *file_name, SPP_PROXY **proxies, SSL *ssl){
    	FILE *fp;					// pointer to file
 	int count = 0;				// simple counters
 	bool firstLine = 1; 		// flag for first line in file
@@ -193,7 +193,7 @@ int tcp_connect(char *host, int port){
 }
 
 /* Check that the common name matches the host name*/
-void check_cert(char *host){
+void check_cert(SSL *ssl, char *host){
 	X509 *peer;
 	char peer_CN[256];
   	
@@ -226,7 +226,7 @@ void check_cert(char *host){
 }
 
 // Check for SSL_write error (just write at this point) -- TO DO: check behavior per slice 
-void check_SSL_write_error(int r, int request_len){
+void check_SSL_write_error(SSL *ssl, int r, int request_len){
 	
 	switch(SSL_get_error(ssl, r)){
 		case SSL_ERROR_NONE:
@@ -242,7 +242,7 @@ void check_SSL_write_error(int r, int request_len){
 
 
 // Perform a connect
-void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_set, SPP_PROXY **proxies){
+void doConnect (SSL *ssl, char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_set, SPP_PROXY **proxies){
 	// SPP CONNECT 
 	if (strcmp(proto, "spp") == 0){
 		#ifdef DEBUG
@@ -261,14 +261,11 @@ void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_se
 		if(SSL_connect(ssl) <= 0)
 			berr_exit("SSL connect error");
    	} 
-
-	// TO DO -- Check here 	
+	/*
 	if(require_server_auth){
-		#ifdef DEBUG
-		printf("[DEBUG] Check certificate\n");
-		#endif
-		check_cert(host);
+	      check_cert(ssl, host);
 	}
+	*/
 }
 
 // Form and send GET
@@ -278,7 +275,7 @@ void sendRequest(char *filename){
 	int request_len;
 	
 	// Form the request 
-	memset(request, '0', sizeof(request));
+	memset(request, 0, sizeof request);
 	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\r\n\r\n", filename, clientID, host, port); 
 	request_len = strlen(request);
 	
@@ -290,7 +287,7 @@ void sendRequest(char *filename){
 		int i; 
 		for (i = 0; i < ssl->slices_len; i++){
 			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
-			check_SSL_write_error(r, request_len); 
+			check_SSL_write_error(ssl, r, request_len); 
 		}
 	} 
 	
@@ -300,7 +297,7 @@ void sendRequest(char *filename){
 		printf("[DEBUG] SSL_write\n");
 		#endif 
 		int r = SSL_write(ssl, request, request_len);
-		check_SSL_write_error(r, request_len); 
+		check_SSL_write_error(ssl, r, request_len); 
 	}
 }
 
@@ -383,10 +380,10 @@ static void *browser_replay(void *ptr){
 
 
 // Emulate browser behavior based on some input traces 
-static int http_complex(char *proto, char *fn){
+static int http_complex(SSL *ssl, char *proto, char *fn){
 
-	int r; 
 	char buf[BUFSIZZ];
+	int r, len;
 
 	// Thread for browser-like behavior 
 	pthread_t reading_thread;
@@ -411,6 +408,7 @@ static int http_complex(char *proto, char *fn){
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
+					len = r;
 					break;
 
 				case SSL_ERROR_ZERO_RETURN:
@@ -433,6 +431,7 @@ static int http_complex(char *proto, char *fn){
 			r = SSL_read(ssl, buf, BUFSIZZ);
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
+					len = r;
 					break;
 
 				case SSL_ERROR_ZERO_RETURN:
@@ -450,6 +449,7 @@ static int http_complex(char *proto, char *fn){
 		// Write buf to stdout
 		#ifdef DEBUG
 		printf("[DEBUG] Received:\n%s\n\n", buf); 
+		//fwrite(buf, 1, len, stdout);
 		#endif 
     }
     
@@ -477,7 +477,7 @@ static int http_complex(char *proto, char *fn){
 
 	
 // Send HTTP get and wait for response (SSL/SPP)
-static int http_request(char *filename, char *proto, bool requestingFile){
+static int http_request(SSL *ssl, char *filename, char *proto, bool requestingFile){
 	
 	char buf[BUFSIZZ];
 	int r;
@@ -579,19 +579,10 @@ void usage(void){
 }
 
 
-// Compute a time difference - NOTE: Return 1 if the difference is negative, otherwise 0
-int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
-{
-    long int diff = (t2->tv_usec + 1000000 * t2->tv_sec) - (t1->tv_usec + 1000000 * t1->tv_sec);
-    result->tv_sec = diff / 1000000;
-    result->tv_usec = diff % 1000000;
-
-    return (diff<0);
-}
-
 // Main function     
 int main(int argc, char **argv){
 	SSL_CTX *ctx;                          // SSL context
+	//SSL *ssl;                              // SSL instance
 	BIO *sbio;
 	int sock;                              // socket descriptor 
 	extern char *optarg;                   // user input parameters
@@ -605,8 +596,7 @@ int main(int argc, char **argv){
 	int N_proxies = 0;                     // number of proxies in path 
 	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file, browser-like)
 	char *file_action = NULL;              // file action to use for browser-liek behavior
-	struct timeval tvBegin, tvEnd, tvDiff; // time struct for handshake duration 
-
+	
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:")) != -1){
 			
@@ -726,7 +716,7 @@ int main(int argc, char **argv){
 	proxies  = malloc( N_proxies * sizeof (SPP_PROXY*));
 
 	// Read proxy list 
-	read_proxy_list(filename, proxies);
+	read_proxy_list(filename, proxies, ssl);
 
 	// Print proxy list 
 	#ifdef DEBUG
@@ -736,17 +726,32 @@ int main(int argc, char **argv){
 	// Connect TCP socket
 	char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
 	memcpy(address, proxies[0]->address, strlen(proxies[0]->address)+1);
-	//char* proxy_host = strtok(address, ":"); 
-	host = strtok(address, ":");
-	//int proxy_port = atoi(strtok(NULL, ":"));
-	port = atoi(strtok(NULL, ":")); 
+	char* proxy_host = strtok(address, ":"); 
+	int proxy_port = atoi(strtok(NULL, ":"));
 	#ifdef DEBUG 
-	//printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
-	printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
+	printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
 	#endif
-	//sock = tcp_connect(proxy_host, proxy_port);
-	sock = tcp_connect(host, port);
+	sock = tcp_connect(proxy_host, proxy_port);
 	
+	/*
+	// Connect TCP socket
+	if (N_proxies > 0){
+		char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
+		memcpy(address, proxies[0]->address, strlen(proxies[0]->address)+1);
+		char* proxy_host = strtok(address, ":"); 
+		int proxy_port = atoi(strtok(NULL, ":"));
+		#ifdef DEBUG 
+		printf("[DEBUG] Opening socket to host: %s, port %d\n", proxy_host, proxy_port);
+		#endif
+		sock = tcp_connect(proxy_host, proxy_port);
+	}else{
+		#ifdef DEBUG 
+		printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
+		#endif
+		sock = tcp_connect(host, port);
+	}
+	*/
+
 	// Connect the SSL socket 
 	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
     SSL_set_bio(ssl, sbio, sbio);
@@ -798,11 +803,8 @@ int main(int argc, char **argv){
 	}
 	
 	// Let's connect
-	gettimeofday(&tvBegin, NULL);
-	doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
-	gettimeofday(&tvEnd, NULL);
-	timeval_subtract(&tvDiff, &tvEnd, &tvBegin);
-
+	doConnect (ssl, proto, slices_len, N_proxies, slice_set, proxies); 
+	
 	// Switch across possible client-server behavior
 	// // NOTE: here we can add more complex strategies
 	switch(action){
@@ -812,17 +814,17 @@ int main(int argc, char **argv){
                 
 		// Send simple request, wait for 200 OK
 		case 2:  
-			http_request(file_requested, proto, false);
+			http_request(ssl, file_requested, proto, false);
 			break; 
 
 		// Send HTTP GET request and wait for file to be received
 		case 3:  		
-			http_request(file_requested, proto, true);
+			http_request(ssl, file_requested, proto, true);
 			break; 
 
 		// Send several GET request following a browser-like behavior  
 		case 4:  
-			http_complex(proto, file_action);
+			http_complex(ssl, proto, file_action);
 			break; 
  
 		// Unknown option 
@@ -845,10 +847,7 @@ int main(int argc, char **argv){
 	for (i = 0; i < slices_len; i++){
 		free(slice_set[i]); 
 	}
-
-	// Report handshake duration 
-	printf("No_Slices %d Handshake_Dur: %ld.%06ld\n", slices_len, tvDiff.tv_sec, tvDiff.tv_usec);	
-
+	
 	// All good
 	return 0; 
 }

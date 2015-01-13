@@ -57,14 +57,12 @@ SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
     
     /* Create our context*/
 	if (strcmp(proto, "ssl") == 0){		
-   		printf("[DEBUG] Using SSLv23_method\n");  
 		meth = SSLv23_method();
 	} else if (strcmp(proto, "middlebox") == 0){  
-   		printf("[DEBUG] Using SPP_proxy_method (only middleboxes should use this)\n");  
+   		printf("Using SPP_Proxy_method (only middleboxes should use this)\n");  
 		meth = SPP_proxy_method();
 	}
 	else {
-   		printf("[DEBUG] Using SPP_method\n");  
 		meth = SPP_method(); 
 	}
 

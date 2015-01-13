@@ -403,7 +403,7 @@ int spp_accept(SSL *s) 	{
                 ret=spp_get_proxy_certificate(s, proxy);
                 printf("Received proxy certificate\n");
                 if (ret <= 0) goto end;
-                s->state=SPP_ST_CR_PRXY_KEY_EXCH_A;
+                s->state=SSL3_ST_CR_KEY_EXCH_A;
                 s->init_num=0;
                 break;
                 
@@ -512,7 +512,6 @@ int spp_accept(SSL *s) 	{
                     ret=spp_send_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
                     s->state = SPP_ST_CW_PRXY_MAT_A;
-                    s->init_num=0;
                 }
                 ret=spp_send_end_key_material(s);
                 
@@ -537,7 +536,6 @@ int spp_accept(SSL *s) 	{
                     ret=spp_get_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
                     s->state = SPP_ST_CR_PRXY_MAT_A;
-                    s->init_num=0;
                 }
                 ret=spp_get_end_key_material(s);
                 if (ret <= 0) goto end;

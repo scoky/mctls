@@ -18,6 +18,8 @@
         <in>ca.c</in>
         <in>ciphers.c</in>
         <in>cms.c</in>
+        <in>common.c</in>
+        <in>common.h</in>
         <in>crl.c</in>
         <in>crl2p7.c</in>
         <in>dgst.c</in>
@@ -1265,6 +1267,27 @@
         <in>e_ubsec_err.c</in>
         <in>e_ubsec_err.h</in>
       </df>
+      <df name="evaluation">
+        <df name="benchmark">
+        </df>
+        <df name="client_server">
+          <in>common.c</in>
+          <in>common.h</in>
+          <in>middlebox.c</in>
+          <in>wclient.c</in>
+          <in>wserver.c</in>
+        </df>
+        <df name="realworld_web">
+          <df name="alexa500_https_2015-01-09">
+          </df>
+          <df name="example">
+          </df>
+          <df name="web-profiler">
+          </df>
+        </df>
+        <df name="test">
+        </df>
+      </df>
       <df name="include">
         <df name="openssl">
           <in>aes.h</in>
@@ -1410,6 +1433,13 @@
         <in>s3_meth.c</in>
         <in>s3_pkt.c</in>
         <in>s3_srvr.c</in>
+        <in>spp_both.c</in>
+        <in>spp_clnt.c</in>
+        <in>spp_enc.c</in>
+        <in>spp_meth.c</in>
+        <in>spp_pkt.c</in>
+        <in>spp_prxy.c</in>
+        <in>spp_srvr.c</in>
         <in>srtp.h</in>
         <in>ssl.h</in>
         <in>ssl2.h</in>
@@ -1509,6 +1539,7 @@
       </df>
       <in>e_os.h</in>
       <in>e_os2.h</in>
+      <in>test.c</in>
     </df>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>

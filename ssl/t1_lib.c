@@ -384,7 +384,7 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
 	if (ret>=limit) return NULL; /* this really never occurs, but ... */
 
         /* Write the SPP proxy list extension to a client hello */
-        if (s->slices_len > 0) {
+        if (s->proxies != NULL && s->slices != NULL) {
             unsigned char *len_pt;
             int i,char_len,n;
             

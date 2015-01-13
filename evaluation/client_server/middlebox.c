@@ -462,13 +462,14 @@ int main(int argc, char **argv){
 
 			SSL* ssl_next;
 			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
-			const char *prxy_address = "localhost:8423";
-			if ((r = SPP_proxy(ssl, prxy_address, connect_func, &ssl_next)) <= 0) {
-				berr_exit("SPP proxy error");
+
+			const char *prxy_address = "127.0.0.1:8423";
+			if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
+				berr_exit("[middlebox] SPP proxy error");
 			} else {
 				#ifdef DEBUG            
-                                        printf("SPP proxy OK\n"); 
-                                #endif
+                printf("[middlebox] SPP proxy OK\n"); 
+                #endif
 			}
 
 			#ifdef DEBUG

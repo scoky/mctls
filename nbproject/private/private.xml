@@ -7,4 +7,25 @@
         <activeConfTypeElem>0</activeConfTypeElem>
         <activeConfIndexElem>0</activeConfIndexElem>
     </data>
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/s3_enc.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/spp_both.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/ssl_sess.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/ssl.h</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/s3_srvr.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/s3_lib.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/spp_srvr.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/include/openssl/ssl3.h</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/t1_enc.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/spp_meth.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/s3_both.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/spp_prxy.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/ssl_locl.h</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/spp_clnt.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/t1_lib.c</file>
+            <file>file:/home/scoky/Downloads/openssl-1.0.1j/ssl/spp_pkt.c</file>
+        </group>
+    </open-files>
 </project-private>

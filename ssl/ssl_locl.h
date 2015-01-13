@@ -1164,7 +1164,6 @@ int ssl_ok(SSL *s);
 int	spp_accept(SSL *s);
 int	spp_connect(SSL *s);
 int	spp_proxy_accept(SSL *s);
-int	spp_proxy_connect(SSL *s);
 int spp_enc(SSL *s, int send);
 int spp_change_cipher_state(SSL *s, int which);
 int spp_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
