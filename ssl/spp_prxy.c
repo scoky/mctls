@@ -15,8 +15,102 @@ static const SSL_METHOD *spp_get_proxy_method(int ver)
 
 IMPLEMENT_spp_meth_func(SPP_VERSION, SPP_proxy_method,
 			spp_proxy_accept,
-			ssl_undefined_function,
+			spp_proxy_connect,
 			spp_get_proxy_method)
+
+int spp_proxy_connect(SSL *s) {
+    BUF_MEM *buf=NULL;
+    unsigned long Time=(unsigned long)time(NULL);
+    void (*cb)(const SSL *ssl,int type,int val)=NULL;
+    int ret= -1;
+
+    RAND_add(&Time,sizeof(Time),0);
+    ERR_clear_error();
+    clear_sys_error();
+
+    if (s->info_callback != NULL)
+        cb=s->info_callback;
+    else if (s->ctx->info_callback != NULL)
+        cb=s->ctx->info_callback;
+
+    s->in_handshake++;
+    if (!SSL_in_init(s) || SSL_in_before(s)) SSL_clear(s); 
+
+#ifndef OPENSSL_NO_HEARTBEATS
+	/* If we're awaiting a HeartbeatResponse, pretend we
+	 * already got and don't await it anymore, because
+	 * Heartbeats don't make sense during handshakes anyway.
+	 */
+	if (s->tlsext_hb_pending) {
+            s->tlsext_hb_pending = 0;
+            s->tlsext_hb_seq++;
+        }
+#endif
+
+    for (;;) {
+        switch(s->state) {
+            case SSL_ST_RENEGOTIATE:
+                SSLerr(SSL_F_SSL3_CONNECT, ERR_R_INTERNAL_ERROR);
+                ret = -1;
+                goto end;
+                
+            case SSL_ST_BEFORE:
+            case SSL_ST_CONNECT:
+            case SSL_ST_BEFORE|SSL_ST_CONNECT:
+            case SSL_ST_OK|SSL_ST_CONNECT:
+                printf("Proxy connecting\n");
+                s->server=0; /* We are a proxy */
+                s->proxy=1;
+                
+                if (cb != NULL) cb(s,SSL_CB_HANDSHAKE_START,1);
+
+                if ((s->version & 0xff00 ) != 0x0600) { /* SPP major version is 6 */
+                    SSLerr(SSL_F_SSL3_CONNECT, ERR_R_INTERNAL_ERROR);
+                    ret = -1;
+                    goto end;
+                }
+				
+                s->version=SPP_VERSION;
+                s->type=SSL_ST_CONNECT;
+
+                if (s->init_buf == NULL) {
+                    if ((buf=BUF_MEM_new()) == NULL) {
+                        ret= -1;
+                        goto end;
+                    }
+                    if (!BUF_MEM_grow(buf,SSL3_RT_MAX_PLAIN_LENGTH)) {
+                        ret= -1;
+                        goto end;
+                    }
+                    s->init_buf=buf;
+                    buf=NULL;
+                }
+
+                if (!ssl3_setup_buffers(s)) { ret= -1; goto end; }
+
+                /* setup buffing BIO */
+                if (!ssl_init_wbio_buffer(s,0)) { ret= -1; goto end; }
+
+                /* don't push the buffering BIO quite yet */
+
+                ssl3_init_finished_mac(s);
+
+                s->state=SSL3_ST_CW_CLNT_HELLO_A;
+                s->ctx->stats.sess_connect++;
+                s->init_num=0;
+
+                ret=1;
+                goto end;
+                
+            default:
+                SSLerr(SSL_F_SSL3_CONNECT,SSL_R_UNKNOWN_STATE);
+                ret= -1;
+                goto end;
+        }
+    }
+end:
+    return(ret);
+}
 
 char * spp_next_proxy_address(SSL *s) {
     int i;
@@ -44,41 +138,12 @@ char * spp_next_proxy_address(SSL *s) {
 }
 
 int spp_initialize_ssl(SSL *s, SSL *n) {
-    int ret = 1, i;
-    BUF_MEM *buf=NULL;
+    int i;
     // Initialize the new SSL state
     s->other_ssl = n;
     n->other_ssl = s;
     n->proxy_id = s->proxy_id;
-    n->proxy = 1;
-    n->server = 0;
-    
-    if (n->handshake_func == 0)
-        /* Not properly initialized yet */
-        SSL_set_connect_state(n);
-    
-    n->version=SPP_VERSION;
-    n->type=SSL_ST_CONNECT;
-    
-    if (!SSL_in_init(n) || SSL_in_before(n)) SSL_clear(n);
-
-    if (n->init_buf == NULL) {
-        if ((buf=BUF_MEM_new()) == NULL) {
-            ret= -1;
-            goto end;
-        }
-        if (!BUF_MEM_grow(buf,SSL3_RT_MAX_PLAIN_LENGTH)) {
-            ret= -1;
-            goto end;
-        }
-        n->init_buf=buf;
-        buf=NULL;
-    }
-
-    if (!ssl3_setup_buffers(n)) { ret= -1; goto end; }
-
-    /* setup buffing BIO */
-    if (!ssl_init_wbio_buffer(n,0)) { ret= -1; goto end; }
+    n->session = s->session;
     
     /* Copy proxies and slices */
     for (i = 0; i < s->proxies_len; i++) {
@@ -93,9 +158,7 @@ int spp_initialize_ssl(SSL *s, SSL *n) {
         n->slices[i]->slice_id = s->slices[i]->slice_id;
         n->slices[i]->purpose = s->slices[i]->purpose;
     }
-
-end:
-    return ret;
+    return 1;
 }
 
 void spp_proxies_count(SSL *s, int *ahead, int *behind) {
@@ -113,20 +176,18 @@ void spp_proxies_count(SSL *s, int *ahead, int *behind) {
  * The read and write calls provided by openssl for handshake messages 
  * are inconsistent in whether the 4 byte header is included or not. */
 int spp_forward_message(SSL *to, SSL*from) {
-    unsigned char *tBuf=(unsigned char *)to->init_buf->data;
-    unsigned char *fBuf = (unsigned char *)from->init_buf->data;
     // When receiving a message, the helper functions automatically strip the header.
+    // Meant, from->init_msg = &(init_buf->data[init_off])+4
+    // So, keep the same pointer location into init_buf->data but increase the init_num value by 4.
     to->init_num = from->init_num + 4;
     to->init_off = from->init_off;
-    memcpy(tBuf, fBuf, to->init_num);    
+    memcpy(&(to->init_buf->data[to->init_off]), &(from->init_buf->data[from->init_off]), to->init_num);    
     return(ssl3_do_write(to,SSL3_RT_HANDSHAKE));
 }
 int spp_duplicate_message(SSL *to, SSL*from) {
-    unsigned char tBuf=(unsigned char *)to->init_buf->data;
-    unsigned char *fBuf = (unsigned char *)from->init_buf->data;
     to->init_num = from->init_num;
     to->init_off = from->init_off;
-    memcpy(tBuf, fBuf, to->init_num);    
+    memcpy(&(to->init_buf->data[to->init_off]), &(from->init_buf->data[from->init_off]), to->init_num);    
     return(ssl3_do_write(to,SSL3_RT_HANDSHAKE));
 }
 
@@ -140,7 +201,6 @@ int get_proxy_msg(SSL *s, int st1, int stn, int msg, int forward) {
         SSL3_RT_MAX_PLAIN_LENGTH,
         &ok);
     if (!ok) return n;
-
     printf("Got message, n=%d, msg_type=%d\n", n, s->s3->tmp.message_type);
     spp_print_buffer(s->init_msg, s->init_num);
     if (forward)
@@ -481,7 +541,7 @@ err:
 }
 
 int spp_proxy_accept(SSL *s) {
-    SSL *next_st;
+    SSL *next_st=NULL;
     BUF_MEM *buf;
     char *address;
     SPP_PROXY *proxy=NULL, *this_proxy;
@@ -522,6 +582,8 @@ int spp_proxy_accept(SSL *s) {
 
     for (;;) {
         state=s->state;
+        if (next_st != NULL)
+            next_st->state=s->state;
 
         switch (s->state) {
             case SSL_ST_RENEGOTIATE:
@@ -608,16 +670,17 @@ int spp_proxy_accept(SSL *s) {
                     goto end;
                 printf("Callback returned\n");
                 
+                if (SSL_connect(next_st) <= 0)
+                    goto end;
+                
                 spp_initialize_ssl(s, next_st);
                 this_proxy = SPP_get_proxy_by_id(s, s->proxy_id);
-                next_st->in_handshake++;
                 
                 // Forward the message on.
                 ret=spp_forward_message(next_st, s);
                 if (ret <= 0) goto end;
                 
                 s->renegotiate = 2;
-                next_st->renegotiate = 0;
                 s->state=SSL3_ST_CR_SRVR_HELLO_A;
                 s->init_num=next_st->init_num=0;
                 break;
@@ -656,10 +719,10 @@ int spp_proxy_accept(SSL *s) {
 
                 /* at this point we check that we have the
                  * required stuff from the server */
-                if (!ssl3_check_cert_and_algorithm(next_st)) {
+                /*if (!ssl3_check_cert_and_algorithm(next_st)) {
                     ret= -1;
                     goto end;
-                }
+                }*/
                 break;
 
             case SSL3_ST_CR_SRVR_DONE_A:
@@ -671,19 +734,19 @@ int spp_proxy_accept(SSL *s) {
                 if (s->s3->tmp.cert_req)
                     goto end;
                 else {
-                    s->state=SPP_ST_PW_PRXY_CERT_A;
+                    s->state=SSL3_ST_SW_CERT_A;
                 }
                 s->init_num=next_st->init_num=0;
 
                 break;
                 
-            case SPP_ST_PW_PRXY_CERT_A:
-            case SPP_ST_PW_PRXY_CERT_B:
+            case SSL3_ST_SW_CERT_A:
+            case SSL3_ST_SW_CERT_B:
                 /* Check if it is anon DH or anon ECDH, */
                 /* normal PSK or KRB5 or SRP */
                 if (!(s->s3->tmp.new_cipher->algorithm_auth & (SSL_aNULL|SSL_aKRB5|SSL_aSRP))
                     && !(s->s3->tmp.new_cipher->algorithm_mkey & SSL_kPSK)) {
-                        printf("Sending certificate\n");
+                        printf("Sending proxy certificate\n");
                         ret=ssl3_send_server_certificate(s); //OK
                         if (ret <= 0) goto end;
                         ret=spp_duplicate_message(next_st, s);
@@ -691,12 +754,12 @@ int spp_proxy_accept(SSL *s) {
                 } else
                     skip=1;
 
-                s->state=SPP_ST_PW_PRXY_KEY_EXCH_A;
+                s->state=SSL3_ST_SW_KEY_EXCH_A;
                 s->init_num=next_st->init_num=0;
                 break;
 
-            case SPP_ST_PW_PRXY_KEY_EXCH_A:
-            case SPP_ST_PW_PRXY_KEY_EXCH_B:
+            case SSL3_ST_SW_KEY_EXCH_A:
+            case SSL3_ST_SW_KEY_EXCH_B:
                 alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
                 /* clear this, it may get reset by
@@ -747,7 +810,7 @@ int spp_proxy_accept(SSL *s) {
                         )
                     )
                         {
-                        printf("Sending server key exchange\n");
+                        printf("Sending proxy key exchange\n");
                         ret=ssl3_send_server_key_exchange(s); //OK
                         if (ret <= 0) goto end;
                         ret=spp_duplicate_message(next_st, s);
@@ -756,15 +819,15 @@ int spp_proxy_accept(SSL *s) {
                 else
                         skip=1;
 
-                s->state=SPP_ST_PW_PRXY_DONE_A;
+                s->state=SSL3_ST_SW_SRVR_DONE_A;
                 s->init_num=next_st->init_num=0;
                 break;
                 
-            case SPP_ST_PW_PRXY_DONE_A:
-            case SPP_ST_PW_PRXY_DONE_B:
-                printf("Sending server done\n");
+            case SSL3_ST_SW_SRVR_DONE_A:
+            case SSL3_ST_SW_SRVR_DONE_B:
+                printf("Sending proxy done\n");
                 ret=ssl3_send_server_done(s); //OK
-                printf("Sent server done\n");
+                printf("Sent proxy done\n");
                 if (ret <= 0) goto end;
                 ret=spp_duplicate_message(next_st, s);
                 if (ret <= 0) goto end;
@@ -838,6 +901,7 @@ int spp_proxy_accept(SSL *s) {
                  * unconditionally.
                  */
 
+                printf("Flushing bios\n");
                 s->rwstate=SSL_WRITING;
                 if (BIO_flush(s->wbio) <= 0) {
                     ret= -1;
