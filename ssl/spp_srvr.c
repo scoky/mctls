@@ -6,6 +6,8 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
+#define DEBUG
+
 static const SSL_METHOD *spp_get_server_method(int ver);
 static const SSL_METHOD *spp_get_server_method(int ver)
 	{
@@ -26,6 +28,11 @@ int spp_accept(SSL *s) 	{
     void (*cb)(const SSL *ssl,int type,int val)=NULL;
     int ret= -1,i;
     int new_state,state,skip=0;
+    	/* Matteo -- START */	
+	struct timeval currTime;      // keep current time  
+	struct timeval prevTime;      // keep previous time (to compute time passed)
+	struct timeval originTime;    // keep previous time (to compute time passed)
+	/* Matteo -- END*/
 
     RAND_add(&Time,sizeof(Time),0);
     ERR_clear_error();
@@ -69,7 +76,15 @@ int spp_accept(SSL *s) 	{
             case SSL_ST_ACCEPT:
             case SSL_ST_BEFORE|SSL_ST_ACCEPT:
             case SSL_ST_OK|SSL_ST_ACCEPT:
-                printf("Before state\n");
+                                // Initialize timers
+				gettimeofday(&currTime, NULL);
+				gettimeofday(&prevTime, NULL);
+				gettimeofday(&originTime, NULL);
+
+				// Log
+				#ifdef DEBUG
+				log_time("Before state\n", &currTime, &prevTime, &originTime); 
+				#endif
                 s->server=1;
                 s->proxy = 0;
                 s->proxy_id = 2;
@@ -131,7 +146,9 @@ int spp_accept(SSL *s) 	{
             case SSL3_ST_SW_HELLO_REQ_A:
             case SSL3_ST_SW_HELLO_REQ_B:
                 s->shutdown=0;
-                printf("Sending hello request\n");
+                #ifdef DEBUG
+				log_time("Sending hello request\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=ssl3_send_hello_request(s);
                 if (ret <= 0) goto end;
                 s->s3->tmp.next_state=SSL3_ST_SW_HELLO_REQ_C;
@@ -151,7 +168,9 @@ int spp_accept(SSL *s) 	{
                 s->shutdown=0;
                 if (s->rwstate != SSL_X509_LOOKUP) {
                     ret=ssl3_get_client_hello(s);
-                    printf("Received client hello\n");
+                    #ifdef DEBUG
+					log_time("Received client hello\n", &currTime, &prevTime, &originTime); 
+					#endif
                     if (ret <= 0) goto end;
                     if (!spp_generate_slice_keys(s)) goto end;
                 }
@@ -183,7 +202,9 @@ int spp_accept(SSL *s) 	{
 
             case SSL3_ST_SW_SRVR_HELLO_A:
             case SSL3_ST_SW_SRVR_HELLO_B:
-                printf("Sending server hello\n");
+                #ifdef DEBUG
+				log_time("Sending server hello\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=ssl3_send_server_hello(s);
                 if (ret <= 0) goto end;
 #ifndef OPENSSL_NO_TLSEXT
@@ -208,7 +229,9 @@ int spp_accept(SSL *s) 	{
                 /* normal PSK or KRB5 or SRP */
                 if (!(s->s3->tmp.new_cipher->algorithm_auth & (SSL_aNULL|SSL_aKRB5|SSL_aSRP))
                     && !(s->s3->tmp.new_cipher->algorithm_mkey & SSL_kPSK)) {
-                        printf("Sending certificate\n");
+                        #ifdef DEBUG
+						log_time("Sending certificate\n", &currTime, &prevTime, &originTime); 
+						#endif
                         ret=ssl3_send_server_certificate(s);
                         if (ret <= 0) goto end;
 #ifndef OPENSSL_NO_TLSEXT
@@ -281,7 +304,9 @@ int spp_accept(SSL *s) 	{
                         )
                     )
                         {
-                        printf("Sending server key exchange\n");
+                        #ifdef DEBUG
+						log_time("Sending server key exchange\n", &currTime, &prevTime, &originTime); 
+						#endif
                         ret=ssl3_send_server_key_exchange(s);
                         if (ret <= 0) goto end;
                         }
@@ -326,7 +351,9 @@ int spp_accept(SSL *s) 	{
                 else
                 {
                     s->s3->tmp.cert_request=1;
-                    printf("Sending certificate request\n");
+                    #ifdef DEBUG
+					log_time("Sending certificate request\n", &currTime, &prevTime, &originTime); 
+					#endif
                     ret=ssl3_send_certificate_request(s);
                     if (ret <= 0) goto end;
 #ifndef NETSCAPE_HANG_BUG
@@ -341,9 +368,13 @@ int spp_accept(SSL *s) 	{
 
             case SSL3_ST_SW_SRVR_DONE_A:
             case SSL3_ST_SW_SRVR_DONE_B:
-                printf("Sending server done\n");
+                #ifdef DEBUG
+				log_time("Sending server done\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=ssl3_send_server_done(s);
-                printf("Sent server done\n");
+                #ifdef DEBUG
+				log_time("Sent server done\n", &currTime, &prevTime, &originTime); 
+				#endif
                 if (ret <= 0) goto end;
                 s->s3->tmp.next_state=SSL3_ST_SR_CERT_A;
                 s->state=SSL3_ST_SW_FLUSH;
@@ -374,16 +405,22 @@ int spp_accept(SSL *s) 	{
             case SSL3_ST_SR_CERT_A:
             case SSL3_ST_SR_CERT_B:
                 /* Check for second client hello (MS SGC) */
-                printf("Checking for second client hello\n");
+                #ifdef DEBUG
+				log_time("Checking for second client hello\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret = ssl3_check_client_hello(s);
-                printf("Checked for second client hello\n");
+                #ifdef DEBUG
+				log_time("Checked for second client hello\n", &currTime, &prevTime, &originTime); 
+				#endif
                 if (ret <= 0)
                     goto end;
                 if (ret == 2)
                     s->state = SSL3_ST_SR_CLNT_HELLO_C;
                 else {
                     if (s->s3->tmp.cert_request) {
-                        printf("Receiving required client certificate\n");
+                        #ifdef DEBUG
+						log_time("Receiving required client certificate\n", &currTime, &prevTime, &originTime); 
+						#endif
                         ret=ssl3_get_client_certificate(s);
                         if (ret <= 0) goto end;
                     }
@@ -399,9 +436,13 @@ int spp_accept(SSL *s) 	{
                 
             case SPP_ST_CR_PRXY_CERT_A:
             case SPP_ST_CR_PRXY_CERT_B:
-                printf("Waiting for proxy certificate\n");
+                #ifdef DEBUG
+				log_time("Waiting for proxy certificate\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=spp_get_proxy_certificate(s, proxy);
-                printf("Received proxy certificate\n");
+                #ifdef DEBUG
+				log_time("Received proxy certificate\n", &currTime, &prevTime, &originTime); 
+				#endif
                 if (ret <= 0) goto end;
                 s->state=SPP_ST_CR_PRXY_KEY_EXCH_A;
                 s->init_num=0;
@@ -411,7 +452,9 @@ int spp_accept(SSL *s) 	{
             case SPP_ST_CR_PRXY_KEY_EXCH_A:
             case SPP_ST_CR_PRXY_KEY_EXCH_B:
                 ret=spp_get_proxy_key_exchange(s, proxy);
-                printf("Received proxy key exchange\n");
+                #ifdef DEBUG
+				log_time("Received proxy key exchange\n", &currTime, &prevTime, &originTime); 
+				#endif
                 if (ret <= 0) goto end;
                 s->state=SPP_ST_CR_PRXY_DONE_A;
                 s->init_num=0; 
@@ -420,7 +463,9 @@ int spp_accept(SSL *s) 	{
             case SPP_ST_CR_PRXY_DONE_A:
             case SPP_ST_CR_PRXY_DONE_B:
                 ret=spp_get_proxy_done(s, proxy);
-                printf("Received proxy done\n");
+                #ifdef DEBUG
+				log_time("Received proxy done\n", &currTime, &prevTime, &originTime); 
+				#endif
                 if (ret <= 0) goto end;
                                 
                 proxy = spp_get_next_proxy(s, proxy, 1);
@@ -435,9 +480,13 @@ int spp_accept(SSL *s) 	{
                 
             case SSL3_ST_SR_KEY_EXCH_A:
             case SSL3_ST_SR_KEY_EXCH_B:
-                printf("Receiving client key exchange\n");
+                #ifdef DEBUG
+				log_time("Receiving client key exchange\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=ssl3_get_client_key_exchange(s);
-                printf("Received client key exchange\n");
+                #ifdef DEBUG
+				log_time("Received client key exchange\n", &currTime, &prevTime, &originTime); 
+				#endif
                 if (ret <= 0)
                     goto end;
                 if (ret == 2)
@@ -507,7 +556,9 @@ int spp_accept(SSL *s) 	{
             /* Send the proxy key material. */
             case SPP_ST_CW_PRXY_MAT_A:
             case SPP_ST_CW_PRXY_MAT_B:
-                printf("Sending proxy key material\n");
+                #ifdef DEBUG
+				log_time("Sending proxy key material\n", &currTime, &prevTime, &originTime); 
+				#endif
                 for (i = 0; i < s->proxies_len; i++) {
                     ret=spp_send_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
@@ -532,7 +583,9 @@ int spp_accept(SSL *s) 	{
                 
             case SPP_ST_CR_PRXY_MAT_A:
             case SPP_ST_CR_PRXY_MAT_B:
-                printf("Receiving proxy key material\n");
+                #ifdef DEBUG
+				log_time("Receiving proxy key material\n", &currTime, &prevTime, &originTime); 
+				#endif
                 for (i = s->proxies_len-1; i >= 0; i--) {
                     ret=spp_get_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
@@ -568,7 +621,9 @@ int spp_accept(SSL *s) 	{
 #if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
             case SSL3_ST_SR_NEXT_PROTO_A:
             case SSL3_ST_SR_NEXT_PROTO_B:
-                printf("Receiving next proto\n");
+                #ifdef DEBUG
+			log_time("Receiving next proto\n", &currTime, &prevTime, &originTime); 			
+			#endif
                 ret=ssl3_get_next_proto(s);
                 if (ret <= 0) goto end;
                 s->init_num = 0;
@@ -578,7 +633,9 @@ int spp_accept(SSL *s) 	{
 
             case SSL3_ST_SR_FINISHED_A:
             case SSL3_ST_SR_FINISHED_B:
-                    printf("Receiving finish\n");
+                #ifdef DEBUG
+			log_time("Receiving finished\n", &currTime, &prevTime, &originTime); 			
+			#endif
                     s->s3->flags |= SSL3_FLAGS_CCS_OK;
                     ret=ssl3_get_finished(s,SSL3_ST_SR_FINISHED_A,
                         SSL3_ST_SR_FINISHED_B);
@@ -620,6 +677,9 @@ int spp_accept(SSL *s) 	{
 			if (!s->method->ssl3_enc->setup_key_block(s))
 				{ ret= -1; goto end; }
 
+                        #ifdef DEBUG
+			log_time("Sending change cipher state\n", &currTime, &prevTime, &originTime); 			
+			#endif
 			ret=ssl3_send_change_cipher_spec(s,
 				SSL3_ST_SW_CHANGE_A,SSL3_ST_SW_CHANGE_B);
 
@@ -724,7 +784,9 @@ int spp_accept(SSL *s) 	{
 		skip=0;
 		}
 end:
-        printf("Handshake end\n");
+                #ifdef DEBUG
+		log_time("Handshake end\n", &currTime, &prevTime, &originTime); 
+		#endif
 	/* BIO_flush(s->wbio); */
 
 	s->in_handshake--;
