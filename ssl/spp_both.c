@@ -787,11 +787,15 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
         /* number of bytes to write */
         s->init_num=n+4;
         s->init_off=0;
+        
+        printf("Sending proxy key material\n");
+        spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
     return(ssl3_do_write(s,SSL3_RT_HANDSHAKE));
 err:
+    printf("Error sending proxy key material\n");
     return(-1);
 }
 
@@ -848,7 +852,7 @@ int spp_send_end_key_material(SSL *s) {
         if(!EVP_EncryptInit_ex(cipher, c, NULL, s->session->master_key, aesIV)) {
              goto err;
         }*/
-        
+
         *(d++)=SPP_MT_PROXY_KEY_MATERIAL;
         l2n3(n,d);
 
@@ -856,6 +860,9 @@ int spp_send_end_key_material(SSL *s) {
         /* number of bytes to write */
         s->init_num=n+4;
         s->init_off=0;
+
+        printf("Sending end key material, n=%d\n", n);
+        spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
@@ -960,7 +967,7 @@ err:
 
 void spp_print_buffer(unsigned char *buf, int len) {
     while (len-- > 0) {
-        printf("[%d]",*(buf++));
+        printf("[%x]",(*(buf++))&0xff);
     }
     printf("\n");
 }

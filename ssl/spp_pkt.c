@@ -48,6 +48,10 @@ again:
             s->rstate=SSL_ST_READ_BODY;
 
             p=s->packet;
+#if 0
+            fprintf(stderr, "Received record header: ");
+            spp_print_buffer(p, SPP_RT_HEADER_LENGTH);
+#endif
             /* Pull apart the header into the SSL3_RECORD */
             rr->type= *(p++);
             ssl_major= *(p++);
@@ -508,6 +512,7 @@ start:
                                     ssl3_release_read_buffer(s);
                             }
                     }
+            printf("Normal return n=%d\n", n);
             return(n);
             }
 

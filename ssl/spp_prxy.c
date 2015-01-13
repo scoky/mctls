@@ -192,7 +192,7 @@ int spp_duplicate_message(SSL *to, SSL*from) {
 }
 
 /* Grab a handshake message from one state and forward it to the other. */
-int get_proxy_msg(SSL *s, int st1, int stn, int msg) {
+int get_proxy_msg(SSL *s, int st1, int stn, int msg, int forward) {
     int n, ok;
     n=s->method->ssl_get_message(s,
         st1,
@@ -202,8 +202,61 @@ int get_proxy_msg(SSL *s, int st1, int stn, int msg) {
         &ok);
     if (!ok) return n;
     printf("Got message, n=%d, msg_type=%d\n", n, s->s3->tmp.message_type);
-    return spp_forward_message(s->other_ssl, s);
+    spp_print_buffer(s->init_msg, s->init_num);
+    if (forward)
+        return spp_forward_message(s->other_ssl, s);
+    return 1;
 }
+
+long spp_get_finished(SSL *s, int st1, int stn)
+	{
+	unsigned char *p;
+	int i=0,al;
+
+	p=(unsigned char *)s->init_buf->data;
+
+	if (s->state == st1) {
+            while (1) {
+                i=s->method->ssl_read_bytes(s,SSL3_RT_HANDSHAKE, &p[0],SSL3_RT_MAX_PLAIN_LENGTH, 0);
+                if (i <= 0) {
+                    s->rwstate=SSL_READING;
+                    return i;
+                }
+                s->init_num=i;
+                s->init_off=0;
+                
+                printf("Received finished: ");
+                spp_print_buffer(p, s->init_num);       
+                
+                if (s->s3->change_cipher_spec) {
+                    break;
+                }
+                
+                // Forward the message along
+                i=spp_duplicate_message(s->other_ssl, s);
+                if (i<=0) goto err;
+            }
+            s->state=stn;
+        }        
+        printf("Got finished\n");
+
+        s->s3->tmp.message_type = SSL3_MT_FINISHED;
+
+        // Send to opposite.
+        // First, send change cipher spec
+        s->other_ssl->state=SSL3_ST_CW_CHANGE_A;
+        i=ssl3_send_change_cipher_spec(s->other_ssl, SSL3_ST_CW_CHANGE_A, SSL3_ST_CW_CHANGE_B);
+        if (i<=0) goto err;
+        // Then send finished
+        i=spp_duplicate_message(s->other_ssl, s);
+        if (i<=0) goto err;
+
+	return s->init_num;
+f_err:
+	ssl3_send_alert(s,SSL3_AL_FATAL,al);
+err:
+	return(-1);
+	}
 
 int spp_process_server_hello(SSL *s) {
     STACK_OF(SSL_CIPHER) *sk;
@@ -635,7 +688,7 @@ int spp_proxy_accept(SSL *s) {
             case SSL3_ST_CR_SRVR_HELLO_A:
             case SSL3_ST_CR_SRVR_HELLO_B:
                 // Must read from the hello to determine what ciphers are in use.
-                ret=get_proxy_msg(next_st, SSL3_ST_CR_SRVR_HELLO_A, SSL3_ST_CR_SRVR_HELLO_B, -1);
+                ret=get_proxy_msg(next_st, SSL3_ST_CR_SRVR_HELLO_A, SSL3_ST_CR_SRVR_HELLO_B, -1,1);
                 printf("Received server hello\n");
                 if (ret <= 0) goto end;
                 ret=spp_process_server_hello(next_st);
@@ -647,7 +700,7 @@ int spp_proxy_accept(SSL *s) {
 
             case SSL3_ST_CR_CERT_A:
             case SSL3_ST_CR_CERT_B:
-                ret=get_proxy_msg(next_st, SSL3_ST_CR_CERT_A, SSL3_ST_CR_CERT_B, SSL3_MT_CERTIFICATE);
+                ret=get_proxy_msg(next_st, SSL3_ST_CR_CERT_A, SSL3_ST_CR_CERT_B, SSL3_MT_CERTIFICATE,1);
                 printf("Received server certificate\n");
                 if (ret <= 0) goto end;
 
@@ -657,7 +710,7 @@ int spp_proxy_accept(SSL *s) {
 
             case SSL3_ST_CR_KEY_EXCH_A:
             case SSL3_ST_CR_KEY_EXCH_B:
-                ret=get_proxy_msg(next_st, SSL3_ST_CR_KEY_EXCH_A, SSL3_ST_CR_KEY_EXCH_B, SSL3_MT_SERVER_KEY_EXCHANGE);
+                ret=get_proxy_msg(next_st, SSL3_ST_CR_KEY_EXCH_A, SSL3_ST_CR_KEY_EXCH_B, SSL3_MT_SERVER_KEY_EXCHANGE,1);
                 printf("Received server key exchange\n");
                 if (ret <= 0) goto end;
 
@@ -674,7 +727,7 @@ int spp_proxy_accept(SSL *s) {
 
             case SSL3_ST_CR_SRVR_DONE_A:
             case SSL3_ST_CR_SRVR_DONE_B:
-                ret=get_proxy_msg(next_st, SSL3_ST_CR_SRVR_DONE_A, SSL3_ST_CR_SRVR_DONE_B, SSL3_MT_SERVER_DONE);
+                ret=get_proxy_msg(next_st, SSL3_ST_CR_SRVR_DONE_A, SSL3_ST_CR_SRVR_DONE_B, SSL3_MT_SERVER_DONE, 1);
                 printf("Received server done\n");
                 if (ret <= 0) goto end;
 
@@ -799,7 +852,7 @@ int spp_proxy_accept(SSL *s) {
                 printf("Waiting for behind proxy message\n");
                 while (proxy != NULL) {
                     s->state=SPP_ST_PR_BEHIND_A;
-                    ret=get_proxy_msg(next_st, SPP_ST_PR_BEHIND_A, SPP_ST_PR_BEHIND_B, -1);
+                    ret=get_proxy_msg(next_st, SPP_ST_PR_BEHIND_A, SPP_ST_PR_BEHIND_B, -1, 1);
                     printf("Received proxy message\n");
                     if (ret <= 0) goto end;
                     s->init_num=next_st->init_num=0;
@@ -822,7 +875,7 @@ int spp_proxy_accept(SSL *s) {
                 printf("Waiting for ahead proxy message\n");
                 while (proxy != NULL) {
                     s->state=SPP_ST_PR_AHEAD_A;
-                    ret=get_proxy_msg(s, SPP_ST_PR_AHEAD_A, SPP_ST_PR_AHEAD_B, -1);
+                    ret=get_proxy_msg(s, SPP_ST_PR_AHEAD_A, SPP_ST_PR_AHEAD_B, -1, 1);
                     printf("Received proxy message\n");
                     if (ret <= 0) goto end;
                     s->init_num=next_st->init_num=0;
@@ -868,7 +921,7 @@ int spp_proxy_accept(SSL *s) {
             case SSL3_ST_SR_KEY_EXCH_A:
             case SSL3_ST_SR_KEY_EXCH_B:
                 printf("Receiving client key exchange\n");
-                ret=get_proxy_msg(s, SSL3_ST_SR_KEY_EXCH_A, SSL3_ST_SR_KEY_EXCH_B, SSL3_MT_CLIENT_KEY_EXCHANGE);
+                ret=get_proxy_msg(s, SSL3_ST_SR_KEY_EXCH_A, SSL3_ST_SR_KEY_EXCH_B, SSL3_MT_CLIENT_KEY_EXCHANGE,1);
                 printf("Received client key exchange\n");
                 if (ret <= 0) goto end;
                 
@@ -883,14 +936,17 @@ int spp_proxy_accept(SSL *s) {
                 // Pass all messages on
                 for (i = 0; i <= s->proxies_len; i++) {
                     s->state = next_st->state = SPP_ST_CR_PRXY_MAT_A;
-                    ret=get_proxy_msg(s, SPP_ST_CR_PRXY_MAT_A, SPP_ST_CR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL);
+                    printf("Getting message\n");
+                    ret=get_proxy_msg(s, SPP_ST_CR_PRXY_MAT_A, SPP_ST_CR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL,1);                    
                     if (ret <= 0) goto end;
+                    printf("Processing message\n");
                     ret=get_proxy_material(s, 0); // From client
                     if (ret <= 0) goto end;
+                    s->init_num=next_st->init_num=0;
                 }
                 
-                s->state=SPP_ST_SR_PRXY_MAT_A;
-                s->init_num=next_st->init_num=0;
+                s->s3->tmp.next_state=SPP_ST_SR_PRXY_MAT_A;
+                s->state=SSL3_ST_SW_FLUSH;
                 break;
                 
             case SPP_ST_SR_PRXY_MAT_A:
@@ -900,27 +956,29 @@ int spp_proxy_accept(SSL *s) {
                 // Pass all messages on
                 for (i = 0; i <= s->proxies_len; i++) {
                     s->state = next_st->state = SPP_ST_SR_PRXY_MAT_A;
-                    ret=get_proxy_msg(next_st, SPP_ST_SR_PRXY_MAT_A, SPP_ST_SR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL);
+                    ret=get_proxy_msg(next_st, SPP_ST_SR_PRXY_MAT_A, SPP_ST_SR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL, 1);
                     if (ret <= 0) goto end;
                     ret=get_proxy_material(next_st, 1); // From server
                     if (ret <= 0) goto end;
+                    s->init_num=next_st->init_num=0;
                 }
                 
 #if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
                 s->state=SSL3_ST_SR_FINISHED_A;
 #else
                 if (s->s3->next_proto_neg_seen)
-                    s->state=SSL3_ST_SR_NEXT_PROTO_A;
+                    s->s3->tmp.next_state=SSL3_ST_SR_NEXT_PROTO_A;
                 else
-                    s->state=SSL3_ST_SR_FINISHED_A;
+                    s->s3->tmp.next_state=SSL3_ST_SR_FINISHED_A;
+                s->state=SSL3_ST_SW_FLUSH;
 #endif
-                s->init_num=next_st->init_num=0;
                 break;
 
 #if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
             case SSL3_ST_SR_NEXT_PROTO_A:
             case SSL3_ST_SR_NEXT_PROTO_B:
-                ret=get_proxy_msg(next_st, SSL3_ST_SR_NEXT_PROTO_A, SSL3_ST_SR_NEXT_PROTO_B, SSL3_MT_NEXT_PROTO);
+                printf("Receiving next proto\n");
+                ret=get_proxy_msg(s, SSL3_ST_SR_NEXT_PROTO_A, SSL3_ST_SR_NEXT_PROTO_B, SSL3_MT_NEXT_PROTO,1);
                 if (ret <= 0) goto end;
                 s->init_num=next_st->init_num=0;
                 s->state=SSL3_ST_SR_FINISHED_A;
@@ -929,63 +987,61 @@ int spp_proxy_accept(SSL *s) {
 
             case SSL3_ST_SR_FINISHED_A:
             case SSL3_ST_SR_FINISHED_B:
-                do {
-                    s->s3->flags |= SSL3_FLAGS_CCS_OK;
-                    s->state = SSL3_ST_SR_FINISHED_A;
-                    ret=get_proxy_msg(s, SSL3_ST_SR_FINISHED_A, SSL3_ST_SR_FINISHED_B, -1);
-                    if (ret <= 0) goto end;
-                } while (s->s3->tmp.message_type != SSL3_MT_FINISHED);
+                printf("Receiving finished from client\n");
+                s->s3->flags |= SSL3_FLAGS_CCS_OK;
+                ret=spp_get_finished(s, SSL3_ST_SR_FINISHED_A, SSL3_ST_SR_FINISHED_B);
+                if (ret <= 0) goto end;
+                s->init_num=next_st->init_num=0;
                 
                 if (s->hit)
                     s->state=SSL_ST_OK;
 #ifndef OPENSSL_NO_TLSEXT
                 else if (s->tlsext_ticket_expected)
-                    s->state=SSL3_ST_SW_SESSION_TICKET_A;
+                    s->state=SSL3_ST_CR_FINISHED_A;
 #endif
                 else
                     s->state=SSL3_ST_CR_FINISHED_A;
-                s->init_num=next_st->init_num=0;
                 
                 /* Cipher state should actually be changed before the finished message.
                  * Since proxies do not actually validate the Finished message, however,
                  * it may be done after. */
-                if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_READ)) {
+                /*if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_READ)) {
                     ret= -1;
                     goto end;
-                }
+                }*/ /* Done when receiving the change cipher spec message */
                 if (!next_st->method->ssl3_enc->change_cipher_state(next_st, SSL3_CHANGE_CIPHER_CLIENT_WRITE)) {
                     ret= -1;
                     goto end;
                 }
                 break;
                 
+            case SSL3_ST_SW_SESSION_TICKET_A:
+            case SSL3_ST_SW_SESSION_TICKET_B:
+                ret=get_proxy_msg(next_st, SSL3_ST_SW_SESSION_TICKET_A, SSL3_ST_SW_SESSION_TICKET_B, SSL3_MT_NEWSESSION_TICKET,1);
+                if (ret <= 0) goto end;
+                s->state=SSL3_ST_CR_FINISHED_A;
+                s->init_num=next_st->init_num=0;
+                break;
+                
             case SSL3_ST_CR_FINISHED_A:
             case SSL3_ST_CR_FINISHED_B:
-                do {
-                    s->s3->flags |= SSL3_FLAGS_CCS_OK;
-                    s->state = SSL3_ST_CR_FINISHED_A;
-                    ret=get_proxy_msg(next_st, SSL3_ST_CR_FINISHED_A, SSL3_ST_CR_FINISHED_B, -1);
-                    if (ret <= 0) goto end;
-                } while (s->s3->tmp.message_type != SSL3_MT_FINISHED);
-                
-                if (s->hit)
-                    s->state=SSL_ST_OK;
-#ifndef OPENSSL_NO_TLSEXT
-                else if (s->tlsext_ticket_expected)
-                    s->state=SSL3_ST_SW_SESSION_TICKET_A;
-#endif
-                else
-                    s->state=SSL_ST_OK;
+                printf("Receiving finished from server\n");
+                next_st->s3->flags |= SSL3_FLAGS_CCS_OK;
+                ret=spp_get_finished(next_st, SSL3_ST_CR_FINISHED_A, SSL3_ST_CR_FINISHED_B);
+                if (ret <= 0) goto end;
                 s->init_num=next_st->init_num=0;
+                
+                s->s3->tmp.next_state=SSL_ST_OK;
+                s->state=SSL3_ST_SW_FLUSH;
                 
                 if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_WRITE)) {
                     ret= -1;
                     goto end;
                 }
-                if (!next_st->method->ssl3_enc->change_cipher_state(next_st, SSL3_CHANGE_CIPHER_CLIENT_READ)) {
+                /*if (!next_st->method->ssl3_enc->change_cipher_state(next_st, SSL3_CHANGE_CIPHER_CLIENT_READ)) {
                     ret= -1;
                     goto end;
-                }
+                }*/ /* Done when receiving the change cipher spec message */
                 break;
 
             case SSL_ST_OK:
@@ -1024,7 +1080,7 @@ int spp_proxy_accept(SSL *s) {
                 next_st->renegotiate=0;
                 next_st->new_session=0;
 
-                next_st->handshake_func=NULL;
+                next_st->handshake_func=spp_proxy_connect;
 
                 ret = 1;
                 goto end;
@@ -1056,9 +1112,12 @@ end:
     printf("Handshake end\n");
     /* BIO_flush(s->wbio); */
 
+    s->s3->change_cipher_spec=0;
     s->in_handshake--;
-    if (next_st != NULL)
+    if (next_st != NULL) {
         next_st->in_handshake--;
+        next_st->s3->change_cipher_spec=0;
+    }
     if (cb != NULL)
             cb(s,SSL_CB_ACCEPT_EXIT,ret);
     return(ret);

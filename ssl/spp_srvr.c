@@ -549,50 +549,51 @@ int spp_accept(SSL *s) 	{
 
             case SSL3_ST_SR_CERT_VRFY_A:
             case SSL3_ST_SR_CERT_VRFY_B:
-
-			s->s3->flags |= SSL3_FLAGS_CCS_OK;
-			/* we should decide if we expected this one */
-			ret=ssl3_get_cert_verify(s);
-			if (ret <= 0) goto end;
+                s->s3->flags |= SSL3_FLAGS_CCS_OK;
+                /* we should decide if we expected this one */
+                ret=ssl3_get_cert_verify(s);
+                if (ret <= 0) goto end;
 
 #if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
-			s->state=SSL3_ST_SR_FINISHED_A;
+                s->state=SSL3_ST_SR_FINISHED_A;
 #else
-			if (s->s3->next_proto_neg_seen)
-				s->state=SSL3_ST_SR_NEXT_PROTO_A;
-			else
-				s->state=SSL3_ST_SR_FINISHED_A;
+                if (s->s3->next_proto_neg_seen)
+                    s->state=SSL3_ST_SR_NEXT_PROTO_A;
+                else
+                    s->state=SSL3_ST_SR_FINISHED_A;
 #endif
-			s->init_num=0;
-			break;
+                s->init_num=0;
+                break;
 
 #if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
-		case SSL3_ST_SR_NEXT_PROTO_A:
-		case SSL3_ST_SR_NEXT_PROTO_B:
-			ret=ssl3_get_next_proto(s);
-			if (ret <= 0) goto end;
-			s->init_num = 0;
-			s->state=SSL3_ST_SR_FINISHED_A;
-			break;
+            case SSL3_ST_SR_NEXT_PROTO_A:
+            case SSL3_ST_SR_NEXT_PROTO_B:
+                printf("Receiving next proto\n");
+                ret=ssl3_get_next_proto(s);
+                if (ret <= 0) goto end;
+                s->init_num = 0;
+                s->state=SSL3_ST_SR_FINISHED_A;
+                break;
 #endif
 
-		case SSL3_ST_SR_FINISHED_A:
-		case SSL3_ST_SR_FINISHED_B:
-			s->s3->flags |= SSL3_FLAGS_CCS_OK;
-			ret=ssl3_get_finished(s,SSL3_ST_SR_FINISHED_A,
-				SSL3_ST_SR_FINISHED_B);
-			if (ret <= 0) goto end;
-			if (s->hit)
-				s->state=SSL_ST_OK;
+            case SSL3_ST_SR_FINISHED_A:
+            case SSL3_ST_SR_FINISHED_B:
+                    printf("Receiving finish\n");
+                    s->s3->flags |= SSL3_FLAGS_CCS_OK;
+                    ret=ssl3_get_finished(s,SSL3_ST_SR_FINISHED_A,
+                        SSL3_ST_SR_FINISHED_B);
+                    if (ret <= 0) goto end;
+                    if (s->hit)
+                        s->state=SSL_ST_OK;
 #ifndef OPENSSL_NO_TLSEXT
-			else if (s->tlsext_ticket_expected)
-				s->state=SSL3_ST_SW_SESSION_TICKET_A;
+                    else if (s->tlsext_ticket_expected)
+                        s->state=SSL3_ST_SW_SESSION_TICKET_A;
 #endif
-			else
-				s->state=SSL3_ST_SW_CHANGE_A;
-			s->init_num=0;
-                                                
-			break;
+                    else
+                        s->state=SSL3_ST_SW_CHANGE_A;
+                    s->init_num=0;
+
+                    break;
 
 #ifndef OPENSSL_NO_TLSEXT
 		case SSL3_ST_SW_SESSION_TICKET_A:
@@ -615,7 +616,6 @@ int spp_accept(SSL *s) 	{
 
 		case SSL3_ST_SW_CHANGE_A:
 		case SSL3_ST_SW_CHANGE_B:
-
 			s->session->cipher=s->s3->tmp.new_cipher;
 			if (!s->method->ssl3_enc->setup_key_block(s))
 				{ ret= -1; goto end; }

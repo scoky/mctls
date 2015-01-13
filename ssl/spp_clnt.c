@@ -266,7 +266,7 @@ int spp_connect(SSL *s) {
             case SPP_ST_CW_PRXY_MAT_B:
                 printf("Sending proxy key material\n");
                 for (i = 0; i < s->proxies_len; i++) {
-                    ret=spp_send_proxy_key_material(s, &(s->proxies[i]));
+                    ret=spp_send_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
                     s->state = SPP_ST_CW_PRXY_MAT_A;
                     s->init_num=0;
@@ -284,7 +284,7 @@ int spp_connect(SSL *s) {
             case SPP_ST_CR_PRXY_MAT_B:
                 printf("Receiving proxy key material\n");
                 for (i = s->proxies_len-1; i >= 0; i--) {
-                    ret=spp_get_proxy_key_material(s, &(s->proxies[i]));
+                    ret=spp_get_proxy_key_material(s, s->proxies[i]);
                     if (ret <= 0) goto end;
                     s->state = SPP_ST_CR_PRXY_MAT_A;
                     s->init_num=0;
@@ -347,6 +347,7 @@ int spp_connect(SSL *s) {
 
             case SSL3_ST_CW_FINISHED_A:
             case SSL3_ST_CW_FINISHED_B:
+                printf("Sending finished\n");
                 ret=ssl3_send_finished(s,
                     SSL3_ST_CW_FINISHED_A,SSL3_ST_CW_FINISHED_B,
                     s->method->ssl3_enc->client_finished_label,
@@ -400,6 +401,7 @@ int spp_connect(SSL *s) {
 
             case SSL3_ST_CR_FINISHED_A:
             case SSL3_ST_CR_FINISHED_B:
+                printf("Receiving finished\n");
                 s->s3->flags |= SSL3_FLAGS_CCS_OK;
                 ret=ssl3_get_finished(s,SSL3_ST_CR_FINISHED_A,
                     SSL3_ST_CR_FINISHED_B);
