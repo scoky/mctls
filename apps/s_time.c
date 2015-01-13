@@ -9,6 +9,7 @@
 /*-----------------------------------------
    s_time - SSL client connection timer program
    Written and donated by Larry Streepy <streepy@healthcare.com>
+   Modified to support SPP protocol by Matteo Varvello <matteo.varvello@telefonica.com>
   -----------------------------------------*/
 
 #include <stdio.h>
