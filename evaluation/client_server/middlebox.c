@@ -460,8 +460,9 @@ int main(int argc, char **argv){
 
 */
 
-			SSL** ssl_next = NULL;
+			SSL* ssl_next;
 			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
+
 			const char *prxy_address = "127.0.0.1:8423";
 			if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
 				berr_exit("[middlebox] SPP proxy error");
@@ -488,7 +489,7 @@ int main(int argc, char **argv){
 			#ifdef DEBUG
 			printf("[middlebox] SPP_proxy done, staring data handlers \n");
 			#endif
-			handle_data(ssl, *ssl_next);
+			handle_data(ssl, ssl_next);
 
 			// Close socket
     		close(s);
