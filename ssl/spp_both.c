@@ -8,6 +8,40 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
+/* Matteo -- START*/
+// Compute a time difference - NOTE: Return 1 if the difference is negative, otherwise 0
+int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1){
+    long int diff = (t2->tv_usec + 1000000 * t2->tv_sec) - (t1->tv_usec + 1000000 * t1->tv_sec);
+    result->tv_sec = diff / 1000000;
+    result->tv_usec = diff % 1000000;
+
+    return (diff<0);
+}
+
+// Compute a time difference - NOTE: Return 1 if the difference is negative, otherwise 0
+void log_time(char *message, struct timeval *currTime, struct timeval *prevTime, struct timeval *originTime){
+	// Local time passed variables
+	struct timeval tPassed; 
+	struct timeval tPassedBeg;
+
+	// Get current time 
+	gettimeofday(currTime, NULL);	
+
+	// Compute time passed from last 
+	timeval_subtract(&tPassed, currTime, prevTime); 
+
+	// Compute time passed
+	timeval_subtract(&tPassedBeg, currTime, originTime);
+	
+	// Logging	
+	printf("[CURR_TIME=%ld.%06ld TIME_LAST=%ld.%06ld TIME_PASSED=%ld.%06ld]\t%s", (long int)(currTime->tv_sec), (long int)(currTime->tv_usec), (long int)(tPassed.tv_sec), (long int)(tPassed.tv_usec),(long int)(tPassedBeg.tv_sec), (long int)(tPassedBeg.tv_usec), message); 
+	
+	// Update previous time 
+	prevTime = currTime; 
+}
+/* Matteo -- END*/
+
+
 void spp_init_slice(SPP_SLICE *slice) {
     slice->read_ciph = slice->read_mac = slice->write_mac = NULL;
     slice->read_mat_len = slice->other_read_mat_len = slice->write_mat_len = slice->other_write_mat_len = 0;
