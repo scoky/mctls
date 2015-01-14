@@ -182,9 +182,9 @@ SPP_MAC* spp_init_mac_st(SSL* s, SPP_MAC* mac, unsigned char* key, int which) {
         mac->read_hash = EVP_MD_CTX_create();
         //ssl_replace_hash(&(mac->read_hash),NULL);
         memset(&(mac->read_sequence[0]),0,8);
-        OPENSSL_assert(s->s3->read_mac_secret_size <= EVP_MAX_MD_SIZE);
-        memcpy(&(mac->read_mac_secret[0]), key, s->s3->read_mac_secret_size);
-        mac->read_mac_secret_size = s->s3->read_mac_secret_size;
+        mac->read_mac_secret_size = s->s3->tmp.new_mac_secret_size;
+        OPENSSL_assert(mac->read_mac_secret_size <= EVP_MAX_MD_SIZE);
+        memcpy(&(mac->read_mac_secret[0]), key, mac->read_mac_secret_size);
         mac_key = EVP_PKEY_new_mac_key(mac_type, NULL,&(mac->read_mac_secret[0]),mac->read_mac_secret_size);
         EVP_DigestSignInit(mac->read_hash,NULL,m,NULL,mac_key);
         EVP_PKEY_free(mac_key);
@@ -192,9 +192,9 @@ SPP_MAC* spp_init_mac_st(SSL* s, SPP_MAC* mac, unsigned char* key, int which) {
         mac->write_hash = EVP_MD_CTX_create();
         //ssl_replace_hash(&(mac->write_hash),NULL);
         memset(&(mac->write_sequence[0]),0,8);
-        OPENSSL_assert(s->s3->write_mac_secret_size <= EVP_MAX_MD_SIZE);
-        memcpy(&(mac->write_mac_secret[0]), key, s->s3->write_mac_secret_size);
-        mac->write_mac_secret_size = s->s3->write_mac_secret_size;
+        mac->write_mac_secret_size = s->s3->tmp.new_mac_secret_size;
+        OPENSSL_assert(mac->write_mac_secret_size <= EVP_MAX_MD_SIZE);
+        memcpy(&(mac->write_mac_secret[0]), key, mac->write_mac_secret_size);
         mac_key = EVP_PKEY_new_mac_key(mac_type, NULL,&(mac->write_mac_secret[0]),mac->write_mac_secret_size);
         EVP_DigestSignInit(mac->write_hash,NULL,m,NULL,mac_key);
         EVP_PKEY_free(mac_key);

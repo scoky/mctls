@@ -48,7 +48,7 @@ again:
             s->rstate=SSL_ST_READ_BODY;
 
             p=s->packet;
-#if 0
+#if 1
             fprintf(stderr, "Received record header: ");
             spp_print_buffer(p, SPP_RT_HEADER_LENGTH);
 #endif
@@ -135,6 +135,11 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
         goto f_err;
     } */    
     s->read_slice = slice;
+    
+    if (slice != NULL) {
+        printf("encrypted packet:");
+        spp_print_buffer(rr->data, rr->length);
+    }
     /* Send to ssp_enc for decryption. */
     enc_err = s->method->ssl3_enc->enc(s,0);
     
@@ -173,7 +178,7 @@ printf("\n");
         (slice != NULL) &&
         (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
-            //printf("Parsing new MAC\n");
+            printf("Parsing new MAC\n");
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE*3];
             
@@ -202,8 +207,8 @@ printf("\n");
                     goto f_err;
             }
 
-            //printf("packet:");
-            //spp_print_buffer(rr->data, rr->length);
+            printf("decrypted packet:");
+            spp_print_buffer(rr->data, rr->length);
             if (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE) {
                 /* We update the length so that the TLS header bytes
                  * can be constructed correctly but we need to extract
@@ -228,8 +233,8 @@ printf("\n");
             } else {
                 spp_ctx->read_mac = mac;
             }
-            //printf("mac: ");
-            //spp_print_buffer(mac, mac_size);
+            printf("mac: ");
+            spp_print_buffer(mac, mac_size);
             //printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
             mac_size = spp_ctx->mac_length;
             spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
@@ -238,17 +243,15 @@ printf("\n");
             /* Compute the read mac, the only one we must be able to verify. */
             
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
-            //printf("md: ");
-            //spp_print_buffer(md, mac_size);
+            printf("md: ");
+            spp_print_buffer(md, mac_size);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                 enc_err = -1;
-#ifdef TLS_DEBUG
                 printf("Read mac fail, %d\n", i);
-#endif
             }
             if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size) {
                 enc_err = -1;
-                //printf("Record too long\n");
+                printf("Record too long\n");
             }            
             
             /* Compare the write mac to see if there have been any illegal writes. */
@@ -257,9 +260,7 @@ printf("\n");
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
-#ifdef TLS_DEBUG
                     printf("Write mac fail, %d\n", i);
-#endif
                     enc_err = -1; 
                 }
             }
