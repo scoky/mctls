@@ -21,7 +21,7 @@
 #include <pthread.h>            // thread support
 #define KEYFILE "client.pem"    // client certificate
 #define PASSWORD "password"     // unused now 	
-#define DEBUG                 // verbose logging
+//#define DEBUG                 // verbose logging
 #define CONNECT_TIMEOUT 5       // socket connection timeout 
 #define MAX_CONC_CLIENT 100     // max concurrent clients
 
@@ -101,15 +101,6 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies){
 		strcpy(newLine, line);
 		proxies[count] = SPP_generate_proxy(ssl, newLine);
 		count++; 
-		/*
-		#ifdef DEBUG
-		printf("Proxy %d stored has address: %s\r\n", count, proxies[count]->address);
-		int j; 
-		for (j = 0; j < count; j++){
-			printf("Previous proxy was %s\r\n",  proxies[j]->address);
-		}
-		#endif
-		*/
 	}
 	
 	// Close file
@@ -541,7 +532,9 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 		}
 		
 		// Write buf to stdout
+		#ifdef DEBUG
 		fwrite(buf, 1, len, stdout);
+		#endif 
     }
     
 	shutdown:
@@ -573,7 +566,7 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 // Usage function 
 void usage(void){
 	printf("usage: wclient -s -r -w -i -f -o -a\n"); 
-	printf("-s:   number of slices requested\n"); 
+	printf("-s:   number of slices requested (min 2, 1 for handshake 1 for rest)\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
@@ -613,7 +606,8 @@ int main(int argc, char **argv){
 	char *file_action = NULL;              // file action to use for browser-liek behavior
 	struct timeval tvBeginConnect; 
 	struct timeval tvEndConnect; 
-	struct timeval tvBegin, tvEnd, tvDiff; // time structures for handshake duration 
+	struct timeval tvBegin, tvEnd; 
+	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
 
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:")) != -1){
@@ -623,7 +617,7 @@ int main(int argc, char **argv){
 			// Number of slices
 			case 's':
 				if(! (slices_len = atoi(optarg) ))
-					err_exit("Bogus number of slices specified (no. of slices need to be > 0)");
+					err_exit("Bogus number of slices specified (no. of slices need to be > 1)");
 				break;
 		
 			// Number of proxies with read access (per slice)
@@ -683,6 +677,10 @@ int main(int argc, char **argv){
 	if (argc == 1){
 		usage(); 
 	}
+	if ((strcmp(proto, "spp") == 0) && slices_len < 2){
+		printf("No. of slices need to be > 1 (1 for handshake and 1 for data transmission"); 
+		usage(); 
+	}
 	if (action < 1 || action > 4){
 		usage(); 
 	}
@@ -711,15 +709,19 @@ int main(int argc, char **argv){
 	clientID = rand() % MAX_CONC_CLIENT; 
 
 	// Construct string for client/server behavior
-	char *temp_str = "undefined";
-	if (action == 1)
+	char *temp_str; 
+	if (action == 1){
 		temp_str = "handshake_only";  
-	if (action == 2)
+	}
+	if (action == 2){
 		temp_str = "200_OK";  
-	if (action == 3)
+	}
+	if (action == 3){
 		temp_str = "serve_file";	
-	if (action == 4)
+	}
+	if (action == 4){
 		temp_str = "browser_like";	
+	}
 
 	// Logging input parameters 
 	#ifdef DEBUG
@@ -806,7 +808,7 @@ int main(int argc, char **argv){
 	gettimeofday(&tvBeginConnect, NULL);
 	doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
 	gettimeofday(&tvEndConnect, NULL);
-	timeval_subtract(&tvDiff, &tvEndConnect, &tvBeginConnect);
+	timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
 
 	// Switch across possible client-server behavior
 	// // NOTE: here we can add more complex strategies
@@ -818,16 +820,19 @@ int main(int argc, char **argv){
 		// Send simple request, wait for 200 OK
 		case 2:  
 			http_request(file_requested, proto, false);
+			gettimeofday(&tvEnd, NULL);
 			break; 
 
 		// Send HTTP GET request and wait for file to be received
 		case 3:  		
 			http_request(file_requested, proto, true);
+			gettimeofday(&tvEnd, NULL);
 			break; 
 
 		// Send several GET request following a browser-like behavior  
 		case 4:  
 			http_complex(proto, file_action);
+			gettimeofday(&tvEnd, NULL);
 			break; 
  
 		// Unknown option 
@@ -835,7 +840,10 @@ int main(int argc, char **argv){
 			usage();
 			break; 
 	}
-
+	// Compute duration of action
+	if (action > 1){
+		timeval_subtract(&tvDuration, &tvEnd, &tvBeginConnect);
+	}
 
 	// Remove SSL context
     destroy_ctx(ctx);
@@ -851,9 +859,12 @@ int main(int argc, char **argv){
 		free(slice_set[i]); 
 	}
 
-	// Report handshake duration 
-	printf("\nNo_Slices %d Handshake_Dur: %ld.%06ld\n", slices_len, tvDiff.tv_sec, tvDiff.tv_usec);	
-
+	// Report time statistics
+	printf("\n[RESULTS] No_Slices %d Action %s Handshake_Dur %ld.%06ld\n", slices_len, temp_str, tvConnect.tv_sec, tvConnect.tv_usec);	
+	if (action > 1){
+		printf("[RESULTS] No_Slices %d Action %s Duration %ld.%06ld\n", slices_len, temp_str, tvDuration.tv_sec, tvDuration.tv_usec);	
+	}
+	
 	// All good
 	return 0; 
 }

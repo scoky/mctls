@@ -1,10 +1,9 @@
 CC=gcc
-#CFLAG=-g -Wall -static
-# (static give some warnings)
+# with debug 
+#CFLAG=-g -Wall -DDEBUG=1
+#without debug 
 CFLAG=-g -Wall
 LD= -L/usr/local/ssl/lib -lssl -lcrypto -ldl -lpthread
-#LD= -lssl -lcrypto
-# (compile with system-wise libraries)
 
 INCLUDES= -I/usr/local/ssl/include
 CFLAGS= $(INCLUDES) $(CFLAG)
@@ -14,12 +13,12 @@ CFLAGS= $(INCLUDES) $(CFLAG)
 all:  wclient wserver mbox
 
 wclient: wclient.o common.o 
-	$(CC) $(INCLUDES) $(CFLAG) wclient.o  common.o  -o wclient $(LD)
+	$(CC) $(CFLAGS) wclient.o  common.o  -o wclient $(LD)
 wserver:  wserver.o common.o 
-	#$(CC) wserver.o  common.o -o wserver $(LD)
-	$(CC) $(INCLUDES) $(CFLAG) wserver.o  common.o  -o wserver $(LD)
+	$(CC) $(CFLAGS) wserver.o  common.o  -o wserver $(LD)
 mbox: middlebox.o common.o 
-	$(CC) $(INCLUDES) $(CFLAG) middlebox.o  common.o  -o mbox $(LD)
+	$(CC) $(CFLAGS) middlebox.o  common.o  -o mbox $(LD)
+
 clean:	
 	rm *.o wclient wserver mbox
 
