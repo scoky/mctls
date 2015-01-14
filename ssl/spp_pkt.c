@@ -135,12 +135,27 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
         goto f_err;
     } */    
     s->read_slice = slice;
-#ifdef DEBUG
+    
+    /* Setup up the ctx for this read 
+     * provided that it is for a slice. */
     if (slice != NULL) {
+#ifdef DEBUG
         printf("encrypted packet:");
         spp_print_buffer(rr->data, rr->length);
-    }
 #endif
+        /* If we are not a proxy, use temporary state. */
+        if (s->proxy == 1) {
+            spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
+        } else {        
+            spp_ctx = &(ctx_tmp);
+        }
+        spp_ctx->mac_length=0;
+        spp_ctx->integrity_mac=spp_ctx->read_mac=spp_ctx->write_mac=NULL;
+        s->spp_read_ctx = spp_ctx;
+    } else {
+        s->spp_read_ctx = NULL;
+    }
+    
     /* Send to ssp_enc for decryption. */
     enc_err = s->method->ssl3_enc->enc(s,0);
     
@@ -160,12 +175,6 @@ printf("dec %d\n",rr->length);
 printf("\n");
 #endif
     
-    if (s->proxy == 1) {
-        spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
-    } else {        
-        spp_ctx = &(ctx_tmp);
-    }
-    s->spp_read_ctx = spp_ctx;
     /*if (slice != NULL) {
         printf("Slice not NULL\n");
         if (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL) {

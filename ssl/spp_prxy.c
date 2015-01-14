@@ -213,7 +213,7 @@ int get_proxy_msg(SSL *s, int st1, int stn, int msg, int forward) {
         &ok);
     if (!ok) return n;
     //printf("Got handshake message, len=%d, type=%d\n", n, s->s3->tmp.message_type);
-    spp_print_buffer(s->init_msg, s->init_num);
+    //spp_print_buffer(s->init_msg, s->init_num);
     if (forward)
         return spp_forward_message(s->other_ssl, s);
     return 1;
@@ -237,7 +237,7 @@ long spp_get_finished(SSL *s, int st1, int stn)
                 s->init_off=0;
                 
                 //printf("Received finished: ");
-                spp_print_buffer(p, s->init_num);       
+                //spp_print_buffer(p, s->init_num);       
                 
                 if (s->s3->change_cipher_spec) {
                     break;

@@ -795,7 +795,6 @@ int tls1_enc(SSL *s, int send)
 			i=bs-((int)l%bs);
 
 			/* Add weird padding of upto 256 bytes */
-
 			/* we need to add 'i' padding bytes of value j */
 			j=i-1;
 			if (s->options & SSL_OP_TLS_BLOCK_PADDING_BUG)
@@ -803,6 +802,7 @@ int tls1_enc(SSL *s, int send)
 				if (s->s3->flags & TLS1_FLAGS_TLS_PADDING_BUG)
 					j++;
 				}
+                        printf("Padding with %d bytes of %d\n", i, j);
 			for (k=(int)l; k<(int)(l+i); k++)
 				rec->input[k]=j;
 			l+=i;
