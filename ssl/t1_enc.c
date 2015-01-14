@@ -802,7 +802,7 @@ int tls1_enc(SSL *s, int send)
 				if (s->s3->flags & TLS1_FLAGS_TLS_PADDING_BUG)
 					j++;
 				}
-                        printf("Padding with %d bytes of %d\n", i, j);
+                        //printf("Padding with %d bytes of %d\n", i, j);
 			for (k=(int)l; k<(int)(l+i); k++)
 				rec->input[k]=j;
 			l+=i;
