@@ -53,8 +53,10 @@ int tcp_connect(char *host, int port){
 		berr_exit("Couldn't resolve host");
 	}
 	#ifdef DEBUG
-	printf("Host resolved\n"); 
+	printf("Host %s resolved to %s port %d\n",  host,  hp->h_addr_list[0], port);
 	#endif
+
+
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_addr = *(struct in_addr*)
@@ -277,6 +279,9 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 	
     int r,w, status; 
 	char buf[BUFSIZZ];
+	SPP_SLICE *slice;       
+	SPP_CTX *ctx;   
+
 
 	// Read HTTP GET (assuming a single read is enough)
 	while(1){
@@ -289,9 +294,7 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 
 
 		if (strcmp(proto, "spp") == 0)
-		{
-			SPP_SLICE *slice;       
-			SPP_CTX *ctx;           
+		{        
 			r = SPP_read_record(prev_ssl, buf, BUFSIZZ, &slice, &ctx);
 		}
 		else 
@@ -320,7 +323,8 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		#endif
 
 		if (strcmp(proto, "spp") == 0) {
-			w = SPP_write_record(next_ssl, buf, r, next_ssl->slices[0]);
+			//w = SPP_write_record(next_ssl, buf, r, next_ssl->slices[0]);
+			w = SPP_forward_record(next_ssl, buf,r , slice, ctx, 0);
 			check_SSL_write_error(next_ssl, w, r); 
 		}
 		else
@@ -346,7 +350,8 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 {  
     int r,w,status ; 
 	char buf[BUFSIZZ];
-
+	SPP_SLICE *slice;       
+	SPP_CTX *ctx; 
 	// Read HTTP GET (assuming a single read is enough)
 	while(1){
 		#ifdef DEBUG
@@ -355,8 +360,6 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 
 		if (strcmp(proto, "spp") == 0)
 		{
-			SPP_SLICE *slice;       
-			SPP_CTX *ctx;           
 			r = SPP_read_record(next_ssl, buf, BUFSIZZ, &slice, &ctx);
 		}
 		else 
@@ -385,7 +388,7 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		#endif
 
 		if (strcmp(proto, "spp") == 0) {
-			w = SPP_write_record(prev_ssl, buf, r, prev_ssl->slices[0]);
+			w = SPP_forward_record(prev_ssl, buf,r , slice, ctx, 0);
 			check_SSL_write_error(prev_ssl, w, r); 
 		}
 		else
@@ -565,7 +568,7 @@ int main(int argc, char **argv){
 			{
 
 				SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
-				char *prxy_address = "127.0.0.1:8423";
+				char *prxy_address = strdup("127.0.0.1:8423");
 				if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
 					berr_exit("[middlebox] SPP proxy error");
 				} else {
