@@ -821,8 +821,10 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
         s->init_num=n+4;
         s->init_off=0;
         
+#ifdef DEBUG
         printf("Sending proxy key material\n");
         spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
+#endif
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
@@ -894,8 +896,10 @@ int spp_send_end_key_material(SSL *s) {
         s->init_num=n+4;
         s->init_off=0;
 
+#ifdef DEBUG
         printf("Sending end key material, n=%d\n", n);
         spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
+#endif
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */

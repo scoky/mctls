@@ -562,14 +562,14 @@ int main(int argc, char **argv){
 			SSL_set_bio(ssl, sbio, sbio);
 
 
-			SSL** ssl_next = NULL;
+			SSL* ssl_next = NULL;
 
 			if (strcmp(proto, "spp") == 0)
 			{
 
 				SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
 				char *prxy_address = strdup("127.0.0.1:8423");
-				if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
+				if ((r = SPP_proxy(ssl, prxy_address, connect_func, &ssl_next)) <= 0) {
 					berr_exit("[middlebox] SPP proxy error");
 				} else {
 					#ifdef DEBUG            
@@ -591,7 +591,7 @@ int main(int argc, char **argv){
 				ssl_next = &new_connection;
 			}
 
-			handle_data(ssl, *ssl_next, proto);
+			handle_data(ssl, ssl_next, proto);
 
 			// Close socket and exit child thread
     		close(s);

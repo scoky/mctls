@@ -405,7 +405,9 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *buf, unsigned c
             /* Now write all of the proxies. */
             s1n(s->proxies_len, ret);
             for (i = 0; i < s->proxies_len; i++) {
+#ifdef DEBUG
                 printf("Extension writing proxy %d, %s\n", s->proxies[i]->proxy_id, s->proxies[i]->address);
+#endif
                 s1n(s->proxies[i]->proxy_id, ret);
                 
                 char_len=strlen(s->proxies[i]->address);
@@ -1137,8 +1139,9 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                         memcpy(s->proxies[i]->address, sdata, char_len);
                         s->proxies[i]->address[char_len] = '\0';
                         sdata += char_len;
-                        
+#ifdef DEBUG
                         printf("Extension reading proxy %d, %s\n", s->proxies[i]->proxy_id, s->proxies[i]->address);
+#endif
                         
                         n1s(sdata, s->proxies[i]->read_slice_ids_len);
                         for (x = 0; x < s->proxies[i]->read_slice_ids_len; x++) {

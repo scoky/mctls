@@ -146,12 +146,14 @@ int spp_initialize_ssl(SSL *s, SSL *n) {
     n->session = s->session;
     
     /* Copy proxies and slices */
+    n->proxies_len = s->proxies_len;
     for (i = 0; i < s->proxies_len; i++) {
         n->proxies[i] = (SPP_PROXY*)malloc(sizeof(SPP_PROXY));
         spp_init_proxy(n->proxies[i]);
         n->proxies[i]->proxy_id = s->proxies[i]->proxy_id;
         n->proxies[i]->address = s->proxies[i]->address;
     }
+    n->slices_len = s->slices_len;
     for (i = 0; i < s->slices_len; i++) {
         n->slices[i] = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
         spp_init_slice(n->slices[i]);
@@ -537,6 +539,7 @@ int get_proxy_material(SSL *s, int server) {
     
     return 1;
 err:
+                        printf("Error reading proxy key material\n");
     return(-1);
 }
 
@@ -1009,6 +1012,9 @@ int spp_proxy_accept(SSL *s) {
                     ret= -1;
                     goto end;
                 }*/ /* Done when receiving the change cipher spec message */
+                next_st->session->cipher=s->s3->tmp.new_cipher;
+                if (!next_st->method->ssl3_enc->setup_key_block(next_st))
+                        { ret= -1; goto end; }
                 if (!next_st->method->ssl3_enc->change_cipher_state(next_st, SSL3_CHANGE_CIPHER_CLIENT_WRITE)) {
                     ret= -1;
                     goto end;
@@ -1034,6 +1040,9 @@ int spp_proxy_accept(SSL *s) {
                 s->s3->tmp.next_state=SSL_ST_OK;
                 s->state=SSL3_ST_SW_FLUSH;
                 
+                s->session->cipher=s->s3->tmp.new_cipher;
+                if (!s->method->ssl3_enc->setup_key_block(s))
+                        { ret= -1; goto end; }
                 if (!s->method->ssl3_enc->change_cipher_state(s, SSL3_CHANGE_CIPHER_SERVER_WRITE)) {
                     ret= -1;
                     goto end;

@@ -512,7 +512,6 @@ start:
                                     ssl3_release_read_buffer(s);
                             }
                     }
-            printf("Normal return n=%d\n", n);
             return(n);
             }
 

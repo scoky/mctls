@@ -464,8 +464,10 @@ long ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 					}
 				s->init_num+=i;
 				}
+#ifdef DEBUG
                         printf("Received header: ");
                         spp_print_buffer(p, 4);
+#endif
 			
 			skip_message = 0;
 			if (!s->server)
