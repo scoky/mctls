@@ -414,7 +414,7 @@ int spp_connect(SSL *s) {
             case SSL3_ST_CW_FINISHED_B:
                 // Logging with time information 
 				#ifdef DEBUG
-				log_time("Sending finished\n", &currTime, &prevTime, &originTime); 		
+				log_time("Sending client finished\n", &currTime, &prevTime, &originTime); 		
 				#endif
                 ret=ssl3_send_finished(s,
                     SSL3_ST_CW_FINISHED_A,SSL3_ST_CW_FINISHED_B,
@@ -452,6 +452,9 @@ int spp_connect(SSL *s) {
 #ifndef OPENSSL_NO_TLSEXT
             case SSL3_ST_CR_SESSION_TICKET_A:
             case SSL3_ST_CR_SESSION_TICKET_B:
+                                #ifdef DEBUG
+				log_time("Receiving session ticket\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=ssl3_get_new_session_ticket(s);
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_FINISHED_A;
@@ -460,6 +463,9 @@ int spp_connect(SSL *s) {
 
             case SSL3_ST_CR_CERT_STATUS_A:
             case SSL3_ST_CR_CERT_STATUS_B:
+                                #ifdef DEBUG
+				log_time("Receiving cert status\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=ssl3_get_cert_status(s);
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
@@ -471,7 +477,7 @@ int spp_connect(SSL *s) {
             case SSL3_ST_CR_FINISHED_B:
                 // Logging with time information 
 				#ifdef DEBUG
-				log_time("Receiving finished\n", &currTime, &prevTime, &originTime); 		
+				log_time("Receiving server finished\n", &currTime, &prevTime, &originTime); 		
 				#endif
                 s->s3->flags |= SSL3_FLAGS_CCS_OK;
                 ret=ssl3_get_finished(s,SSL3_ST_CR_FINISHED_A,
@@ -497,6 +503,9 @@ int spp_connect(SSL *s) {
                 break;
 
             case SSL_ST_OK:
+                                #ifdef DEBUG
+				log_time("Handshake OK\n", &currTime, &prevTime, &originTime); 
+				#endif
                 /* clean a few things up */
                 ssl3_cleanup_key_block(s);
 

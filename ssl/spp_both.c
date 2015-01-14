@@ -1004,7 +1004,10 @@ err:
 
 void spp_print_buffer(unsigned char *buf, int len) {
     while (len-- > 0) {
-        printf("[%x]",(*(buf++))&0xff);
+        if (len == 0)
+            printf("%x",(*(buf++))&0xff);
+        else
+            printf("%x:",(*(buf++))&0xff);
     }
     printf("\n");
 }

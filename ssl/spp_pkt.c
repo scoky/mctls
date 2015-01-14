@@ -48,7 +48,7 @@ again:
             s->rstate=SSL_ST_READ_BODY;
 
             p=s->packet;
-#if 1
+#if DEBUG
             fprintf(stderr, "Received record header: ");
             spp_print_buffer(p, SPP_RT_HEADER_LENGTH);
 #endif
@@ -135,11 +135,12 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
         goto f_err;
     } */    
     s->read_slice = slice;
-    
+#ifdef DEBUG
     if (slice != NULL) {
         printf("encrypted packet:");
         spp_print_buffer(rr->data, rr->length);
     }
+#endif
     /* Send to ssp_enc for decryption. */
     enc_err = s->method->ssl3_enc->enc(s,0);
     
@@ -178,7 +179,9 @@ printf("\n");
         (slice != NULL) &&
         (EVP_MD_CTX_md(slice->read_mac->read_hash) != NULL)) {
             /* s->read_hash != NULL => mac_size != -1 */
-            printf("Parsing new MAC\n");
+#ifdef DEBUG
+            printf("Parsing 3MAC\n");
+#endif
             unsigned char *mac = NULL;
             unsigned char mac_tmp[EVP_MAX_MD_SIZE*3];
             
@@ -206,9 +209,10 @@ printf("\n");
                     SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_LENGTH_TOO_SHORT);
                     goto f_err;
             }
-
+#ifdef DEBUG
             printf("decrypted packet:");
             spp_print_buffer(rr->data, rr->length);
+#endif
             if (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE) {
                 /* We update the length so that the TLS header bytes
                  * can be constructed correctly but we need to extract
@@ -233,8 +237,10 @@ printf("\n");
             } else {
                 spp_ctx->read_mac = mac;
             }
+#ifdef DEBUG
             printf("mac: ");
             spp_print_buffer(mac, mac_size);
+#endif
             //printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
             mac_size = spp_ctx->mac_length;
             spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
@@ -243,15 +249,17 @@ printf("\n");
             /* Compute the read mac, the only one we must be able to verify. */
             
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
+#ifdef DEBUG
             printf("md: ");
             spp_print_buffer(md, mac_size);
+#endif
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                 enc_err = -1;
-                printf("Read mac fail, %d\n", i);
+                printf("Read MAC failed!\n");
             }
             if (rr->length > SSL3_RT_MAX_COMPRESSED_LENGTH+extra+mac_size) {
                 enc_err = -1;
-                printf("Record too long\n");
+                printf("Record too long!\n");
             }            
             
             /* Compare the write mac to see if there have been any illegal writes. */
@@ -260,8 +268,8 @@ printf("\n");
                 mac = spp_ctx->write_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
                 if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
-                    printf("Write mac fail, %d\n", i);
-                    enc_err = -1; 
+                    printf("Write MAC failed!\n");
+                    //enc_err = -1; 
                 }
             }
             /* Compare the end-to-end integrity mac to see if there have been any writes at all */
@@ -269,8 +277,10 @@ printf("\n");
                 spp_copy_mac_state(s, s->i_mac, 0);
                 mac = spp_ctx->integrity_mac;
                 i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
-                if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
+                if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0) {
                     enc_err = 0;    /* This is not a fatal error. Just important information to know. Expose it somehow to the application */
+                    printf("Integrity MAC failed!\n");
+                }
             }
     } else if ((sess != NULL) &&
         (s->enc_read_ctx != NULL) &&
