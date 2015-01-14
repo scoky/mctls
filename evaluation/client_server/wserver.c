@@ -22,7 +22,7 @@
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
 #include <openssl/e_os2.h>
-#define DEBUG
+//#define DEBUG
 #define MAX_PACKET 16384 
 
 static char *strategy = "uni";
@@ -163,7 +163,9 @@ void splitting (SSL *ssl, char *request, int request_len){
 		#endif
     	memset(dest, 0, inc);
 		memcpy(dest, request + beginIndex,  inc); 
+		#ifdef DEBUG
 		printf("%s\n", dest); 
+		#endif 
 		int r = SPP_write_record(ssl, dest, inc, ssl->slices[i]);
 		check_SSL_write_error(ssl, r, inc);
 		
@@ -211,7 +213,7 @@ void sendData(SSL *ssl, char *request, char *proto, int request_len){
 // Simple test for SPP handshake 
 static int http_simple_response(SSL *ssl, int s, char *proto){
 
-	int N_proxies, N_slices, i; 
+	int i; 
 
 	#ifdef DEBUG
 	printf("[DEBUG] HTTP test simple response\n"); 
@@ -222,14 +224,12 @@ static int http_simple_response(SSL *ssl, int s, char *proto){
 
 	if (strcmp(proto, "spp") == 0){
 		// Print proxies
-		N_proxies = ssl->proxies_len; 
-		for (i = 0; i < N_proxies; i++){
+		for (i = 0; i < ssl->proxies_len; i++){
 			printf("\t[DEBUG] Proxy: %s\n", ssl->proxies[i]->address); 
 		}
 
 		// print slices
-		N_slices = ssl->slices_len; 
-		for (i = 0; i < N_slices; i++){
+		for (i = 0; i < ssl->slices_len; i++){
 			printf("\t[DEBUG] Slice with ID %d and purpose %s\n", ssl->slices[i]->slice_id, ssl->slices[i]->purpose); 
 		}
 	}
@@ -298,7 +298,9 @@ int serveData(SSL *ssl, int data_size, char *proto){
 		//Allocate buffer with size to sens and fill with zeros
 		char *buf = (char*) malloc(sizeof(char) * toSend);
 		memset(buf, '!', sizeof(char) * toSend);	
+		#ifdef DEBUG
 		printf ("[DEBUG] Buffer=\n%s\n", buf); 
+		#endif 
 		
 		// Send <<buf>> on SPP/SSL connection 
 		if (strcmp(proto, "spp") == 0){
@@ -312,7 +314,9 @@ int serveData(SSL *ssl, int data_size, char *proto){
 		// Update how much content is still to send 
 		still_to_send -= toSend;
 		if (still_to_send == 0){
+			#ifdef DEBUG
 			printf ("[DEBUG] No more data to send\n"); 
+			#endif 
 			break; 	
 		}
 
@@ -765,7 +769,7 @@ void usage(void){
 
 // Main function  
 int main(int argc, char **argv){
-	int sock, s;
+	int sock, newsock;                 // socket descriptors 
 	BIO *sbio;
 	SSL_CTX *ctx;
 	SSL *ssl;
@@ -818,7 +822,7 @@ int main(int argc, char **argv){
 		temp_str = "200_OK";  
 	if (action == 3)
 		temp_str = "serve_file";  
-	printf("[DEBUG] proto=%s; action=%d (%s)\n", proto, action, temp_str); 
+	printf("\t[DEBUG] proto=%s; action=%d (%s)\n", proto, action, temp_str); 
 	#endif 
 
 	// Build SSL context
@@ -831,27 +835,33 @@ int main(int argc, char **argv){
 	// Wait for client request 
 	while(1){
 		#ifdef DEBUG
-		printf("[DEBUG] Waiting on accept...\n"); 
+		printf("[DEBUG] Waiting on TCP accept...\n"); 
 		#endif
-		if((s = accept(sock, 0, 0)) < 0){
+		if((newsock = accept(sock, 0, 0)) < 0){
 			err_exit("Problem socket accept\n");
 		}else{
 			#ifdef DEBUG
 			printf("[DEBUG] Accepted new connection %d\n", sock); 
 			#endif
 		}
-		// fork a new proces 
-		if((pid = fork())){
+
+		// Fork a new process
+		pid = fork(); 
+		if (pid != 0){
+			/* In parent process */
+			if (pid == -1) {
+				berr_exit("FORK error"); 
+				return 1;
+           	}
 			#ifdef DEBUG
-			printf("[DEBUG] Parent process close socket (PID=%d)\n", pid); 
+			printf("[DEBUG] parent process close old socket (why?)and operate on new one\n");
 			#endif
-			close(s);
-		} else {
-			sbio = BIO_new_socket(s, BIO_NOCLOSE);
+			close(sock);
+			sbio = BIO_new_socket(newsock, BIO_NOCLOSE);
 			ssl = SSL_new(ctx);
 			SSL_set_bio(ssl, sbio, sbio);
-
-			// SSL Accept 
+			
+			// Wait on SSL Accept 
 			if((r = SSL_accept(ssl) <= 0)){
 				berr_exit("SSL accept error");
 			} else {
@@ -863,57 +873,54 @@ int main(int argc, char **argv){
 				}
 				#endif
 			}
-   			
+  			
 			// Switch across possible client-server behavior 
 			// NOTE: here we can add more complex strategies
 			switch(action){
-
 				// Handshake only 
-				case 1: 
-					break; 
-
-				// Respond with 200 OK
-				case 2: 
-					http_simple_response(ssl, s, proto);
-					break; 
-
-				// Serve some content 
-				case 3: 
-					http_serve_request(ssl, s, proto, true, action);
-					break;
+				case 1: break; 
 				
+				// Respond with 200 OK
+				case 2: http_simple_response(ssl, newsock, proto);
+						break; 
+				
+				// Serve some content 
+				case 3: http_serve_request(ssl, newsock, proto, true, action);
+						break;
+			
 				// Serve a browser like behavior 
-				case 4:
-					/* NOTE
-					* This can only serve one connection at a time. 
-					* Here we would need to fire a new thread 
-					* (or re-think the code) to support multiple SSL connections 
-					*/
-					while(1){
-						if (http_serve_request(ssl, s, proto, false, action) < 0){
-							break; 
+				// NOTE
+				// This can only serve one connection at a time. 
+				// Here we would need to fire a new thread 
+				// (or re-think the code) to support multiple SSL connections 
+				case 4: while(1){
+							if (http_serve_request(ssl, newsock, proto, false, action) < 0){
+								break; 
+							}
 						}
-					}
-					break;
- 
-				// Unknown option 
-				default: 
-					usage();
-					break; 
-			} 
+						break;
 
-		/* exit from process forked -- THIS CAUSE PREMATURE CLOSE ON CLIENT SIDE? 
-		#ifdef DEBUG
-		printf("[DEBUG] Exit from forked process\n"); 
-		#endif
-		exit(0);
-		*/
+				// Unknown option 
+				default: usage();
+						 break; 
+			}
+			// Correctly end child process
+			#ifdef DEBUG
+			printf("[DEBUG] End parent process (prevent zombies)\n");
+			#endif
+			exit(0);  
+			// return 0 
+		}else{
+			#ifdef DEBUG
+			printf("[DEBUG] child process close new socket (why?)\n");
+			#endif
+			close(newsock); 
 		}
 	}
 	
-// Clean context
-destroy_ctx(ctx);
+	// Clean context
+	destroy_ctx(ctx);
 	
-// Exit
-exit(0);
+	// Correctly end parent process
+	exit(0); 
 }
