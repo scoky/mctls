@@ -296,6 +296,7 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		if (strcmp(proto, "spp") == 0)
 		{        
 			r = SPP_read_record(prev_ssl, buf, BUFSIZZ, &slice, &ctx);
+			fprintf(stderr, "[middlebox-p] Read %d bytes from previous hop\n", r);
 		}
 		else 
 		{
@@ -361,6 +362,7 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		if (strcmp(proto, "spp") == 0)
 		{
 			r = SPP_read_record(next_ssl, buf, BUFSIZZ, &slice, &ctx);
+			fprintf(stderr, "[middlebox-p] Read %d bytes from next hop\n", r);
 		}
 		else 
 		{

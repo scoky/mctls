@@ -167,6 +167,9 @@ void splitting (SSL *ssl, char *request, int request_len){
 		printf("%s\n", dest); 
 		#endif 
 		int r = SPP_write_record(ssl, dest, inc, ssl->slices[i]);
+		#ifdef DEBUG
+		printf("Wrote %d bytes\n", r);
+		#endif
 		check_SSL_write_error(ssl, r, inc);
 		
 		// Move pointers
@@ -520,6 +523,10 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 			SPP_SLICE *slice;       
 			SPP_CTX *ctx;           
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
+		#ifdef DEBUG
+		printf("Read %d bytes\n", r);
+		#endif
+
 		}
 	
 		if (strcmp(proto, "ssl") == 0){

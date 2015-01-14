@@ -281,6 +281,9 @@ void sendRequest(char *filename){
 		int i; 
 		for (i = 0; i < ssl->slices_len; i++){
 			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
+			#ifdef DEBUG
+			printf("Wrote %d bytes\n", r);
+			#endif
 			check_SSL_write_error(r, request_len); 
 		}
 	} 
@@ -400,6 +403,9 @@ static int http_complex(char *proto, char *fn){
 			SPP_SLICE *slice;		// slice for SPP_read
 			SPP_CTX *ctx;			// context pointer for SPP_read
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
+			#ifdef DEBUG
+			printf("Read %d bytes\n", r);
+			#endif
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					break;
@@ -491,6 +497,9 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 			SPP_SLICE *slice;		// slice for SPP_read
 			SPP_CTX *ctx;			// context pointer for SPP_read
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
+			#ifdef DEBUG
+			printf("Read %d bytes\n", r);
+			#endif
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					len = r;
