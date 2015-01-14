@@ -8,8 +8,8 @@
 
 #define DEBUG
 #define MIDDLEBOX_PORT 8423
-
-int tcp_listen()
+ 
+int tcp_listen(int port)
   {
     int sock;
     struct sockaddr_in sin;
@@ -22,7 +22,7 @@ int tcp_listen()
     memset(&sin,0,sizeof(sin));
     sin.sin_addr.s_addr=INADDR_ANY;
     sin.sin_family=AF_INET;
-    sin.sin_port=htons(MIDDLEBOX_PORT);
+    sin.sin_port=htons(port);
     setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,
       &val,sizeof(val));
     
@@ -32,7 +32,7 @@ int tcp_listen()
     listen(sock,5);  
 
     #ifdef DEBUG
-	printf("Listening at port: %d\n", MIDDLEBOX_PORT); 
+	printf("Listening at port: %d\n", port); 
 	#endif
 
     return(sock);
@@ -150,15 +150,55 @@ static int print_ssl_debug_info(SSL *ssl){
 
 
 
-// Usage function 
-void usage(void){
-	printf("usage: wserver -f \n");
-	printf("-f:   protocol requested: ssl, spp.\n");
-	exit(-1);
+
+//this creates a new outgoing SSL connection. If method = SSL it also runs SSL_connect
+SSL* create_SSL_connection(char *address, char* method){
+	#ifdef DEBUG
+    printf("Creating new ssl/spp conection to: %s\n", address);
+    #endif
+
+	SSL_CTX *ctx;							// SSL context
+	SSL *new_ssl;								// SSL context
+	BIO *sbio;								// ?
+	int sock;								// socket
+	char* ipv4 = strtok(strdup(address), ":");	// ip
+    int port = atoi(strtok(NULL, ":"));	// port 
+
+
+    #ifdef DEBUG
+    printf("Connecting to next hop: %s %d\n", ipv4, port);
+    #endif
+
+	ctx = initialize_ctx(KEYFILE, PASSWORD, method);
+	new_ssl = SSL_new(ctx);
+	sock = tcp_connect(ipv4, port);
+	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
+    SSL_set_bio(new_ssl, sbio, sbio);
+
+    //also run connect for ssl (we do not run this when the callback is used for SPP)
+    if (strcmp(method, "ssl")==0)
+    {
+    	#ifdef DEBUG
+    	printf("SSL CONNECT\n");
+    	#endif
+    	if(SSL_connect(new_ssl) <= 0)
+			berr_exit("SSL connect error");
+    	#ifdef DEBUG
+    	printf("SSL CONNECTED\n");
+    	#endif
+
+    }
+
+    return new_ssl;
 }
 
 
 
+
+
+/*
+TODO: replace the content of this with the call to the function above (create_SSL_connection)
+*/
 
 SSL* SPP_Callback(SSL *ssl, char *address){
 	#ifdef DEBUG
@@ -194,71 +234,48 @@ SSL* SPP_Callback(SSL *ssl, char *address){
 
 
 
-/*
-For testing purposes only,
-this will overwrite the ssl connection struct with valid values, 
-till the protocol is ready... 
-
-DELETE WHEN SPP IS READY
-*/ 
-SSL* fake_SPP_connection(SSL *ssl)
+int shut_down_connections(SSL* ssl)
 {
-	printf("[middlebox] ******\nWARNING: FAKING callback!\n********\n\n");
-
-	//setup end server info...
-	char next_hop_address[] = "127.0.0.1:4433"; //the address of the next hp. this should be given by the call-back...
-   
-	//fake callback...
-	SSL* next_ssl = SPP_Callback(ssl, next_hop_address);
+	int r;
+	int socket;
 
 	#ifdef DEBUG
-	printf("[middlebox] DONE Callback...\n FAKING CONNECTION\n");
-	#endif 
-	/* we might need to fake the connect call too */
-
-
-	// Create slices_n slices with incremental purpose 
-
-	// SPP CONNECT 
-	//only for fakeing...
-
-
-
-	SPP_PROXY *proxies[0];
-	SPP_SLICE *slice_set[1];
-	char *newPurpose;  
-	char str[30]; 
-	sprintf (str, "slices_%d", 0); 
-	newPurpose = (char *)malloc(strlen(str));    
-	strcpy(newPurpose, str);
-
-	slice_set[0] = SPP_generate_slice(next_ssl, newPurpose); 
-
-	#ifdef DEBUG
-	printf("[DEBUG] Generated slices %d with purpose %s\n", slice_set[0]->slice_id, slice_set[0]->purpose); 
+	printf("[middlebox ] Shutting down  connection!\n");
 	#endif
 
-	SPP_assign_proxy_read_slices(next_ssl, proxies[0], slice_set, 1);
-	#ifdef DEBUG
-	printf("[middlebox] SPP_connect to next hop... (this should be removed when library is ready)\n");
-	#endif 
-	
-	if (SPP_connect(next_ssl, slice_set, 1, proxies, 0) <= 0){
-			berr_exit("[middlebox] SPP connect error");
+
+	// Shutdown SSL - TO DO (check what happens here) 
+
+
+	r = SSL_shutdown(ssl);
+	if (r == 0)
+	{
+		shutdown(SSL_get_fd(ssl), SHUT_WR);
+		r = SSL_shutdown(ssl);
 	}
-	
-	#ifdef DEBUG
-	printf("[middlebox] SPP_connect SUCCEDED\n");
-	#endif 
-	
-	return next_ssl;
+	// Verify that all went good 
+	switch(r){  
+		case 1:
+		 	printf("Closed  connection \n");
+       		break; // Success
+		case 0:
+		case -1:
+		default: // Error 
+			printf("[middlebox-p] Shutdown failed\n");
+	}
+
+	socket =  SSL_get_fd(ssl);
+	close(socket);
+    
+    return 0;
 }
 
 
-int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
+
+int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 {  
 	
-    int r,w; 
+    int r,w, status; 
 	char buf[BUFSIZZ];
 
 	// Read HTTP GET (assuming a single read is enough)
@@ -268,28 +285,49 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
 		#ifdef DEBUG
 		printf("[middlebox-p] Waiting to read data from previous hop\n");
 		#endif
-		SPP_SLICE *slice;       
-		SPP_CTX *ctx;           
-		r = SPP_read_record(prev_ssl, buf, BUFSIZZ, &slice, &ctx);
-		#ifdef DEBUG
-		printf("[middlebox-p] Got data from previous hop!\n");
-		#endif
 
 
-		if (SSL_get_error(prev_ssl, r) == SSL_ERROR_NONE){
-		} else {
-			berr_exit("[middlebox-p] SSL read problem (from previous hop)");
+
+		if (strcmp(proto, "spp") == 0)
+		{
+			SPP_SLICE *slice;       
+			SPP_CTX *ctx;           
+			r = SPP_read_record(prev_ssl, buf, BUFSIZZ, &slice, &ctx);
 		}
+		else 
+		{
+			r = SSL_read(prev_ssl, buf, BUFSIZZ);
+		}
+
+
+		status = SSL_get_error(prev_ssl, r);
+		if (status ==  SSL_ERROR_ZERO_RETURN || status ==  SSL_ERROR_SYSCALL ){
+			#ifdef DEBUG
+			fprintf(stderr, "[middlebox-p] Connection with previous hop closed, exiting next hop thread\n");
+			#endif
+			break;
+		}
+		else if  (status != SSL_ERROR_NONE){
+			berr_exit("[middlebox-p] SSL read problem");
+		}
+
 		
 		#ifdef DEBUG
-		printf("[middlebox-p] Request received (from previous hop) (length %d bytes):\n", r); 
-		printf("****\n%s\n***\n", buf); 
-
+		printf("[middlebox-p] Data received (from previous hop) (length %d bytes):\n*****\n", r); 
+		fwrite(buf, 1, r, stdout);
+		printf("\n******\n"); 
 		printf("[middlebox-p] Forwarding record to  next hop\n"); 
 		#endif
 
-
-		w = SPP_write_record(next_ssl, buf, r, next_ssl->slices[0]);
+		if (strcmp(proto, "spp") == 0) {
+			w = SPP_write_record(next_ssl, buf, r, next_ssl->slices[0]);
+			check_SSL_write_error(next_ssl, w, r); 
+		}
+		else
+		{
+			w = SSL_write(next_ssl, buf, r);
+			check_SSL_write_error(next_ssl, w, r); 
+		}
 
 		//Look for the blank line that signals the end of the HTTP header
 		if(r == 0 ){
@@ -297,90 +335,78 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl)
 		}
 	}
 
-	#ifdef DEBUG
-	printf("[middlebox-p] Shutting down previous hop handler thread!\n");
-	#endif
-	// Shutdown SSL - TO DO (check what happens here) 
-	r = SSL_shutdown(prev_ssl);
-
-	// Verify that all went good 
-	switch(r){  
-		case 1:
-       		break; // Success
-		case 0:
-		case -1:
-		default: // Error 
-			berr_exit("[middlebox-p] Shutdown failed");
-	}
-
-	// free SSL 
-    SSL_free(prev_ssl);
+	//shut_down_connections(prev_ssl);
+	SSL_free(prev_ssl);
 	// All good 
     return(0);
 }
 
 
-int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
+int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 {  
-    int r,w ; 
+    int r,w,status ; 
 	char buf[BUFSIZZ];
 
 	// Read HTTP GET (assuming a single read is enough)
 	while(1){
-
-
 		#ifdef DEBUG
 		printf("[middlebox-n] Waiting to read data from next hop\n");
 		#endif
-		SPP_SLICE *slice;       
-		SPP_CTX *ctx;           
-		r = SPP_read_record(next_ssl, buf, BUFSIZZ, &slice, &ctx);
-		#ifdef DEBUG
-		printf("[middlebox-n] Got data from next hop!\n");
-		#endif
 
-
-		if (SSL_get_error(next_ssl, r) == SSL_ERROR_NONE){
-		} else {
-			berr_exit("[middlebox-n] SSL read problem (from next hop)");
+		if (strcmp(proto, "spp") == 0)
+		{
+			SPP_SLICE *slice;       
+			SPP_CTX *ctx;           
+			r = SPP_read_record(next_ssl, buf, BUFSIZZ, &slice, &ctx);
 		}
+		else 
+		{
+			r = SSL_read(next_ssl, buf, BUFSIZZ);
+		}
+
+
+		status = SSL_get_error(next_ssl, r);
+		if (status ==  SSL_ERROR_ZERO_RETURN || status ==  SSL_ERROR_SYSCALL ){
+			#ifdef DEBUG
+			fprintf(stderr, "[middlebox-n] Connection with next hop closed, exiting next hop thread\n");
+			#endif
+			break;
+		}
+		else if  (status != SSL_ERROR_NONE){
+			berr_exit("[middlebox-n] SSL read problem");
+		}
+
 		
 		#ifdef DEBUG
-		printf("[middlebox-n] Data received (from next hop):\n"); 
-		printf("****\n%s\n***\n", buf); 
-
+		printf("[middlebox-p] Data received (from previous hop) (length %d bytes):\n*****\n", r); 
+		fwrite(buf, 1, r, stdout);
+		printf("\n******\n"); 
 		printf("[middlebox-n] Forwarding record to  previous hop\n"); 
 		#endif
 
-		w = SPP_write_record(prev_ssl, buf, r, prev_ssl->slices[0]);
-		check_SSL_write_error(prev_ssl, w, r); 
-		
+		if (strcmp(proto, "spp") == 0) {
+			w = SPP_write_record(prev_ssl, buf, r, prev_ssl->slices[0]);
+			check_SSL_write_error(prev_ssl, w, r); 
+		}
+		else
+		{
+			w = SSL_write(prev_ssl, buf, r);
+			check_SSL_write_error(prev_ssl, w, r); 
+		}
+
+
+
 		// End of socket....
 		if(r == 0 ){
 			break; 
 		}
 	}
-
+	//shut_down_connections(next_ssl);
+	SSL_free(next_ssl);
 	#ifdef DEBUG
-	printf("[middlebox-n] Shutting down next hop handler thread!\n");
+	fprintf(stderr, "[middlebox-n] Triggering connection with previous hop to close too\n");
 	#endif
-	// Shutdown SSL - TO DO (check what happens here) 
-	r = SSL_shutdown(next_ssl);
-
-	// Verify that all went good 
-	switch(r){  
-		case 1:
-       		break; // Success
-		case 0:
-		case -1:
-		default: // Error 
-			berr_exit("[middlebox-n] Shutdown failed");
-	}
-
-	// free SSL 
-    SSL_free(next_ssl);
-
-
+	shut_down_connections(prev_ssl);
 	// All good 
     return(0);
 }
@@ -389,27 +415,41 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl)
 
 
 
-int handle_data(SSL* prev_ssl, SSL* next_ssl)
+int handle_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 {
 	pid_t next_handler;
+	int status;
 
 	#ifdef DEBUG
 	printf("[middlebox] Initializing data handlers\n");
-		#endif
+	#endif
 
-	if( (next_handler = fork())) 
+	next_handler = fork();
+	if( next_handler == 0) 
 	{
+		//child process
 		// handle traffic from client
-		handle_previous_hop_data(prev_ssl, next_ssl);
+		handle_previous_hop_data(prev_ssl, next_ssl, proto);
+		#ifdef DEBUG
+		printf("[middlebox] Exiting previous hop handler\n");
+		#endif
 		//TODO: wait for child before returning
-
+		exit(0);
 	}
 	else 
 	{
-		//child 
-		handle_next_hop_data(prev_ssl, next_ssl);
+		//parent 
+		handle_next_hop_data(prev_ssl, next_ssl, proto);
+		#ifdef DEBUG
+		printf("[middlebox] Exiting next hop handler\n");
+		#endif
 	}
 
+	#ifdef DEBUG
+	printf("[middlebox] Waiting previous hop handler to quit before quiting data handler\n");
+	#endif
+
+	wait(&status);
 
 	#ifdef DEBUG
 	printf("[middlebox] Exiting data handler!\n");
@@ -417,6 +457,27 @@ int handle_data(SSL* prev_ssl, SSL* next_ssl)
 	return 0;
 }
 
+
+
+
+
+// Usage function 
+void usage(void){
+	printf("usage: wclient -c -a \n"); 
+	printf("-c:   protocol chosen (ssl ; spp)\n"); 
+	printf("-a:   {for ssl splitting only: address to forward in ip:port format}\n");
+	printf("-p:   {port number that the box will listen at (default 8423)}\n");
+	exit(-1);  
+}
+
+
+
+
+
+
+
+
+ 
 // Main function  
 int main(int argc, char **argv){
 	int sock, s;
@@ -426,15 +487,63 @@ int main(int argc, char **argv){
 	int r;
 	pid_t pid;
 	char *proto; 						// protocol type 
+	int port = 8423;
 	extern char *optarg;                // user input parameters
-
+	char *address_to_forward = NULL;
+	int c;  
 	proto = "spp";
+
+	// Handle user input parameters
+	while((c = getopt(argc, argv, "c:a:p:")) != -1){
+			
+			switch(c){
+			// Protocol chosen
+			case 'c':
+				if(! (proto = strdup(optarg) ))
+					err_exit("Out of memory");
+				break; 
+			
+			// File requested for HTTP GET
+			case 'a':
+				if(! (address_to_forward = strdup(optarg) ))
+					err_exit("Out of memory");
+				break; 
+						// Client/Server behavior 
+			case 'p':
+					if(! (port = atoi(optarg) ))
+					err_exit("A port NUMBER for the middlebox should be given\n");
+				break;
 	
-	ctx = initialize_ctx(KEYFILE, PASSWORD, "middlebox");
+			// default case 
+			default:
+				usage(); 
+				break; 
+		}
+    }
+
+	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0))
+	{
+		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
+		usage(); 
+	}
+	else if ( strcmp(proto, "ssl") == 0  && address_to_forward == NULL )
+	{
+		printf("You must specify a forwarding address for SSL splitting (-a)\n"); 
+		usage(); 
+	}
+	
+
+
+	//initialize SSL connection
+	if (strcmp(proto, "spp") == 0)
+		ctx = initialize_ctx(KEYFILE, PASSWORD, "middlebox");
+	else 
+		ctx = initialize_ctx(KEYFILE, PASSWORD, "ssl");
+
 	load_dh_params(ctx,DHFILE);
    
 	// Socket in listen state
-	sock = tcp_listen();
+	sock = tcp_listen(port);
 
 	while(1){
 		if((s = accept(sock, 0, 0)) < 0){
@@ -443,56 +552,47 @@ int main(int argc, char **argv){
 		// fork a new proces 
 		if((pid = fork())){
 			close(s);
+			exit(0);
 		} else {
 			sbio = BIO_new_socket(s, BIO_NOCLOSE);
 			ssl = SSL_new(ctx);
 			SSL_set_bio(ssl, sbio, sbio);
 
-			// SSL Accept 
-/*			// Proxies use SPP_proxy instead of SSL_accept to perform the handshake
-			if((r = SSL_accept(ssl) <= 0)){
-				berr_exit("SPP accept error");
-			} else {
-				#ifdef DEBUG		
-					printf("SPP accept OK\n"); 
-				#endif
+
+			SSL** ssl_next = NULL;
+
+			if (strcmp(proto, "spp") == 0)
+			{
+
+				SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
+				char *prxy_address = "127.0.0.1:8423";
+				if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
+					berr_exit("[middlebox] SPP proxy error");
+				} else {
+					#ifdef DEBUG            
+	                printf("[middlebox] SPP proxy OK\n"); 
+	                #endif
+				}
+			}
+			else if (strcmp(proto, "ssl") == 0)
+			{
+				if((r = SSL_accept(ssl) <= 0)){
+					berr_exit("SSL accept error");
+				} else {
+					#ifdef DEBUG		
+					printf("SSL accept OK\n"); 
+					#endif
+				}
+
+				SSL* new_connection = create_SSL_connection(address_to_forward, "ssl");
+				ssl_next = &new_connection;
 			}
 
-*/
+			handle_data(ssl, *ssl_next, proto);
 
-			SSL* ssl_next;
-			SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
-
-			const char *prxy_address = "127.0.0.1:8423";
-			if ((r = SPP_proxy(ssl, prxy_address, connect_func, ssl_next)) <= 0) {
-				berr_exit("[middlebox] SPP proxy error");
-			} else {
-				#ifdef DEBUG            
-                printf("[middlebox] SPP proxy OK\n"); 
-                #endif
-			}
-
-			#ifdef DEBUG
-			printf("[middlebox] GOT SSL CONNECTION. PRINTING SPP DEBUG INFO: \n");
-			print_ssl_debug_info(ssl);
-			printf("[middlebox] Calling SPP_PROXY\n");
-			#endif
-
-			//WARNING, THIS SHOULD BE ENABLED !!!
-			//SPP_proxy(ssl, "127.0.0.1:8423" , &SPP_Callback, ssl_next);
-
-
-			//*this fakes the callback and the data...
-			//SSL* fake_ssl = (fake_SPP_connection(ssl));
-			//ssl_next = &fake_ssl;
-
-			#ifdef DEBUG
-			printf("[middlebox] SPP_proxy done, staring data handlers \n");
-			#endif
-			handle_data(ssl, ssl_next);
-
-			// Close socket
+			// Close socket and exit child thread
     		close(s);
+    		
  
 		}
 	}
