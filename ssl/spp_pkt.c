@@ -7,6 +7,7 @@
 #include <openssl/buffer.h>
 #include <openssl/rand.h>
 
+//#define DEBUG
 #define MAX_EMPTY_RECORDS 10 /* Might not be needed */
 /* Read record from the underlying communication medium 
  * This method attempts to read and decrypt the . */
@@ -48,7 +49,7 @@ again:
             s->rstate=SSL_ST_READ_BODY;
 
             p=s->packet;
-#if DEBUG
+#ifdef DEBUG
             fprintf(stderr, "Received record header: ");
             spp_print_buffer(p, SPP_RT_HEADER_LENGTH);
 #endif
@@ -140,7 +141,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
      * provided that it is for a slice. */
     if (slice != NULL) {
 #ifdef DEBUG
-        printf("encrypted packet:");
+        printf("Encrypted packet:");
         spp_print_buffer(rr->data, rr->length);
 #endif
         /* If we are not a proxy, use temporary state. */
@@ -219,7 +220,7 @@ printf("\n");
                     goto f_err;
             }
 #ifdef DEBUG
-            printf("decrypted packet:");
+            printf("Decrypted packet:");
             spp_print_buffer(rr->data, rr->length);
 #endif
             if (EVP_CIPHER_CTX_mode(s->enc_read_ctx) == EVP_CIPH_CBC_MODE) {
@@ -784,11 +785,17 @@ start:
             if (s->msg_callback)
                     s->msg_callback(0, s->version, SSL3_RT_CHANGE_CIPHER_SPEC, rr->data, 1, s, s->msg_callback_arg);
 
+#ifdef DEBUG
+            printf("Got change cipher spec\n");
+#endif
             s->s3->change_cipher_spec=1;
-            if (!ssl3_do_change_cipher_spec(s))
-                    goto err;
-            else
-                    goto start;
+            if (!ssl3_do_change_cipher_spec(s)) {
+#ifdef DEBUG
+                printf("Error in do cipher spec\n");
+#endif
+                goto err;
+            } else
+                goto start;
             }
 
     /* Unexpected handshake message (Client Hello, or protocol violation) */
@@ -1025,7 +1032,10 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* Write the slice ID as the 4th byte of the header. */
     wr->slice_id = slice == NULL ? 0 : slice->slice_id;
     *(p++)=wr->slice_id;
-    //printf("Sending record slice %d\n", wr->slice_id);
+#ifdef DEBUG
+    fprintf(stderr, "Writing record header: ");
+    spp_print_buffer(wb->buf + wb->offset, SPP_RT_HEADER_LENGTH);
+#endif
     
     /* Explicit IV length, block ciphers and TLS version 1.1 or later */
     if (s->enc_write_ctx && s->version >= TLS1_1_VERSION) {
@@ -1051,6 +1061,11 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
 
     /* we now 'read' from wr->input, wr->length bytes into
      * wr->data */
+    
+/*#if DEBUG
+    fprintf(stderr, "Decrypted packet:");
+    spp_print_buffer(wr->input, wr->len);
+#endif*/
 
     /* first we compress */
     if (s->compress != NULL) {

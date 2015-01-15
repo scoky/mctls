@@ -257,15 +257,15 @@ int spp_store_defaults(SSL *s, int which) {
 }
 
 int spp_change_cipher_state(SSL *s, int which) {
-    int ret;
+    int ret=1;
     if (!s->proxy) {
         ret = tls1_change_cipher_state(s, which);
         if (ret <= 0) goto end;
         ret = spp_store_defaults(s, which);
         if (ret <= 0) goto end;
-    }    
-    ret = spp_init_slices_st(s, which);
-    if (ret <= 0) goto end;
+    }
+    //ret = spp_init_slices_st(s, which);
+    //if (ret <= 0) goto end;
 end:
     return ret;
 }

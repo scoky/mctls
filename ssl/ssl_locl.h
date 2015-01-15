@@ -1105,6 +1105,7 @@ int spp_init_slices_st(SSL *s, int which);
 int spp_store_defaults(SSL *s, int which);
 void spp_init_proxy(SPP_PROXY *proxy);
 void spp_init_slice(SPP_SLICE *slice);
+void log_time(char *message, struct timeval *currTime, struct timeval *prevTime, struct timeval *originTime);
 
 int dtls1_send_hello_request(SSL *s);
 int dtls1_send_server_hello(SSL *s);

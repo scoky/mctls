@@ -329,8 +329,9 @@ int spp_connect(SSL *s) {
                 }
                 ret=spp_send_end_key_material(s);
                 
-                s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
-                s->state=SSL3_ST_CW_FLUSH;
+                //s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
+                //s->state=SSL3_ST_CW_FLUSH;
+                s->state=SSL3_ST_CW_CHANGE_A;
                 //s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
@@ -354,7 +355,13 @@ int spp_connect(SSL *s) {
 				log_time("Received proxy key material\n", &currTime, &prevTime, &originTime); 				
 				#endif
                 if (ret <= 0) goto end;
-                s->state=SSL3_ST_CW_CHANGE_A;
+#ifndef OPENSSL_NO_TLSEXT
+                /* Allow NewSessionTicket if ticket expected */
+                if (s->tlsext_ticket_expected)
+                    s->state=SSL3_ST_CR_SESSION_TICKET_A;
+                else
+#endif
+                    s->state=SSL3_ST_CR_FINISHED_A;
                 s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
@@ -434,13 +441,7 @@ int spp_connect(SSL *s) {
                         s->s3->delay_buf_pop_ret=0;
                     }
                 } else {
-#ifndef OPENSSL_NO_TLSEXT
-                    /* Allow NewSessionTicket if ticket expected */
-                    if (s->tlsext_ticket_expected)
-                        s->s3->tmp.next_state=SSL3_ST_CR_SESSION_TICKET_A;
-                    else
-#endif
-                        s->s3->tmp.next_state=SSL3_ST_CR_FINISHED_A;
+                    s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
                 }
                                 
                 // Store the values for end-to-end integrity checking
@@ -489,6 +490,12 @@ int spp_connect(SSL *s) {
                 else
                     s->state=SSL_ST_OK;
                 s->init_num=0;
+                
+                /* Setup the slices now that we have the necessary state. */
+                ret = spp_init_slices_st(s, SSL3_CHANGE_CIPHER_CLIENT_WRITE);
+                if (ret <= 0) goto end;
+                ret = spp_init_slices_st(s, SSL3_CHANGE_CIPHER_CLIENT_READ);
+                if (ret <= 0) goto end;
                 
                 break;
 

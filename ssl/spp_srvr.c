@@ -567,15 +567,12 @@ int spp_accept(SSL *s) 	{
                 }
                 ret=spp_send_end_key_material(s);
                 
-#if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
-                s->s3->tmp.next_state=SSL3_ST_SR_FINISHED_A;
-#else
-                if (s->s3->next_proto_neg_seen)
-                    s->s3->tmp.next_state=SSL3_ST_SR_NEXT_PROTO_A;
+#ifndef OPENSSL_NO_TLSEXT
+                if (s->tlsext_ticket_expected)
+                    s->state=SSL3_ST_SW_SESSION_TICKET_A;
                 else
-                    s->s3->tmp.next_state=SSL3_ST_SR_FINISHED_A;
 #endif
-                s->state=SSL3_ST_SW_FLUSH;
+                    s->state=SSL3_ST_SW_CHANGE_A;
                 //s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
@@ -594,8 +591,15 @@ int spp_accept(SSL *s) 	{
                 }
                 ret=spp_get_end_key_material(s);
                 if (ret <= 0) goto end;
-                s->state=SPP_ST_CW_PRXY_MAT_A;
-                //s->s3->change_cipher_spec=0;
+#if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
+                s->state=SSL3_ST_SR_FINISHED_A;
+#else
+                if (s->s3->next_proto_neg_seen)
+                    s->state=SSL3_ST_SR_NEXT_PROTO_A;
+                else
+                    s->state=SSL3_ST_SR_FINISHED_A;
+#endif
+                s->s3->change_cipher_spec=0;
 
                 s->init_num=0;
                 break;
@@ -645,12 +649,7 @@ int spp_accept(SSL *s) 	{
                     if (ret <= 0) goto end;
                     if (s->hit)
                         s->state=SSL_ST_OK;
-#ifndef OPENSSL_NO_TLSEXT
-                    else if (s->tlsext_ticket_expected)
-                        s->state=SSL3_ST_SW_SESSION_TICKET_A;
-#endif
-                    else
-                        s->state=SSL3_ST_SW_CHANGE_A;
+                    s->state=SPP_ST_CW_PRXY_MAT_A;
                     s->init_num=0;
 
                     break;
@@ -737,6 +736,11 @@ int spp_accept(SSL *s) 	{
                         // Store the values for end-to-end integrity checking
                         if (spp_init_integrity_st(s) <= 0)
                             goto end;
+                        /* Setup the slices now that we have the necessary state. */
+                        ret = spp_init_slices_st(s, SSL3_CHANGE_CIPHER_SERVER_WRITE);
+                        if (ret <= 0) goto end;
+                        ret = spp_init_slices_st(s, SSL3_CHANGE_CIPHER_SERVER_READ);
+                        if (ret <= 0) goto end;
 			break;
 
 		case SSL_ST_OK:

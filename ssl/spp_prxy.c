@@ -236,8 +236,10 @@ long spp_get_finished(SSL *s, int st1, int stn)
                 s->init_num=i;
                 s->init_off=0;
                 
-                //printf("Received finished: ");
-                //spp_print_buffer(p, s->init_num);       
+/*#ifdef DEBUG
+                printf("Received during finished: ");
+                spp_print_buffer(p, s->init_num);       
+#endif*/
                 
                 if (s->s3->change_cipher_spec) {
                     break;
@@ -248,8 +250,10 @@ long spp_get_finished(SSL *s, int st1, int stn)
                 if (i<=0) goto err;
             }
             s->state=stn;
-        }        
-        //printf("Got finished\n");
+        }
+/*#ifdef DEBUG
+        printf("Got finished\n");
+#endif*/
 
         s->s3->tmp.message_type = SSL3_MT_FINISHED;
 
@@ -993,8 +997,16 @@ int spp_proxy_accept(SSL *s) {
                     s->init_num=next_st->init_num=0;
                 }
                 
-                s->s3->tmp.next_state=SPP_ST_SR_PRXY_MAT_A;
-                s->state=SSL3_ST_SW_FLUSH;
+#if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
+                s->state=SSL3_ST_SR_FINISHED_A;
+#else
+                if (s->s3->next_proto_neg_seen)
+                    s->state=SSL3_ST_SR_NEXT_PROTO_A;
+                else
+                    s->state=SSL3_ST_SR_FINISHED_A;
+#endif
+                //s->s3->tmp.next_state=SPP_ST_SR_PRXY_MAT_A;
+                //s->state=SSL3_ST_SW_FLUSH;
                 break;
                 
             case SPP_ST_SR_PRXY_MAT_A:
@@ -1013,15 +1025,12 @@ int spp_proxy_accept(SSL *s) {
                     s->init_num=next_st->init_num=0;
                 }
                 
-#if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
-                s->state=SSL3_ST_SR_FINISHED_A;
-#else
-                if (s->s3->next_proto_neg_seen)
-                    s->s3->tmp.next_state=SSL3_ST_SR_NEXT_PROTO_A;
+#ifndef OPENSSL_NO_TLSEXT
+                if (s->tlsext_ticket_expected)
+                    s->state=SSL3_ST_CR_FINISHED_A;
                 else
-                    s->s3->tmp.next_state=SSL3_ST_SR_FINISHED_A;
-                s->state=SSL3_ST_SW_FLUSH;
 #endif
+                    s->state=SSL3_ST_CR_FINISHED_A;
                 break;
 
 #if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
@@ -1049,12 +1058,9 @@ int spp_proxy_accept(SSL *s) {
                 
                 if (s->hit)
                     s->state=SSL_ST_OK;
-#ifndef OPENSSL_NO_TLSEXT
-                else if (s->tlsext_ticket_expected)
-                    s->state=SSL3_ST_CR_FINISHED_A;
-#endif
                 else
-                    s->state=SSL3_ST_CR_FINISHED_A;
+                    s->state=SPP_ST_SR_PRXY_MAT_A;
+
                 
                 /* Cipher state should actually be changed before the finished message.
                  * Since proxies do not actually validate the Finished message, however,
@@ -1074,6 +1080,9 @@ int spp_proxy_accept(SSL *s) {
                 
             case SSL3_ST_SW_SESSION_TICKET_A:
             case SSL3_ST_SW_SESSION_TICKET_B:
+                                #ifdef DEBUG
+				log_time("Waiting for session ticket\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=get_proxy_msg(next_st, SSL3_ST_SW_SESSION_TICKET_A, SSL3_ST_SW_SESSION_TICKET_B, SSL3_MT_NEWSESSION_TICKET,1);
                 if (ret <= 0) goto end;
                 s->state=SSL3_ST_CR_FINISHED_A;
@@ -1104,6 +1113,16 @@ int spp_proxy_accept(SSL *s) {
                     ret= -1;
                     goto end;
                 }*/ /* Done when receiving the change cipher spec message */
+                
+                /* Setup the slices now that we have the necessary state. */
+                ret = spp_init_slices_st(s, SSL3_CHANGE_CIPHER_SERVER_WRITE);
+                if (ret <= 0) goto end;
+                ret = spp_init_slices_st(s, SSL3_CHANGE_CIPHER_SERVER_READ);
+                if (ret <= 0) goto end;
+                ret = spp_init_slices_st(next_st, SSL3_CHANGE_CIPHER_CLIENT_WRITE);
+                if (ret <= 0) goto end;
+                ret = spp_init_slices_st(next_st, SSL3_CHANGE_CIPHER_CLIENT_READ);
+                if (ret <= 0) goto end;
                 break;
 
             case SSL_ST_OK:
