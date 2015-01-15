@@ -155,12 +155,14 @@ int spp_initialize_ssl(SSL *s, SSL *n) {
     n->session = s->session;
     
     /* Copy proxies and slices */
+    //printf("Proxy list is:\n");
     n->proxies_len = s->proxies_len;
     for (i = 0; i < s->proxies_len; i++) {
         n->proxies[i] = (SPP_PROXY*)malloc(sizeof(SPP_PROXY));
         spp_init_proxy(n->proxies[i]);
         n->proxies[i]->proxy_id = s->proxies[i]->proxy_id;
         n->proxies[i]->address = s->proxies[i]->address;
+        //printf("%d: %s\n", n->proxies[i]->proxy_id, n->proxies[i]->address);
     }
     n->slices_len = s->slices_len;
     for (i = 0; i < s->slices_len; i++) {
@@ -211,9 +213,10 @@ int get_proxy_msg(SSL *s, int st1, int stn, int msg, int forward) {
         msg,
         SSL3_RT_MAX_PLAIN_LENGTH,
         &ok);
+    //printf("ok=%d\n", ok);
     if (!ok) return n;
     //printf("Got handshake message, len=%d, type=%d\n", n, s->s3->tmp.message_type);
-    //spp_print_buffer(s->init_msg, s->init_num);
+    spp_print_buffer(s->init_msg, s->init_num);
     if (forward)
         return spp_forward_message(s->other_ssl, s);
     return 1;
@@ -772,7 +775,9 @@ int spp_proxy_accept(SSL *s) {
 
                 if (s->s3->tmp.cert_req)
                     goto end;
-                else {
+                else if ((proxy = spp_get_next_proxy(s, NULL, 0)) != NULL && proxy->proxy_id != s->proxy_id) {
+                    s->state=SPP_ST_PR_BEHIND_A;
+                } else {
                     s->state=SSL3_ST_SW_CERT_A;
                 }
                 s->init_num=next_st->init_num=0;
@@ -879,9 +884,7 @@ int spp_proxy_accept(SSL *s) {
                 s->init_num=next_st->init_num=0;
                 
                 // Receive and forward the certificates for proxies between us and the server
-                if ((proxy = spp_get_next_proxy(s, this_proxy, 1)) != NULL) {
-                    s->state=SPP_ST_PR_BEHIND_A;
-                } else if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL) {
+                if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL) {
                     // Need to flush
                     s->state=SSL3_ST_SW_FLUSH;
                     s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
@@ -894,10 +897,11 @@ int spp_proxy_accept(SSL *s) {
             case SPP_ST_PR_BEHIND_A:
             case SPP_ST_PR_BEHIND_B:
                                 #ifdef DEBUG
+                //printf("Receiving message from behind proxy %d\n", proxy->proxy_id);
 				log_time("Waiting for messages from proxies behind\n", &currTime, &prevTime, &originTime); 
 				#endif
                 while (proxy != NULL) {
-                    s->state=SPP_ST_PR_BEHIND_A;
+                    next_st->state=SPP_ST_PR_BEHIND_A;
                     ret=get_proxy_msg(next_st, SPP_ST_PR_BEHIND_A, SPP_ST_PR_BEHIND_B, -1, 1);
                                 #ifdef DEBUG
 				log_time("Proxy message received\n", &currTime, &prevTime, &originTime); 
@@ -905,22 +909,20 @@ int spp_proxy_accept(SSL *s) {
                     if (ret <= 0) goto end;
                     s->init_num=next_st->init_num=0;
                     if (next_st->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
-                        if ((proxy = spp_get_next_proxy(s, proxy, 1)) == NULL) {
-                            if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL)
-                                s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
-                            else
-                                s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
+                        if ((proxy = spp_get_next_proxy(s, proxy, 0)) == NULL || proxy->proxy_id == s->proxy_id) {
+                            s->state=SSL3_ST_SW_CERT_A;
                             break;
                         }
+                        //printf("Receiving message from behind proxy %d\n", proxy->proxy_id);
                     }
                 }
-                s->state=SSL3_ST_SW_FLUSH;
                 
                 break;
                 
             case SPP_ST_PR_AHEAD_A:
             case SPP_ST_PR_AHEAD_B:
                                 #ifdef DEBUG
+//printf("Receiving message from ahead proxy %d\n", proxy->proxy_id);
 				log_time("Waiting for messages from proxies ahead\n", &currTime, &prevTime, &originTime); 
 				#endif
                 while (proxy != NULL) {
@@ -933,12 +935,12 @@ int spp_proxy_accept(SSL *s) {
                     s->init_num=next_st->init_num=0;
                     if (s->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
                         if ((proxy = spp_get_next_proxy(s, proxy, 0)) == NULL) {
-                            s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
+                            s->state=SSL3_ST_SR_KEY_EXCH_A;
                             break;
                         } 
+                        //printf("Receiving message from ahead proxy %d\n", proxy->proxy_id);
                     }
                 }
-                s->state=SSL3_ST_SW_FLUSH;
                 
                 break;
 		

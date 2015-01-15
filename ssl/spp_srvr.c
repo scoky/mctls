@@ -468,7 +468,7 @@ int spp_accept(SSL *s) 	{
 				#endif
                 if (ret <= 0) goto end;
                                 
-                proxy = spp_get_next_proxy(s, proxy, 1);
+                proxy = spp_get_next_proxy(s, proxy, 0);
                 if (proxy == NULL) {
                     s->state=SSL3_ST_SR_KEY_EXCH_A;
                 } else {

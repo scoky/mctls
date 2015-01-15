@@ -124,6 +124,8 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
+//#define DEBUG
+
 /* send s->init_buf in records of type 'type' (SSL3_RT_HANDSHAKE or SSL3_RT_CHANGE_CIPHER_SPEC) */
 int ssl3_do_write(SSL *s, int type)
 	{
@@ -465,7 +467,7 @@ long ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 				s->init_num+=i;
 				}
 #ifdef DEBUG
-                        printf("Received header: ");
+                        printf("Received handshake header: ");
                         spp_print_buffer(p, 4);
 #endif
 			

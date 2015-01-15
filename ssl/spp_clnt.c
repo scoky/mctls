@@ -219,7 +219,7 @@ int spp_connect(SSL *s) {
                 if (s->s3->tmp.cert_req)
                     s->state=SSL3_ST_CW_CERT_A;
                 else {
-                    proxy = spp_get_next_proxy(s, proxy, 1);
+                    proxy = spp_get_next_proxy(s, proxy, 0);
                     if (proxy == NULL) {
                         s->state=SSL3_ST_CW_KEY_EXCH_A;
                     } else {
@@ -241,7 +241,7 @@ int spp_connect(SSL *s) {
                 ret=ssl3_send_client_certificate(s);
                 if (ret <= 0) goto end;
 
-                proxy = spp_get_next_proxy(s, proxy, 1);
+                proxy = spp_get_next_proxy(s, proxy, 0);
                 if (proxy == NULL) {
                     s->state=SSL3_ST_CW_KEY_EXCH_A;
                 } else {
@@ -290,7 +290,7 @@ int spp_connect(SSL *s) {
 				#endif
                 if (ret <= 0) goto end;
                                 
-                proxy = spp_get_next_proxy(s, proxy, 1);
+                proxy = spp_get_next_proxy(s, proxy, 0);
                 if (proxy == NULL) {
                     s->state=SSL3_ST_CW_KEY_EXCH_A;
                 } else {
