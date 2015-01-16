@@ -1,8 +1,8 @@
 CC=gcc
 # with debug 
-#CFLAG=-g -Wall -DDEBUG=1
+CFLAG=-g -Wall -DDEBUG=1
 #without debug 
-CFLAG=-g -Wall
+#CFLAG=-g -Wall
 LD= -L/usr/local/ssl/lib -lssl -lcrypto -ldl -lpthread
 
 INCLUDES= -I/usr/local/ssl/include
