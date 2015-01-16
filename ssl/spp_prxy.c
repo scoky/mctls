@@ -719,6 +719,10 @@ int spp_proxy_accept(SSL *s) {
                 s->renegotiate = 2;
                 s->state=SSL3_ST_CR_SRVR_HELLO_A;
                 s->init_num=next_st->init_num=0;
+                
+                //Turn on buffering for the remainder of the handshake
+                if (next_st->bbio != next_st->wbio)
+                    next_st->wbio=BIO_push(next_st->bbio,next_st->wbio);
                 break;
                 
             case SSL3_ST_CR_SRVR_HELLO_A:
@@ -778,9 +782,13 @@ int spp_proxy_accept(SSL *s) {
                 if (s->s3->tmp.cert_req)
                     goto end;
                 else if ((proxy = spp_get_next_proxy(s, NULL, 0)) != NULL && proxy->proxy_id != s->proxy_id) {
-                    s->state=SPP_ST_PR_BEHIND_A;
+                    /* Received certs from proxies between this proxy and the server. */
+                    s->state=SPP_ST_SW_AHEAD_FLUSH;
+                    s->s3->tmp.next_state=SPP_ST_PR_BEHIND_A;
                 } else {
-                    s->state=SSL3_ST_SW_CERT_A;
+                    /* Send our certificate. */
+                    s->state=SPP_ST_SW_AHEAD_FLUSH;
+                    s->s3->tmp.next_state=SSL3_ST_SW_CERT_A;
                 }
                 s->init_num=next_st->init_num=0;
 
@@ -887,10 +895,12 @@ int spp_proxy_accept(SSL *s) {
                 
                 // Receive and forward the certificates for proxies between us and the server
                 if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL) {
-                    // Need to flush
+                    // Flush our cert in both directions
+                    // Need to receive and forward certificates from proxies between this proxy and the client
                     s->state=SSL3_ST_SW_FLUSH;
                     s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
                 } else {
+                    // No proxies between us and client, wait for client key exchange
                     s->state=SSL3_ST_SW_FLUSH;
                     s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
                 }
@@ -912,7 +922,8 @@ int spp_proxy_accept(SSL *s) {
                     s->init_num=next_st->init_num=0;
                     if (next_st->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
                         if ((proxy = spp_get_next_proxy(s, proxy, 0)) == NULL || proxy->proxy_id == s->proxy_id) {
-                            s->state=SSL3_ST_SW_CERT_A;
+                            s->state=SPP_ST_SW_AHEAD_FLUSH;
+                            s->s3->tmp.next_state=SSL3_ST_SW_CERT_A;
                             break;
                         }
                         //printf("Receiving message from behind proxy %d\n", proxy->proxy_id);
@@ -937,7 +948,8 @@ int spp_proxy_accept(SSL *s) {
                     s->init_num=next_st->init_num=0;
                     if (s->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
                         if ((proxy = spp_get_next_proxy(s, proxy, 0)) == NULL) {
-                            s->state=SSL3_ST_SR_KEY_EXCH_A;
+                            s->state=SPP_ST_CW_BEHIND_FLUSH;
+                            s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
                             break;
                         } 
                         //printf("Receiving message from ahead proxy %d\n", proxy->proxy_id);
@@ -963,6 +975,34 @@ int spp_proxy_accept(SSL *s) {
                     goto end;
                 }
                 s->rwstate=SSL_NOTHING;
+                next_st->rwstate=SSL_WRITING;
+                if (BIO_flush(next_st->wbio) <= 0) {
+                    ret= -1;
+                    goto end;
+                }
+                next_st->rwstate=SSL_NOTHING;
+
+                s->state=s->s3->tmp.next_state;
+                break;
+                
+            case SPP_ST_SW_AHEAD_FLUSH:
+                /* Flush between the proxy and the client
+                 */
+
+                s->rwstate=SSL_WRITING;
+                if (BIO_flush(s->wbio) <= 0) {
+                    ret= -1;
+                    goto end;
+                }
+                s->rwstate=SSL_NOTHING;
+
+                s->state=s->s3->tmp.next_state;
+                break;
+                
+            case SPP_ST_CW_BEHIND_FLUSH:
+                /* Flush between the proxy and the server
+                 */
+
                 next_st->rwstate=SSL_WRITING;
                 if (BIO_flush(next_st->wbio) <= 0) {
                     ret= -1;
@@ -1060,10 +1100,11 @@ int spp_proxy_accept(SSL *s) {
                 if (ret <= 0) goto end;
                 s->init_num=next_st->init_num=0;
                 
+                s->state=SPP_ST_CW_BEHIND_FLUSH;
                 if (s->hit)
-                    s->state=SSL_ST_OK;
+                    s->s3->tmp.next_state=SSL_ST_OK;
                 else
-                    s->state=SPP_ST_SR_PRXY_MAT_A;
+                    s->s3->tmp.next_state=SPP_ST_SR_PRXY_MAT_A;
 
                 
                 /* Cipher state should actually be changed before the finished message.
@@ -1104,7 +1145,7 @@ int spp_proxy_accept(SSL *s) {
                 s->init_num=next_st->init_num=0;
                 
                 s->s3->tmp.next_state=SSL_ST_OK;
-                s->state=SSL3_ST_SW_FLUSH;
+                s->state=SPP_ST_SW_AHEAD_FLUSH;
                 
                 s->session->cipher=s->s3->tmp.new_cipher;
                 if (!s->method->ssl3_enc->setup_key_block(s))
