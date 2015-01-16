@@ -97,6 +97,22 @@ int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send) {
     }
     return 1;
 }
+int spp_copy_mac_back(SSL *s, SPP_MAC *mac, int send) {
+    if (mac == NULL)
+        return 1;
+    if (send) {
+        //mac->write_hash = s->write_hash;
+        //memcpy(mac->write_mac_secret, s->s3->write_mac_secret, EVP_MAX_MD_SIZE);
+        //mac->write_mac_secret_size = s->s3->write_mac_secret_size;
+        memcpy(mac->write_sequence, s->s3->write_sequence, 8);
+    } else {
+        //mac->read_hash = s->read_hash;
+        //memcpy(mac->read_mac_secret, s->s3->read_mac_secret, EVP_MAX_MD_SIZE);
+        //mac->read_mac_secret_size = s->s3->read_mac_secret_size;
+        memcpy(mac->read_sequence, s->s3->read_sequence, 8);
+    }
+    return 1;
+}
 int spp_copy_ciph_state(SSL *s, SPP_CIPH *ciph, int send) {
     if (send) {
         s->enc_write_ctx = ciph->enc_write_ctx;
@@ -1003,6 +1019,7 @@ err:
 }
 
 void spp_print_buffer(unsigned char *buf, int len) {
+    printf("(%d) ", len);
     while (len-- > 0) {
         if (len == 0)
             printf("%x",(*(buf++))&0xff);

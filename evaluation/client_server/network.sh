@@ -7,7 +7,8 @@ iface="lo"
 # Function to print script usage
 usage(){
     echo -e "Usage: $0 opt"
-    echo -e "opt = [1=limit speed ; 2=remove rate control ; 3=list configured rules]"
+    echo -e "opt = [1=insert rate and delay control; 2=remove rate and delay control ; 3=list configured rules]"
+    echo -e "{1) [rate[Mbps] max_rate[Mbps] delay[ms] iface"
     echo -h "NOTE: you can use <<nload lo>> to visualize traffic"
 	exit 0;
 }
@@ -21,14 +22,15 @@ opt=$1
 #More check 
 if [ $opt -eq 1 ] 
 then 
-	if [ $# -lt 4 ] 
+	if [ $# -lt 5 ] 
 	then 
-		echo "OPT=1 requires 3 more parameters: rate[Mbps] max_rate[Mbps] delay[ms]"
+		echo "OPT=1 requires 4 additional parameters: rate[Mbps] max_rate[Mbps] delay[ms] iface"
 		usage
 	else
 		rate=$2"Mbps"
 		maxRate=$3"Mbps"
 		delay=$4"ms"
+		iface=$5
 	fi 
 fi
 

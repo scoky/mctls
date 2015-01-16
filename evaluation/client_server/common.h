@@ -21,7 +21,7 @@
 #define HOST	"localhost"
 #define RANDOM  "random.pem"
 #define PORT	4433
-#define BUFSIZZ 1024
+#define BUFSIZZ 20000
 
 extern BIO *bio_err;
 int berr_exit (char *string);

@@ -1,5 +1,4 @@
 BEGIN{
-	S = 1
 	sum = 0
 	count = 0
 }
@@ -10,7 +9,7 @@ function compute()
 	for( x = 0; x < count; x++){
 		sumsq += ((array[x]-(sum/(count)))**2)
 	}
-	print S " " avg " " sqrt(sumsq/(count))
+	print S " " fix1 " " fix2 " " avg " " sqrt(sumsq/(count))
 }
 {
 	if($1 == S){
@@ -24,7 +23,7 @@ function compute()
 		delete array 
 		array[count] = $2
 		count = count + 1
-		S += 1
+		S = $1
 	}
 }
 END{

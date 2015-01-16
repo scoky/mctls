@@ -853,15 +853,16 @@ int main(int argc, char **argv){
 		}
 
 		// Fork a new process
+		signal(SIGCHLD, SIG_IGN); 
 		pid = fork(); 
-		if (pid != 0){
-			/* In parent process */
+		if (pid -= 0){
+			/* In chil process */
 			if (pid == -1) {
 				berr_exit("FORK error"); 
 				return 1;
            	}
 			#ifdef DEBUG
-			printf("[DEBUG] parent process close old socket (why?)and operate on new one\n");
+			printf("[DEBUG] child process close old socket (why?) and operate on new one\n");
 			#endif
 			close(sock);
 			sbio = BIO_new_socket(newsock, BIO_NOCLOSE);
@@ -913,13 +914,13 @@ int main(int argc, char **argv){
 			}
 			// Correctly end child process
 			#ifdef DEBUG
-			printf("[DEBUG] End parent process (prevent zombies)\n");
+			printf("[DEBUG] End child process (prevent zombies)\n");
 			#endif
 			exit(0);  
 			// return 0 
 		}else{
 			#ifdef DEBUG
-			printf("[DEBUG] child process close new socket (why?)\n");
+			printf("[DEBUG] parent process close new socket (why?)\n");
 			#endif
 			close(newsock); 
 		}
