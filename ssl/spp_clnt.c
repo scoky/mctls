@@ -31,7 +31,7 @@ int spp_connect(SSL *s) {
        struct timeval currTime;      // keep current time  
        struct timeval prevTime;      // keep previous time (to compute time passed)
        struct timeval originTime;    // keep previous time (to compute time passed)
-       /* Matteo -- END*/
+	/* Matteo -- END*/
 
 
     RAND_add(&Time,sizeof(Time),0);
@@ -70,7 +70,7 @@ int spp_connect(SSL *s) {
             case SSL_ST_CONNECT:
             case SSL_ST_BEFORE|SSL_ST_CONNECT:
             case SSL_ST_OK|SSL_ST_CONNECT:
-                                // Initialize timers
+				// Initialize timers
 				gettimeofday(&currTime, NULL);
 				gettimeofday(&prevTime, NULL);
 				gettimeofday(&originTime, NULL);
@@ -145,7 +145,7 @@ int spp_connect(SSL *s) {
             case SSL3_ST_CR_SRVR_HELLO_A:
             case SSL3_ST_CR_SRVR_HELLO_B:
                 ret=ssl3_get_server_hello(s);
-                                // Logging with time information 
+				// Logging with time information 
 				#ifdef DEBUG
 				log_time("Received server hello\n", &currTime, &prevTime, &originTime); 			          
 				#endif
@@ -158,7 +158,7 @@ int spp_connect(SSL *s) {
             case SSL3_ST_CR_CERT_A:
             case SSL3_ST_CR_CERT_B:
                 ret=ssl3_get_server_certificate(s);
-                                // Logging with time information 
+				// Logging with time information 
 				#ifdef DEBUG
 				log_time("Received server certificate\n", &currTime, &prevTime, &originTime); 			            
 				#endif

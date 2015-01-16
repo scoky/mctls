@@ -6,6 +6,12 @@
 #include <openssl/evp.h>
 
 #define DEBUG
+// They need to be global here to work 
+/* Matteo -- START */	
+struct timeval currTime;      // keep current time  
+struct timeval prevTime;      // keep previous time (to compute time passed)
+struct timeval originTime;    // keep previous time (to compute time passed)
+/* Matteo -- END*/
 
 static const SSL_METHOD *spp_get_proxy_method(int ver);
 static const SSL_METHOD *spp_get_proxy_method(int ver)
@@ -25,11 +31,7 @@ int spp_proxy_connect(SSL *s) {
     unsigned long Time=(unsigned long)time(NULL);
     void (*cb)(const SSL *ssl,int type,int val)=NULL;
     int ret= -1;
-        /* Matteo -- START */	
-	struct timeval currTime;      // keep current time  
-	struct timeval prevTime;      // keep previous time (to compute time passed)
-	struct timeval originTime;    // keep previous time (to compute time passed)
-	/* Matteo -- END*/
+	
 
     RAND_add(&Time,sizeof(Time),0);
     ERR_clear_error();
@@ -65,7 +67,12 @@ int spp_proxy_connect(SSL *s) {
             case SSL_ST_CONNECT:
             case SSL_ST_BEFORE|SSL_ST_CONNECT:
             case SSL_ST_OK|SSL_ST_CONNECT:
-                                #ifdef DEBUG
+				// Initialize timers
+				gettimeofday(&currTime, NULL);
+				gettimeofday(&prevTime, NULL);
+				gettimeofday(&originTime, NULL);
+
+				#ifdef DEBUG
 				log_time("Connecting next session\n", &currTime, &prevTime, &originTime); 
 				#endif
                 s->server=0; /* We are a proxy */
@@ -571,7 +578,7 @@ int spp_proxy_accept(SSL *s) {
     int ahead,behind;
     int ret= -1,i;
     int new_state,state,skip=0;
-        /* Matteo -- START */	
+    /* Matteo -- START 
 	struct timeval currTime;      // keep current time  
 	struct timeval prevTime;      // keep previous time (to compute time passed)
 	struct timeval originTime;    // keep previous time (to compute time passed)
@@ -686,7 +693,7 @@ int spp_proxy_accept(SSL *s) {
                 s->shutdown=0;
                 if (s->rwstate != SSL_X509_LOOKUP) {
                     ret=ssl3_get_client_hello(s);
-                                #ifdef DEBUG
+				#ifdef DEBUG
 				log_time("Received client hello\n", &currTime, &prevTime, &originTime); 
 				#endif
                     if (ret <= 0) goto end;
