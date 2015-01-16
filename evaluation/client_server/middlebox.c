@@ -1,4 +1,19 @@
-// A simple https server orginally provided by Ilias
+/* 
+ * Copyright (C) Telefonica 2015
+ * All rights reserved.
+ *
+ * Telefonica Proprietary Information.
+ *
+ * Contains proprietary/trade secret information which is the property of 
+ * Telefonica and must not be made available to, or copied or used by
+ * anyone outside Telefonica without its written authorization.
+ *
+ * Authors: 
+ *   Ilias Leontiadis <ilias.leontiadis@telefonica.com> et al. 
+ *
+ * Description: 
+ * An SSL/SPP middlebox. 
+ */
 
 #include "common.h"
 #define KEYFILE "server.pem"
@@ -6,7 +21,7 @@
 #define DHFILE "dh1024.pem"
 #include <openssl/e_os2.h>
 
-#define DEBUG
+//#define DEBUG				// now this can be turned on/off in the Makefile 
 
  
 int tcp_listen(int port)
@@ -395,7 +410,7 @@ int handle_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 
 // Usage function 
 void usage(void){
-	printf("usage: wclient -c -a \n"); 
+	printf("usage: mbox -c -a -p -m\n"); 
 	printf("-c:   protocol chosen (ssl ; spp)\n"); 
 	printf("-a:   {for ssl splitting only: address to forward in ip:port format}\n");
 	printf("-p:   {port number that the box will listen at (default 8423)}\n");
@@ -423,38 +438,46 @@ int main(int argc, char **argv){
 	SSL* ssl_next = NULL;
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "c:a:p:m:")) != -1){
+	while((c = getopt(argc, argv, "h:c:a:p:m:")) != -1){
 			
 			switch(c){
+
+			// Print usage
+			case 'h': usage(); 
+					  break; 
+
 			// Protocol chosen
-			case 'c':
-				if(! (proto = strdup(optarg) ))
-					err_exit("Out of memory");
-				break; 
+			case 'c': if(! (proto = strdup(optarg) )){
+					  	err_exit("Out of memory");
+					  }
+					  break; 
 			
-			// File requested for HTTP GET
-			case 'a':
-				if(! (address_to_forward = strdup(optarg) ))
-					err_exit("Out of memory");
-				break; 
-						// Client/Server behavior 
-			case 'p':
-					if(! (port = atoi(optarg) ))
-					err_exit("A port NUMBER for the middlebox should be given\n");
-				break;
-										// Client/Server behavior 
-			case 'm':
-					if(! (prxy_address = strdup(optarg) ))
-					err_exit("Out of memory");
-				break;
+			
+			// Address to forward in case of SSL splitting 
+			case 'a': if(! (address_to_forward = strdup(optarg) )){
+					  	err_exit("Out of memory");
+					  }
+					  break; 
+			
+			// Port used by mbox 
+			case 'p': if(! (port = atoi(optarg) )){
+						err_exit("A port NUMBER for the middlebox should be given\n");
+					  }
+					  break;
+										
+			// Middlebox ID, required by SPP
+			case 'm': if(! (prxy_address = strdup(optarg) )){
+						err_exit("Out of memory");
+					  }
+					  break;
 	
-			// default case 
-			default:
-				usage(); 
-				break; 
+			// Default case 
+			default: usage(); 
+					 break; 
 		}
     }
 
+	// Checking input parameters 
 	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0))
 	{
 		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
@@ -465,6 +488,11 @@ int main(int argc, char **argv){
 		printf("You must specify a forwarding address for SSL splitting (-a)\n"); 
 		usage(); 
 	}
+	
+	//logging 
+	#ifdef DEBUG
+	printf("[DEBUG] port=%d proto=%s address_to_fwd=%s  prxy_address=%s\n", port, proto, address_to_forward, prxy_address);  
+	#endif 
 	
 	//initialize SSL connection
 	if (strcmp(proto, "spp") == 0)
