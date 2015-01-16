@@ -203,15 +203,25 @@ int shut_down_connections(SSL* ssl)
 	printf("[middlebox ] Shutting down  connection!\n");
 	#endif
 
+	//shutdown(SSL_get_fd(ssl), SHUT_WR);
+	shutdown(SSL_get_fd(ssl), 1);
 	r = SSL_shutdown(ssl);
+	
 	if (r == 0)
 	{
-		shutdown(SSL_get_fd(ssl), SHUT_WR);
+		#ifdef DEBUG
+		printf("[middlebox ] r=0 trying again to shutdown\n");
+		#endif
+		shutdown(SSL_get_fd(ssl), 1);
 		r = SSL_shutdown(ssl);
 	}
+	
 	// Verify that all went good 
 	switch(r){  
 		case 1:
+			#ifdef DEBUG
+			printf("[middlebox ] Succesfully shut down client connection!\n");
+			#endif
        		break; // Success
 		case 0:
 		case -1:
@@ -219,8 +229,8 @@ int shut_down_connections(SSL* ssl)
 			printf("[middlebox] Connection shutdown failed\n");
 	}
 
-	socket =  SSL_get_fd(ssl);
-	close(socket);
+	//socket =  SSL_get_fd(ssl);
+	//close(socket);
     
     return 0;
 }
@@ -291,7 +301,7 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 	}
 
 	// The previous connection has been terminated by the client... we just free the SSL object... 
-	SSL_free(prev_ssl);
+	//SSL_free(prev_ssl);
 	// All good 
     return(0);
 }
@@ -351,13 +361,13 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 			break; 
 		}
 	}
-	//shut_down_connections(next_ssl);
-	SSL_free(next_ssl);
+	
+	
 	#ifdef DEBUG
 	fprintf(stderr, "[middlebox-n] Triggering connection with previous hop to close too\n");
 	#endif
 	shut_down_connections(prev_ssl);
-	SSL_free(prev_ssl);
+	//SSL_free(prev_ssl);
 	// All good 
     return(0);
 }
@@ -402,6 +412,27 @@ int handle_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 	wait(&status);
 
 	#ifdef DEBUG
+	printf("[middlebox] CLEANING UP!\n");
+	#endif
+	//CLEAN UP
+	close(SSL_get_fd(next_ssl));
+	close(SSL_get_fd(prev_ssl));
+	#ifdef DEBUG
+	printf("[middlebox] FREE NEXT!\n");
+	#endif
+	//CLEAN UP
+	SSL_free(next_ssl);
+		#ifdef DEBUG
+	printf("[middlebox] FREE PREV\n");
+	#endif
+	//CLEAN UP
+	//SSL_free(prev_ssl);
+	#ifdef DEBUG
+	printf("[middlebox] DONE!\n");
+	#endif
+	//CLEAN UP
+
+	#ifdef DEBUG
 	printf("[middlebox] Exiting data handler!\n");
 	#endif
 	return 0;
@@ -414,7 +445,7 @@ int tcp_forwarder(int prev, int next)
 	int status;
 	char buf[BUFSIZZ];
 	int r;
-	
+
 	#ifdef DEBUG
 	printf("[middlebox] Initializing data handlers\n");
 	#endif
