@@ -1094,6 +1094,7 @@ int spp_get_proxy_key_material(SSL *s, SPP_PROXY* proxy);
 int spp_get_end_key_material(SSL *s);
 void spp_print_buffer(unsigned char *buf, int len);
 int spp_copy_mac_state(SSL *s, SPP_MAC *mac, int send);
+int spp_copy_mac_back(SSL *s, SPP_MAC *mac, int send);
 int spp_copy_ciph_state(SSL *s, SPP_CIPH *ciph, int send);
 int spp_generate_slice_keys(SSL *s);
 SPP_PROXY* spp_get_next_proxy(SSL *s, SPP_PROXY* proxy, int forward);

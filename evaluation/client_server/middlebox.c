@@ -15,6 +15,7 @@
  * An SSL/SPP middlebox. 
  */
 
+
 #include "common.h"
 #define KEYFILE "server.pem"
 #define PASSWORD "password"
@@ -407,11 +408,69 @@ int handle_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 }
 
 
+int tcp_forwarder(int prev, int next)
+{
+	pid_t next_handler;
+	int status;
+	char buf[BUFSIZZ];
+	int r;
+	
+	#ifdef DEBUG
+	printf("[middlebox] Initializing data handlers\n");
+	#endif
+
+	next_handler = fork();
+	if( next_handler == 0) 
+	{
+		//child process
+		// handle traffic from client
+		while(1){
+ 		r = read( prev, buf, sizeof( buf ) );
+	    if ( r <= 0 )
+			break;
+	    r = write( next, buf, r );
+	    if ( r <= 0 )
+			break;
+		}
+
+		exit(0);
+	}
+	else 
+	{
+		//parent 
+		
+		while(1){
+ 		r = read( next, buf, sizeof( buf ) );
+	    if ( r <= 0 )
+			break;
+	    r = write( prev, buf, r );
+	    if ( r <= 0 )
+			break;
+		}
+		
+		//this will signal the other thread to quit
+		close(prev);
+	}
+
+	#ifdef DEBUG
+	printf("[middlebox] Waiting previous hop handler to quit before quiting data handler\n");
+	#endif
+
+	wait(&status);
+
+	#ifdef DEBUG
+	printf("[middlebox] Exiting data handler!\n");
+	#endif
+	return 0;
+}
+
+
+
 
 // Usage function 
 void usage(void){
 	printf("usage: mbox -c -a -p -m\n"); 
-	printf("-c:   protocol chosen (ssl ; spp)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; fwd)\n"); 
 	printf("-a:   {for ssl splitting only: address to forward in ip:port format}\n");
 	printf("-p:   {port number that the box will listen at (default 8423)}\n");
 	printf("-m:   {id of this proxy in ip:port format.}\n");
@@ -478,14 +537,14 @@ int main(int argc, char **argv){
     }
 
 	// Checking input parameters 
-	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0))
+	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0) && (strcmp(proto, "fwd") != 0))
 	{
-		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
+		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl, fwd\n"); 
 		usage(); 
 	}
-	else if ( strcmp(proto, "ssl") == 0  && address_to_forward == NULL )
+	else if ( (strcmp(proto, "ssl") == 0 || (strcmp(proto, "fwd"))==0 ) && address_to_forward == NULL )
 	{
-		printf("You must specify a forwarding address for SSL splitting (-a)\n"); 
+		printf("You must specify a forwarding address for SSL splitting or forwarding  (-a)\n"); 
 		usage(); 
 	}
 	
@@ -495,12 +554,14 @@ int main(int argc, char **argv){
 	#endif 
 	
 	//initialize SSL connection
-	if (strcmp(proto, "spp") == 0)
-		ctx = initialize_ctx(KEYFILE, PASSWORD, "middlebox");
-	else 
-		ctx = initialize_ctx(KEYFILE, PASSWORD, "ssl");
+	if (strcmp(proto, "fwd") != 0){
+		if (strcmp(proto, "spp") == 0)
+			ctx = initialize_ctx(KEYFILE, PASSWORD, "middlebox");
+		else 
+			ctx = initialize_ctx(KEYFILE, PASSWORD, "ssl");
 
-	load_dh_params(ctx,DHFILE);
+		load_dh_params(ctx,DHFILE);
+	}
    
 	// Socket in listen state
 	sock = tcp_listen(port);
@@ -509,42 +570,56 @@ int main(int argc, char **argv){
 		if((s = accept(sock, 0, 0)) < 0){
 			err_exit("Problem socket accept\n");
 		}
+		signal(SIGCHLD, SIG_IGN);
 		// fork a new proces 
 		if((pid = fork())){
 			close(s);
 		} else {
-			sbio = BIO_new_socket(s, BIO_NOCLOSE);
-			ssl = SSL_new(ctx);
-			SSL_set_bio(ssl, sbio, sbio);
-
-			// Accept connections based on the protocol (ssl split or proxy)
-			if (strcmp(proto, "spp") == 0)
+			if (strcmp(proto, "fwd") == 0)
 			{
-				//SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
-				if ((r = SPP_proxy(ssl, prxy_address, SPP_Callback, &ssl_next)) <= 0) {
-					berr_exit("[middlebox] SPP proxy error");
-				} else {
-					#ifdef DEBUG            
-	                printf("[middlebox] SPP proxy OK\n"); 
-	                #endif
-				}
+				#ifdef DEBUG            
+		        printf("[middlebox] TCP forwarder\n"); 
+		        #endif
+				/* no encryption... just tcp forwarding... */
+				char* fwd_host = strtok(strdup(address_to_forward), ":");	// TODO: memory leak here...
+    			int fwd_port = atoi(strtok(NULL, ":"));	// port 
+				int next_hop =  tcp_connect(fwd_host, fwd_port);
+				tcp_forwarder(s, next_hop);
 			}
-			else if (strcmp(proto, "ssl") == 0)
+			else
 			{
-				if((r = SSL_accept(ssl) <= 0)){
-					berr_exit("SSL accept error");
-				} else {
-					#ifdef DEBUG		
-					printf("SSL accept OK\n"); 
-					#endif
-				}
-				ssl_next = create_SSL_connection(address_to_forward, "ssl");
-			}
-			/*
-			STARTING THE DATA HANDLERS
-			*/
-			handle_data(ssl, ssl_next, proto);
+				sbio = BIO_new_socket(s, BIO_NOCLOSE);
+				ssl = SSL_new(ctx);
+				SSL_set_bio(ssl, sbio, sbio);
 
+				// Accept connections based on the protocol (ssl split or proxy)
+				if (strcmp(proto, "spp") == 0)
+				{
+					//SSL* (*connect_func)(SSL *, char *)  = SPP_Callback;
+					if ((r = SPP_proxy(ssl, prxy_address, SPP_Callback, &ssl_next)) <= 0) {
+						berr_exit("[middlebox] SPP proxy error");
+					} else {
+						#ifdef DEBUG            
+		                printf("[middlebox] SPP proxy OK\n"); 
+		                #endif
+					}
+				}
+				else if (strcmp(proto, "ssl") == 0)
+				{
+					if((r = SSL_accept(ssl) <= 0)){
+						berr_exit("SSL accept error");
+					} else {
+						#ifdef DEBUG		
+						printf("SSL accept OK\n"); 
+						#endif
+					}
+					ssl_next = create_SSL_connection(address_to_forward, "ssl");
+				}
+				/*
+				STARTING THE DATA HANDLERS
+				*/
+				handle_data(ssl, ssl_next, proto);
+			}
 			// Close socket and exit child thread
     		close(s);
     		exit(0);
