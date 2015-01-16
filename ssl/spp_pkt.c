@@ -302,7 +302,9 @@ printf("\n");
             mac_size=EVP_MD_CTX_size(s->read_hash);
             OPENSSL_assert(mac_size <= EVP_MAX_MD_SIZE);
 
-            //printf("Parsing old MAC\n");
+#ifdef DEBUG
+            printf("Parsing old-style MAC\n");
+#endif
             
             /* kludge: *_cbc_remove_padding passes padding length in rr->type */
             orig_len = rr->length+((unsigned int)rr->type>>8);
@@ -532,6 +534,9 @@ start:
                             if (s->mode & SSL_MODE_RELEASE_BUFFERS && s->s3->rbuf.left == 0)
                                     ssl3_release_read_buffer(s);
                             }
+                    } else if (type == SSL3_RT_APPLICATION_DATA) {
+                        printf("FATAL ERROR: Application buffer not large enough for record!\n");
+                        return -1;
                     }
             return(n);
             }
@@ -1082,6 +1087,9 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
      * from wr->input.  Length should be wr->length.
      * wr->data still points in the wb->buf */
     if (mac_size != 0 && slice != NULL) {
+#ifdef DEBUG
+        printf("Generating 3MAC\n");
+#endif
         /* Must have read access, so write the read MAC. */
         spp_copy_mac_state(s, slice->read_mac, 1);
         if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
@@ -1089,21 +1097,27 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
         
         /* Compute the write hash. */
         if (slice->write_mac != NULL) {
+#ifdef DEBUG
+            printf("Generating write MAC\n");
+#endif
             spp_copy_mac_state(s, slice->write_mac, 1);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + mac_size]),1) < 0)
                 goto err;
         } else {
             /* Copy from the previous record. */
-            memcpy(spp_ctx->write_mac, &(p[wr->length + eivlen + mac_size]), mac_size);
+            memcpy(&(p[wr->length + eivlen + mac_size]), spp_ctx->write_mac, mac_size);
         }
         /* Must be an end point, write the integrity hash. */
         if (s->def_ctx->read_access) {
+#ifdef DEBUG
+            printf("Generating integrity MAC\n");
+#endif
             spp_copy_mac_state(s, s->def_ctx->read_mac, 1);
             if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen + (mac_size*2)]),1) < 0)
                 goto err;            
         } else {
             /* Copy from the previous record. */
-            memcpy(spp_ctx->integrity_mac, &(p[wr->length + eivlen + (mac_size*2)]), mac_size);
+            memcpy(&(p[wr->length + eivlen + (mac_size*2)]), spp_ctx->integrity_mac, mac_size);
         }        
         wr->length+=(mac_size*3);        
     } else if (mac_size != 0) {
@@ -1130,12 +1144,22 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
                 goto err; */
         wr->length += eivlen;
     }
+    
+#ifdef DEBUG
+    printf("Unencrypted packet: ");
+    spp_print_buffer(wr->data, wr->length);
+#endif
 
     /* ssl3_enc can only have an error on read */
     /* This is a call to spp_enc which will encrypt or not 
      * depending upon whether we have the encryption material. */
     s->method->ssl3_enc->enc(s,1);
 
+#ifdef DEBUG
+    printf("Encrypted packet: ");
+    spp_print_buffer(wr->data, wr->length);
+#endif
+    
     /* record length after mac and block padding */
     s2n(wr->length,plen);
 
