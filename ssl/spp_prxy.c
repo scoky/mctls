@@ -215,8 +215,10 @@ int get_proxy_msg(SSL *s, int st1, int stn, int msg, int forward) {
         &ok);
     //printf("ok=%d\n", ok);
     if (!ok) return n;
-    //printf("Got handshake message, len=%d, type=%d\n", n, s->s3->tmp.message_type);
+#if 0
+    printf("Got handshake message, len=%d, type=%d\n", n, s->s3->tmp.message_type);
     spp_print_buffer(s->init_msg, s->init_num);
+#endif
     if (forward)
         return spp_forward_message(s->other_ssl, s);
     return 1;

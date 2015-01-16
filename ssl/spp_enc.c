@@ -213,7 +213,7 @@ int spp_init_slices_st(SSL *s, int which) {
 }
 
 int spp_init_integrity_st(SSL *s) {
-    if (s->i_mac == NULL) {
+    /*if (s->i_mac == NULL) {
         if ((s->i_mac=(SPP_MAC*)malloc(sizeof(SPP_MAC)))==NULL)
             goto err;
         memset(&(s->i_mac->read_sequence[0]),0,8);
@@ -224,7 +224,7 @@ int spp_init_integrity_st(SSL *s) {
         memcpy(&(s->i_mac->write_mac_secret[0]), &(s->s3->write_mac_secret[0]), s->s3->write_mac_secret_size); 
         s->i_mac->read_hash = s->read_hash;
         s->i_mac->write_hash = s->write_hash;
-    }
+    }*/
     
     return 1;
 err:
