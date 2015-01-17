@@ -214,7 +214,7 @@ int spp_init_slices_st(SSL *s, int which) {
 
 int spp_init_integrity_st(SSL *s) {
     /*if (s->i_mac == NULL) {
-        if ((s->i_mac=(SPP_MAC*)malloc(sizeof(SPP_MAC)))==NULL)
+        if ((s->i_mac=(SPP_MAC*)OPENSSL_malloc(sizeof(SPP_MAC)))==NULL)
             goto err;
         memset(&(s->i_mac->read_sequence[0]),0,8);
         memset(&(s->i_mac->write_sequence[0]),0,8);

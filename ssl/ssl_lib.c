@@ -389,13 +389,18 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->read_slice = NULL;
         s->_proxy_id = 3;
         s->_slice_id = 2;
-        s->def_ctx = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+        s->def_ctx = (SPP_SLICE*)OPENSSL_malloc(sizeof(SPP_SLICE));
         spp_init_slice(s->def_ctx);
         s->def_ctx->slice_id = 1;
-        s->def_ctx->read_mac = (SPP_MAC*)malloc(sizeof(SPP_MAC));
+        s->def_ctx->read_mac = (SPP_MAC*)OPENSSL_malloc(sizeof(SPP_MAC));
         s->def_ctx->write_mac = s->def_ctx->read_mac;
-        s->def_ctx->read_ciph = (SPP_CIPH*)malloc(sizeof(SPP_CIPH));
+        s->def_ctx->read_ciph = (SPP_CIPH*)OPENSSL_malloc(sizeof(SPP_CIPH));
         s->spp_server_address = NULL;
+        /* Stats variables */
+        s->read_stats.bytes = s->read_stats.app_bytes = s->read_stats.pad_bytes 
+                = s->read_stats.header_bytes = s->read_stats.handshake_bytes = 0;
+        s->write_stats.bytes = s->write_stats.app_bytes = s->write_stats.pad_bytes 
+                = s->write_stats.header_bytes = s->write_stats.handshake_bytes = 0;
 
 	return(s);
 err:
@@ -571,7 +576,7 @@ void SSL_free(SSL *s)
 		ssl_clear_bad_session(s);
 		SSL_SESSION_free(s->session);
 		}
-
+        spp_clear_slices_ctx(s);
 	ssl_clear_cipher_ctx(s);
 	ssl_clear_hash_ctx(&s->read_hash);
 	ssl_clear_hash_ctx(&s->write_hash);
@@ -1007,7 +1012,7 @@ int SPP_get_proxies(SSL *ssl, SPP_PROXY **proxies, int *proxies_len){
 }
 SPP_PROXY* SPP_generate_proxy(SSL *s, char* address) {
     SPP_PROXY *prxy;
-    prxy = (SPP_PROXY*)malloc(sizeof(SPP_PROXY));
+    prxy = (SPP_PROXY*)OPENSSL_malloc(sizeof(SPP_PROXY));
     spp_init_proxy(prxy);
     prxy->address = address;
     prxy->proxy_id = (s->_proxy_id++);
@@ -1015,7 +1020,7 @@ SPP_PROXY* SPP_generate_proxy(SSL *s, char* address) {
 }
 SPP_SLICE* SPP_generate_slice(SSL *s, char* purpose) {
     SPP_SLICE *slice;
-    slice = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+    slice = (SPP_SLICE*)OPENSSL_malloc(sizeof(SPP_SLICE));
     spp_init_slice(slice);
     slice->purpose = purpose;
     slice->slice_id = (s->_slice_id++);
@@ -2967,7 +2972,60 @@ err:
 		}
 	return(ret);
 	}
-
+void spp_clear_slice_ctx(SSL *s, SPP_SLICE *slice){
+    if (slice->read_mac != NULL) {
+        ssl_clear_hash_ctx(&slice->read_mac->read_hash);
+        ssl_clear_hash_ctx(&slice->read_mac->write_hash);
+        OPENSSL_free(slice->read_mac);
+        slice->read_mac = NULL;
+    }
+    if (slice->read_ciph != NULL) {
+        if (slice->read_ciph->enc_read_ctx != NULL) {
+            EVP_CIPHER_CTX_cleanup(slice->read_ciph->enc_read_ctx);
+            OPENSSL_free(slice->read_ciph->enc_read_ctx);
+        }
+        if (slice->read_ciph->enc_write_ctx != NULL) {
+            EVP_CIPHER_CTX_cleanup(slice->read_ciph->enc_write_ctx);
+            OPENSSL_free(slice->read_ciph->enc_write_ctx);
+        }
+        slice->read_ciph = NULL;
+    }
+    if (slice->purpose != NULL) {
+        OPENSSL_free(slice->purpose);
+        slice->purpose = NULL;
+    }
+}
+void spp_clear_proxy_ctx(SSL *s, SPP_PROXY* proxy) {
+    if (proxy->address != NULL) {
+        OPENSSL_free(proxy->address);
+        proxy->address = NULL;
+    }
+    // TODO: clean up cert and stuff
+}
+void spp_clear_slices_ctx(SSL *s) {
+    int i;
+    /*if (s->def_ctx != NULL) {
+        spp_clear_slice_ctx(s, s->def_ctx);
+        OPENSSL_free(s->def_ctx);
+        s->def_ctx = NULL;
+    }
+    for (i = 0; i < s->slices_len; i++) {
+        if (s->slices[i] != NULL) {
+            spp_clear_slice_ctx(s, s->slices[i]);
+            OPENSSL_free(s->slices[i]);
+            s->slices[i] = NULL;
+        }
+    }
+    s->slices_len = 0;
+    for (i = 0; i < s->proxies_len; i++) {
+        if (s->proxies[i] != NULL) {
+            spp_clear_proxy_ctx(s, s->proxies[i]);
+            OPENSSL_free(s->proxies[i]);
+            s->proxies[i] = NULL;
+        }
+    }
+    s->proxies_len = 0;*/
+}
 void ssl_clear_cipher_ctx(SSL *s)
 	{
 	if (s->enc_read_ctx != NULL)

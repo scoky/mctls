@@ -1186,7 +1186,16 @@ struct spp_read_st
         unsigned char *read_mac;
         unsigned char *write_mac;
         size_t mac_length;
-        };       
+        };     
+        
+struct spp_stats_st
+        {
+        int bytes;
+        int app_bytes;
+        int pad_bytes;
+        int header_bytes;
+        int handshake_bytes;
+        };
 
 struct ssl_st
 	{
@@ -1487,6 +1496,9 @@ struct ssl_st
         SSL* (*proxy_func)(SSL *, char *);
         char *proxy_address;
         char *spp_server_address;
+        
+        struct spp_stats_st read_stats;
+        struct spp_stats_st write_stats;
 	};
 
 #endif

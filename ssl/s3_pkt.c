@@ -333,6 +333,9 @@ again:
 		ssl_minor= *(p++);
 		version=(ssl_major<<8)|ssl_minor;
 		n2s(p,rr->length);
+                
+                s->read_stats.header_bytes += SSL3_RT_HEADER_LENGTH;
+                s->read_stats.bytes += rr->length + SSL3_RT_HEADER_LENGTH;
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
@@ -540,6 +543,11 @@ printf("\n");
 			}
 		goto again;
 		}
+        
+        if (rr->type == SSL3_RT_APPLICATION_DATA)
+            s->read_stats.app_bytes += rr->length;
+        else if (rr->type == SSL3_RT_HANDSHAKE)
+            s->read_stats.handshake_bytes += rr->length;
 
 #if 0
 fprintf(stderr, "Ultimate Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -792,6 +800,14 @@ static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
 	/* field where we are to write out packet length */
 	plen=p; 
 	p+=2;
+        
+        /* Stats */
+        if (type == SSL3_RT_APPLICATION_DATA)
+            s->write_stats.app_bytes += len;
+        else if (type == SSL3_RT_HANDSHAKE)
+            s->write_stats.handshake_bytes += len;
+        s->write_stats.header_bytes += SSL3_RT_HEADER_LENGTH;
+        
 	/* Explicit IV length, block ciphers and TLS version 1.1 or later */
 	if (s->enc_write_ctx && s->version >= TLS1_1_VERSION)
 		{
@@ -860,6 +876,8 @@ static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
 
 	/* record length after mac and block padding */
 	s2n(wr->length,plen);
+        
+        s->write_stats.bytes += wr->length + SSL3_RT_HEADER_LENGTH;
 
 	/* we should now have
 	 * wr->data pointing to the encrypted data, which is

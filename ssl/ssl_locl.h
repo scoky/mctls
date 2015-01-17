@@ -865,6 +865,9 @@ struct openssl_ssl_test_functions
 #ifndef OPENSSL_UNIT_TEST
 
 void ssl_clear_cipher_ctx(SSL *s);
+void spp_clear_slices_ctx(SSL *s);
+void spp_clear_slice_ctx(SSL *s, SPP_SLICE* slice);
+void spp_clear_proxy_ctx(SSL *s, SPP_PROXY* proxy);
 int ssl_clear_bad_session(SSL *s);
 CERT *ssl_cert_new(void);
 CERT *ssl_cert_dup(CERT *cert);

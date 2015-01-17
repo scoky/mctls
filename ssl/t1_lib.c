@@ -1116,12 +1116,12 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                     /* Read the slice IDs */
                     n1s(sdata, s->slices_len);
                     for (i = 0; i < s->slices_len; i++) {
-                        s->slices[i] = (SPP_SLICE *)malloc(sizeof(SPP_SLICE));
+                        s->slices[i] = (SPP_SLICE *)OPENSSL_malloc(sizeof(SPP_SLICE));
                         spp_init_slice(s->slices[i]);
                         n1s(sdata, s->slices[i]->slice_id);
                         
                         n1s(sdata, char_len);
-                        s->slices[i]->purpose = (char *)malloc(char_len+1);
+                        s->slices[i]->purpose = (char *)OPENSSL_malloc(char_len+1);
                         memcpy(s->slices[i]->purpose, sdata, char_len);
                         s->slices[i]->purpose[char_len] = '\0';
                         sdata += char_len;
@@ -1130,12 +1130,12 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                     }
                     n1s(sdata, s->proxies_len);
                     for (i = 0; i < s->proxies_len; i++) {
-                        s->proxies[i] = (SPP_PROXY *)malloc(sizeof(SPP_PROXY));
+                        s->proxies[i] = (SPP_PROXY *)OPENSSL_malloc(sizeof(SPP_PROXY));
                         spp_init_proxy(s->proxies[i]);
                         n1s(sdata, s->proxies[i]->proxy_id);
                         
                         n1s(sdata, char_len);
-                        s->proxies[i]->address = (char *)malloc(char_len+1);
+                        s->proxies[i]->address = (char *)OPENSSL_malloc(char_len+1);
                         memcpy(s->proxies[i]->address, sdata, char_len);
                         s->proxies[i]->address[char_len] = '\0';
                         sdata += char_len;
@@ -1156,7 +1156,7 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
                     }
                     
                     n1s(sdata, char_len);
-                    s->spp_server_address = (char *)malloc(char_len+1);
+                    s->spp_server_address = (char *)OPENSSL_malloc(char_len+1);
                     memcpy(s->spp_server_address, sdata, char_len);
                     s->spp_server_address[char_len] = '\0';
                     sdata += char_len;

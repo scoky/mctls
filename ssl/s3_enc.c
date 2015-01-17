@@ -519,6 +519,7 @@ int ssl3_enc(SSL *s, int send)
 			{
 			i=bs-((int)l%bs);
 
+                        s->write_stats.pad_bytes += i;
 			/* we need to add 'i-1' padding bytes */
 			l+=i;
 			/* the last of these zero bytes will be overwritten
@@ -539,8 +540,14 @@ int ssl3_enc(SSL *s, int send)
 
 		if (EVP_MD_CTX_md(s->read_hash) != NULL)
 			mac_size = EVP_MD_CTX_size(s->read_hash);
-		if ((bs != 1) && !send)
-			return ssl3_cbc_remove_padding(s, rec, bs, mac_size);
+		if ((bs != 1) && !send) 
+                    {
+                        int ret;
+                        i = rec->length;
+			ret = ssl3_cbc_remove_padding(s, rec, bs, mac_size);
+                        s->read_stats.pad_bytes += i - rec->length;
+                        return ret;
+                    }
 		}
 	return(1);
 	}

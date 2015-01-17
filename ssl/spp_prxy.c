@@ -165,7 +165,7 @@ int spp_initialize_ssl(SSL *s, SSL *n) {
     //printf("Proxy list is:\n");
     n->proxies_len = s->proxies_len;
     for (i = 0; i < s->proxies_len; i++) {
-        n->proxies[i] = (SPP_PROXY*)malloc(sizeof(SPP_PROXY));
+        n->proxies[i] = (SPP_PROXY*)OPENSSL_malloc(sizeof(SPP_PROXY));
         spp_init_proxy(n->proxies[i]);
         n->proxies[i]->proxy_id = s->proxies[i]->proxy_id;
         n->proxies[i]->address = s->proxies[i]->address;
@@ -173,7 +173,7 @@ int spp_initialize_ssl(SSL *s, SSL *n) {
     }
     n->slices_len = s->slices_len;
     for (i = 0; i < s->slices_len; i++) {
-        n->slices[i] = (SPP_SLICE*)malloc(sizeof(SPP_SLICE));
+        n->slices[i] = (SPP_SLICE*)OPENSSL_malloc(sizeof(SPP_SLICE));
         spp_init_slice(n->slices[i]);
         n->slices[i]->slice_id = s->slices[i]->slice_id;
         n->slices[i]->purpose = s->slices[i]->purpose;

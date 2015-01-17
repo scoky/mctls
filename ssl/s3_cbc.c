@@ -95,7 +95,7 @@ int ssl3_cbc_remove_padding(const SSL* s,
 	good &= constant_time_ge(block_size, padding_length+1);
 	padding_length = good & (padding_length+1);
 	rec->length -= padding_length;
-	rec->type |= padding_length<<8;	/* kludge: pass padding length */
+	rec->type |= padding_length<<8;	/* kludge: pass padding length */        
 	return constant_time_select_int(good, 1, -1);
 	}
 

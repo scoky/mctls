@@ -61,6 +61,9 @@ again:
             n2s(p,rr->length);
             /* New header fields: slice_id, proxy_id */
             rr->slice_id = *(p++);
+            
+            s->read_stats.header_bytes += SPP_RT_HEADER_LENGTH;
+            s->read_stats.bytes += rr->length + SPP_RT_HEADER_LENGTH;
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
@@ -146,7 +149,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
         /* If we are not a proxy, use temporary state. */
         if (s->proxy == 1) {
-            spp_ctx = (SPP_CTX*)malloc(sizeof(SPP_CTX));
+            spp_ctx = (SPP_CTX*)OPENSSL_malloc(sizeof(SPP_CTX));
         } else {        
             spp_ctx = &(ctx_tmp);
         }
@@ -242,7 +245,7 @@ printf("\n");
             /* Save the locations of the MACs into context. */
             /* We are creating a copy here that must be freed when writing the record out again. */
             if (s->proxy == 1) {
-                spp_ctx->read_mac = (unsigned char*)malloc(mac_size);
+                spp_ctx->read_mac = (unsigned char*)OPENSSL_malloc(mac_size);
                 memcpy(spp_ctx->read_mac, mac, mac_size);
             } else {
                 spp_ctx->read_mac = mac;
@@ -405,6 +408,11 @@ printf("\n");
         goto again;
     }
 
+    if (rr->type == SSL3_RT_APPLICATION_DATA)
+        s->read_stats.app_bytes += rr->length;
+    else if (rr->type == SSL3_RT_HANDSHAKE)
+        s->read_stats.handshake_bytes += rr->length;
+    
 #if 0
     fprintf(stderr, "Ultimate Record type=%d, Length=%d\n", rr->type, rr->length);
 #endif
@@ -1037,6 +1045,13 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* Write the slice ID as the 4th byte of the header. */
     wr->slice_id = slice == NULL ? 0 : slice->slice_id;
     *(p++)=wr->slice_id;
+    
+    /* Stats */
+    if (type == SSL3_RT_APPLICATION_DATA)
+        s->write_stats.app_bytes += len;
+    else if (type == SSL3_RT_HANDSHAKE)
+        s->write_stats.handshake_bytes += len;
+    s->write_stats.header_bytes += SPP_RT_HEADER_LENGTH;
 #ifdef DEBUG
     fprintf(stderr, "Writing record header: ");
     spp_print_buffer(wb->buf + wb->offset, SPP_RT_HEADER_LENGTH);
@@ -1131,9 +1146,9 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* If we do not have read access, then the MACs were interpreted as part of the payload. */
     if (spp_ctx != NULL) {
         if (s->proxy) {
-            free(spp_ctx->read_mac);
+            OPENSSL_free(spp_ctx->read_mac);
         }
-        free(spp_ctx);
+        OPENSSL_free(spp_ctx);
     }
 
     wr->input=p;
@@ -1159,6 +1174,8 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     printf("Encrypted packet: ");
     spp_print_buffer(wr->data, wr->length);
 #endif
+    
+    s->write_stats.bytes += wr->length + SPP_RT_HEADER_LENGTH;
     
     /* record length after mac and block padding */
     s2n(wr->length,plen);
@@ -1227,8 +1244,7 @@ int spp_write_bytes(SSL *s, int type, const void *buf_, int len) {
     if (len < tot) {
         SSLerr(SSL_F_SSL3_WRITE_BYTES,SSL_R_BAD_LENGTH);
         return(-1);
-    }
-
+    }    
 
     n=(len-tot);
     for (;;) {

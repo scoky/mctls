@@ -793,7 +793,7 @@ int tls1_enc(SSL *s, int send)
 		else if ((bs != 1) && send)
 			{
 			i=bs-((int)l%bs);
-
+                        s->write_stats.pad_bytes += i;
 			/* Add weird padding of upto 256 bytes */
 			/* we need to add 'i' padding bytes of value j */
 			j=i-1;
@@ -857,10 +857,19 @@ int tls1_enc(SSL *s, int send)
 		ret = 1;
 		if (EVP_MD_CTX_md(s->read_hash) != NULL)
 			mac_size = EVP_MD_CTX_size(s->read_hash);
-		if ((bs != 1) && !send)
+		if ((bs != 1) && !send) 
+                    {
+                        int ret;
+                        i = rec->length;
 			ret = tls1_cbc_remove_padding(s, rec, bs, mac_size);
-		if (pad && !send)
+                        s->read_stats.pad_bytes += i - rec->length;
+                        return ret;
+                    }
+		if (pad && !send) 
+                    {
+                        s->read_stats.pad_bytes += pad;
 			rec->length -= pad;
+                    }
 		}
 	return ret;
 	}
