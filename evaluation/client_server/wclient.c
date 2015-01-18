@@ -33,6 +33,7 @@ static int clientID=0;
 // -- Moved up here just because of thread 
 static SSL *ssl;                              // SSL instance
 static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
+static int stats=0;                           // Report byte statistics boolean
 
 
 
@@ -471,6 +472,8 @@ static int http_complex(char *proto, char *fn){
 		}
     
 	done:
+                if (stats)
+                    print_stats(ssl);        
 		SSL_free(ssl);
 		return(0);
 }
@@ -567,14 +570,30 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 	}
     
 	done:
+                if (stats)
+                    print_stats(ssl);
 		SSL_free(ssl);
 		return(0);
+}
+
+void print_stats(SSL *s) {
+    printf("BYTE STATISITICS:\n");
+    printf("Bytes read: %d\n", s->read_stats.bytes);
+    printf("Application bytes read: %d\n", s->read_stats.app_bytes);
+    printf("Block padding bytes read: %d\n", s->read_stats.pad_bytes);
+    printf("Header bytes read: %d\n", s->read_stats.header_bytes);
+    printf("Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
+    printf("Bytes write: %d\n", s->write_stats.bytes);
+    printf("Application bytes write: %d\n", s->write_stats.app_bytes);
+    printf("Block padding bytes write: %d\n", s->write_stats.pad_bytes);
+    printf("Header bytes write: %d\n", s->write_stats.header_bytes);
+    printf("Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
 }
 
 
 // Usage function 
 void usage(void){
-	printf("usage: wclient -s -r -w -i -f -o -a\n"); 
+	printf("usage: wclient -s -r -w -i -f -o -a -b\n"); 
 	printf("-s:   number of slices requested (min 2, 1 for handshake 1 for rest)\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
@@ -582,6 +601,7 @@ void usage(void){
 	printf("-c:   protocol chosen (ssl ; spp)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-f:   file for http GET (either via <name> (require file to exhist) of via <size>)\n"); 
+	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
 
@@ -619,7 +639,7 @@ int main(int argc, char **argv){
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
 
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:")) != -1){
+	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:b:")) != -1){
 			
 			switch(c){
 	
@@ -667,6 +687,10 @@ int main(int argc, char **argv){
 				if(! (file_action = strdup(optarg) ))
 					err_exit("Out of memory");
 				break; 
+                                
+                        case 'b':
+                                stats = atoi(optarg);
+                                break;
 			
 			// default case 
 			default:
