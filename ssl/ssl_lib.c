@@ -987,7 +987,7 @@ int SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY *proxie
     ssl->proxies_len = proxies_len-1;
     for (i = 0; i < proxies_len-1; i++) {
         ssl->proxies[i] = proxies[i];
-        printf("SPP_connect: proxy %d = %s\n", proxies[i]->proxy_id, proxies[i]->address);
+        //printf("SPP_connect: proxy %d = %s\n", proxies[i]->proxy_id, proxies[i]->address);
     }
     ssl->spp_server_address = proxies[proxies_len-1]->address;
     return(SSL_connect(ssl));
