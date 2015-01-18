@@ -42,7 +42,11 @@ case $opt in
 	;;
 
 2)	#Remove the rate control/delay
-	sudo tc qdisc del dev $iface root
+	lines=`sudo tc -s qdisc ls dev $iface | wc -l`
+	if [ $lines -gt 0 ]
+	then
+		sudo tc qdisc del dev $iface root
+	fi
 	;;
 
 3)  #Check what is configured on an interface

@@ -14,7 +14,9 @@ close all
 protocol = [
 	'ssl'
 	'spp'
+	'fwd'
 	]; 
+
 nProt = size(protocol, 1); 
 handshakeTime = figure(); 
 hold on 

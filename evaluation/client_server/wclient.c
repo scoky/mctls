@@ -472,8 +472,9 @@ static int http_complex(char *proto, char *fn){
 		}
     
 	done:
-                if (stats)
-                    print_stats(ssl);        
+		if (stats){
+			print_stats(ssl);        
+		}
 		SSL_free(ssl);
 		return(0);
 }
@@ -570,24 +571,26 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 	}
     
 	done:
-                if (stats)
-                    print_stats(ssl);
+		if (stats){
+			print_stats(ssl);
+		}
 		SSL_free(ssl);
 		return(0);
 }
 
+// report "BYTE STATISITICS"
 void print_stats(SSL *s) {
-    printf("BYTE STATISITICS:\n");
-    printf("Bytes read: %d\n", s->read_stats.bytes);
-    printf("Application bytes read: %d\n", s->read_stats.app_bytes);
-    printf("Block padding bytes read: %d\n", s->read_stats.pad_bytes);
-    printf("Header bytes read: %d\n", s->read_stats.header_bytes);
-    printf("Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
-    printf("Bytes write: %d\n", s->write_stats.bytes);
-    printf("Application bytes write: %d\n", s->write_stats.app_bytes);
-    printf("Block padding bytes write: %d\n", s->write_stats.pad_bytes);
-    printf("Header bytes write: %d\n", s->write_stats.header_bytes);
-    printf("Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
+    printf("[RESULTS] BYTE STATISITICS:\n");
+    printf("[RESULTS] Bytes read: %d\n", s->read_stats.bytes);
+    printf("[RESULTS] Application bytes read: %d\n", s->read_stats.app_bytes);
+    printf("[RESULTS] Block padding bytes read: %d\n", s->read_stats.pad_bytes);
+    printf("[RESULTS] Header bytes read: %d\n", s->read_stats.header_bytes);
+    printf("[RESULTS] Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
+    printf("[RESULTS] Bytes write: %d\n", s->write_stats.bytes);
+    printf("[RESULTS] Application bytes write: %d\n", s->write_stats.app_bytes);
+    printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
+    printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
+    printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
 }
 
 
@@ -638,64 +641,60 @@ int main(int argc, char **argv){
 	struct timeval tvBegin, tvEnd; 
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
 
+	
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:b:")) != -1){
 			
 			switch(c){
 	
 			// Number of slices
-			case 's':
-				if(! (slices_len = atoi(optarg) ))
-					err_exit("Bogus number of slices specified (no. of slices need to be > 1)");
-				break;
+			case 's':	if(! (slices_len = atoi(optarg) )){
+							err_exit("Bogus number of slices specified (no. of slices need to be > 1)");
+						}
+						break;
 		
 			// Number of proxies with read access (per slice)
-			case 'r':
-				r = atoi(optarg); 
-				break;
+			case 'r':	r = atoi(optarg); 
+						break; 
 
 			// Number of proxies with write access (per slice)
-			case 'w':
-				w = atoi(optarg); 
-				break;
+			case 'w':	w = atoi(optarg); 
+						break; 
 
         	// Integrity check requested 
-			case 'i':
-				require_server_auth = 0;
-				break; 
+			case 'i':	require_server_auth = 0;
+						break; 
       		
 			// Protocol chosen
-			case 'c':
-				if(! (proto = strdup(optarg) ))
-					err_exit("Out of memory");
-				break; 
+			case 'c':	if(! (proto = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						break; 
 			
 			// File requested for HTTP GET
-			case 'f':
-				if(! (file_requested = strdup(optarg) ))
-					err_exit("Out of memory");
-				break; 
+			case 'f':	if(! (file_requested = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						break; 
 
 			// Client/Server behavior 
-			case 'o':
-				action = atoi(optarg); 
-				break; 
+			case 'o':	action = atoi(optarg); 
+						break; 
 
 			// Action file 
 			// NOTE: necessary only if  -o 4, i.e., browser-like behavior
-			case 'a':
-				if(! (file_action = strdup(optarg) ))
-					err_exit("Out of memory");
-				break; 
+			case 'a':	if(! (file_action = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						break; 
                                 
-                        case 'b':
-                                stats = atoi(optarg);
-                                break;
-			
+			// Print byte statistics 
+			case 'b':	stats = atoi(optarg);
+						break; 
+
 			// default case 
-			default:
-				usage(); 
-				break; 
+			default:	usage(); 
+						break; 
 		}
     }
 
