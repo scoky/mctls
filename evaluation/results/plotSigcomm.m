@@ -12,10 +12,20 @@ close all
 
 % Plotting protocol usage evolution over time
 protocol = [
+	'fwd'
 	'ssl'
 	'spp'
-	'fwd'
 	]; 
+	%'spp_mod'
+	%]; 
+% Plotting protocol usage evolution over time
+leg= [
+	'TLS (forwarding)'
+	'TLS (splitting) '
+	'SPP             '
+	]; 
+	%'SPP (modified)  '
+	%]; 
 
 nProt = size(protocol, 1); 
 handshakeTime = figure(); 
@@ -28,6 +38,9 @@ if (opt == 2)
 end
 if (opt == 3) 
 	suffix = 'timeFirstByte_latency'; 
+end
+if (opt == 4) 
+	suffix = 'timeFirstByte_proxy'; 
 end
 
 
@@ -43,19 +56,24 @@ for ii = 1 : nProt
 	else 
 		set (h, 'color', kind_line(counter), 'LineWidth', 3);
 	end
-	if (ii == 1)
-		leg = {sprintf('%s',currProt)};
-	else
-		leg = [leg, {sprintf('%s', currProt)}];
-	end
+	%if (ii == 1)
+	%	leg = {sprintf('%s',currProt)};
+	%else
+	%	leg = [leg, {sprintf('%s', currProt)}];
+	%end
 	counter = counter + 1; 
 	if (opt == 2) 
 		rtt = data(1, 2); 
+		N = data(1, 3); 
 	end
-	if (opt == 3) 
+	if (opt == 3)
 		N_slices = data(1, 2);
+		N = data(1, 3); 
 	end
-	N = data(1, 3); 
+	if (opt == 4)
+		N_slices = data(1, 2);
+		rtt = data(1, 3); 
+	end
 end
 
 % Add figure details 
@@ -64,6 +82,9 @@ if (opt == 2)
 end
 if (opt == 3) 
 	xlabel('Network Latency (ms)');
+end
+if (opt == 4) 
+	xlabel('No. proxies (#)');
 end
 
 ylabel('Time to First Byte (ms)');
@@ -76,6 +97,9 @@ end
 if (opt == 3) 
 	t = sprintf('S=%d ; N_{prxy}=%d', N_slices, N); 
 end
+if (opt == 4) 
+	t = sprintf('S=%d ; Latency=%dms', N_slices, rtt); 
+end
 title(t);
 
 % set xtick label correctly 
@@ -83,12 +107,17 @@ xlim([1 size(data, 1)]);
 X = 1:size(data, 1); 
 set(gca, 'XTick', X, 'XTickLabel', data(:, 1)'); 
 %set(gca, 'XTickLabel', [5; 10; 20]); 
-%set(gca, 'YScale','log'); 
+%if (opt == 3) 
+%	set(gca, 'YScale','log'); 
+%end
 if (opt == 2) 
 	outFile = sprintf ('%s/time_1st_byte_slice.eps', figFolder); 
 end
 if (opt == 3) 
 	outFile = sprintf ('%s/time_1st_byte_latency.eps', figFolder); 
+end
+if (opt == 4) 
+	outFile = sprintf ('%s/time_1st_byte_proxy.eps', figFolder); 
 end
 saveas (h, outFile, 'psc2');
 

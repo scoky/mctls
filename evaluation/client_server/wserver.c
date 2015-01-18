@@ -795,6 +795,12 @@ int main(int argc, char **argv){
 				if(! (proto = strdup(optarg) )){
 					err_exit("Out of memory");
 				}
+				if (strcmp(proto, "fwd") == 0){
+					proto = "ssl"; 
+				}
+				if (strcmp(proto, "spp_mod") == 0){
+					proto = "spp"; 
+				}
 				break; 
 
 			// Client/Server behavior 

@@ -7,14 +7,14 @@ usage(){
     echo -e "MAX_S   = max number of slices (min is 2)"
     echo -e "MAX_R   = number of repetition of handshake per slice value"
     echo -e "proto   = protocol requested (ssl; spp; fwd)"
-    echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=file download (f[size(1K-10MB)])}"
+    echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=ping-like (f[N_proxy]) ; 5=file download (f[size(1K-10MB)])}"
     exit 0
 }
 
 # Kill eventual pending server processes 
 killServer(){
 	echo "Killing server"
-	killall wserver
+	#killall -q wserver #>> /dev/null 2>&1
 	for i in `ps aux | grep wserver | grep -v vi | grep -v grep | cut -f 2 -d " "`
 	do 
 		echo "Killing wserver $i"
@@ -25,7 +25,7 @@ killServer(){
 # Kill eventual pending mbox processes
 killMbox(){
 	echo "Killing mbox"
-	killall mbox
+	#killall -q mbox #>> /dev/null 2>&1
 	for i in `ps aux | grep mbox | grep -v vi | grep -v grep | cut -f 2 -d " "`
 	do 
 		echo "Killing mbox $i"
@@ -74,7 +74,7 @@ organizeMBOXES(){
 		nextProxy=${proxyList[$j]}
 		
 		# Start proxy with SPP 
-		if [ $proto == "spp" ]
+		if [ $proto == "spp" -o $proto == "spp_mod" ]
 		then
 			# Logging 
 			echo "[PERF] Starting proxy $proxy (port extracted: $port)"
@@ -95,6 +95,30 @@ organizeMBOXES(){
 	done
 }
 
+
+# Here updating proxy list 
+proxyFileUpdate(){
+
+	# parameters
+	server_add="127.0.0.1"    # default server address 
+	server_port="4433"        # default server port 
+	address="127.0.0.1"       # default proxy address (TO DO -- extend to array if multiple machines used)
+	nextPort=8423             # proxy starting port 
+
+	# derive and print total number of network elements (N proxies + 1 server)
+	let "tot=N+1"             
+	echo $tot > $proxyFile
+
+	# Generating lines for proxy
+	for((i=1; i<=N; i++))
+		do
+			echo "$address:$nextPort" >> $proxyFile
+			let "nextPort++"
+		done
+
+	echo "$server_add:$server_port" >> $proxyFile
+}
+
 # Check input for minimum number of parameteres requestes
 [[ $# -lt 4 ]] && usage
 
@@ -110,16 +134,17 @@ proxyFile="./proxyList"   # contains proxy information
 resFolder="../results"    # result folder        
 resFile=$resFolder"/res"  # result file 
 debug=0                   # more logging 
-proto_list[1]="ssl"            # array for protocol types currently supported
-proto_list[2]="spp"
-proto_list[3]="fwd"
+protoList[1]="ssl"            # array for protocol types currently supported
+protoList[2]="fwd"
+protoList[3]="spp"
+#protoList[4]="spp_mod"
 
 
 # Max file size in MB
 let "fSizeMAX = fSizeMAX*1024*1024"
 
 # derive proto size
-proto_count=${#proto[@]}
+proto_count=${#protoList[@]}
 
 # Run few checks on input parameters
 if [ $S_MAX -gt $MAX ] 
@@ -135,14 +160,15 @@ then
 fi 
 
 # check that protocol requested is supported
+found=0
 for ((i=1; i<=proto_count; i++))
 do
-	if [ $proto == "${prot_list[$i]}" ] 
+	if [ $proto == "${protoList[$i]}" ] 
 	then 
-		break
+		found=1
 	fi
 done
-if [ $i == $proto_count ]
+if [ $found == 0 ]
 then 
 	echo "Protocol requested ($proto) is currently not supported"
 	usage
@@ -198,13 +224,10 @@ fi
 killServer
 
 # Start middlebox - and in proper way - if needed 
-organizeMBOXES
-
-# restore ssl in case of fwd
-if [ $proto == "fwd" ]
-then
-	proto="ssl"
-fi 
+if [ $expType -ne 3 ]
+then  
+	organizeMBOXES
+fi
 
 # Switch among user choices
 case $expType in 
@@ -236,7 +259,7 @@ case $expType in
 		for((s=2; s<=S_MAX; s++))
 		do
 			# Run R handshake repetitions	
-			echo "[perf] Testing $R handshakes with $s slices (1 slice is used for handshake)"
+			echo "[PERF] Testing $R handshakes with $s slices (1 slice is used for handshake)"
 			for((i=1; i<R; i++))
 			do
 				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
@@ -319,9 +342,86 @@ case $expType in
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
 		;;
+	
+	
+	4)  # Test time to first byte [f(N_proxy])
+		echo "[PERF] Test time to first byte (function of number of proxies [1:8])"
+		opt=2
+		N_MAX=8
+
+		# Update res file 
+		resFile=$resFile"_timeFirstByte_proxy"
+		if [ -f $resFile ] 
+		then 
+			rm -v $resFile
+		fi
+
+		# Start the server 
+		echo "[PERF] ./wserver -c $proto -o $opt"
+		./wserver -c $proto -o $opt > log_server 2>&1 &
+
+		# Give server small time to setup 
+		sleep 1
+
+		# Setup 3 slices 
+		s=3
+
+		# Make copy of current file 
+		cp $proxyFile $proxyFile"_original"
+
+		# Run S_MAX repetitions
+		for((N=1; N<=N_MAX; N=2*N))
+		do
+			# Update proxy file 
+			proxyFileUpdate 
+
+			# Proxy setup 
+			organizeMBOXES
+			
+			# Run R handshake repetitions	
+			echo "[PERF] Testing $R handshakes with $N proxies (3 slices:  for handshake, 1 for header, 1 for content)"
+			for((i=1; i<R; i++))
+			do
+				# Logging for future correction
+				echo $N >> .tmp 
+
+				# Starting client 
+				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
+				./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1
+			done
+
+			# Reset mboxes 
+			killMbox
+		done
+
+		# Results
+		if [ -f $log ] 
+		then  
+			if [ $debug -eq 1 ]
+			then 
+				echo "#Handshake Analysis" > $resFile
+				echo "#Slices AvgDur StdDur" >> $resFile 
+			fi
+			let "fix2=nProxy-1"
+			
+			# fixing log file 
+			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
+			paste .tmp .tmpMore > .res
+			
+			# Analyzing (corrected) log 
+			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=1 -f stdev.awk >> $resFile
+			rm .tmp .tmpMore 
+		else
+			echo "[PERF] No file <<$log>> created, check for ERRORS!"
+		fi
+
+		# Restore original proxy file (user for other experiments)
+		cp $proxyFile"_original" $proxyFile
+		;;
 
 
-	4)	# Test download time as a function of file size for slice value range 
+
+	5)	# Test download time as a function of file size for slice value range 
 		echo "Test download time"
 		opt=3
 	

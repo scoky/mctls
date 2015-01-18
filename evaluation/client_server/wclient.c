@@ -669,6 +669,12 @@ int main(int argc, char **argv){
 			case 'c':	if(! (proto = strdup(optarg) )){
 							err_exit("Out of memory");
 						}
+						if (strcmp(proto, "fwd") == 0){
+                  			proto = "ssl"; 
+						}
+						if (strcmp(proto, "spp_mod") == 0){
+                  			proto = "spp"; 
+						}
 						break; 
 			
 			// File requested for HTTP GET
