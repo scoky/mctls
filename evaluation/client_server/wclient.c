@@ -960,7 +960,7 @@ int main(int argc, char **argv){
 
 	// Report time statistics
 	if (action > 1){
-		printf("[RESULTS] No_Slices %d Action %s Duration %ld.%06ld\n", slices_len, temp_str, tvDuration.tv_sec, tvDuration.tv_usec);	
+		printf("[RESULTS] No_Slices %d Action %s_%d Duration %ld.%06ld\n", slices_len, temp_str, sizeCheck, tvDuration.tv_sec, tvDuration.tv_usec);	
 	}else{
 		printf("[RESULTS] No_Slices %d Action %s Handshake_Dur %ld.%06ld\n", slices_len, temp_str, tvConnect.tv_sec, tvConnect.tv_usec);	
 	}

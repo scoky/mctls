@@ -134,7 +134,7 @@ proxyFile="./proxyList"   # contains proxy information
 resFolder="../results"    # result folder        
 resFile=$resFolder"/res"  # result file 
 debug=0                   # more logging 
-protoList[1]="ssl"            # array for protocol types currently supported
+protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 #protoList[4]="spp_mod"
@@ -456,6 +456,7 @@ case $expType in
 			do
 				echo $fSizeShort >> .tmp
 				echo "[PERF] ./wclient -s $s -c $proto -o $opt -f $fSize"
+				#echo "./wclient -s $s -c $proto -o $opt -f $fSize >> $log 2>/dev/null"
 				./wclient -s $s -c $proto -o $opt -f $fSize >> $log 2>/dev/null
 			done
 				let "fSize = 2*fSize"
@@ -483,6 +484,74 @@ case $expType in
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
 		;;
+
+	6)	# Measure download time in browser-like behavior 
+		echo "[PERF] Measure download time in browser-like behavior"
+		opt=4
+	
+		# Update res file 
+		resFile=$resFile"_downloadTime_browser"
+
+		# Cleaning
+		if [ -f $resFile ] 
+		then 
+			rm -v $resFile
+		fi
+
+		# Start the server 
+		echo "[PERF] ./wserver -c $proto -o $opt"
+		./wserver -c $proto -o $opt > log_server &
+	
+		# Give server small time to setup 
+		sleep 1
+
+		# Setup 3 slices 
+		s=3 
+
+		# Run until no action 
+		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
+		loop=0
+		MAX_LOOP=1
+		for actionFile in `ls $actionFolder`	
+		do 
+			if [ $loop -eq $MAX_LOOP ] 
+			then 
+				echo "[PERF] Stopping since tested already <<$loop>> actionFiles"
+				break 
+			fi
+			# Run R handshake repetitions	
+			echo "[PERF] Test $R file retrievals with action file $fSize ($s slices)"
+			for((i=1; i<=R; i++))
+			do
+				echo $loop >> .tmp
+				#echo "[PERF] ./wclient -s $s -c $proto -o $opt -a $actionFile"
+				echo "./wclient -s $s -c $proto -o $opt -a $actionFile >> $log 2>/dev/null"
+			done
+			let "loop++"
+		done
+		
+		# Results
+		if [ -f $log ] 
+		then  
+			if [ $debug -eq 1 ]
+			then 
+				echo "#Download Time Analysis" > $resFile
+				echo "#Loop Slices Delay AvgDur StdDur" >> $resFile 
+			fi
+			let "fix2=nProxy-1"
+			
+			# fixing log file 
+			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
+			paste .tmp .tmpMore > .res
+			
+			# Analyzing (corrected) log 
+			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=0 -f stdev.awk > $resFile
+			rm .tmp .tmpMore 
+		else
+			echo "[PERF] No file <<$log>> created, check for ERRORS!"
+		fi
+		;;
+
 
 	*)	
 		;;

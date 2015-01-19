@@ -98,8 +98,29 @@ case $opt in
 		echo "[MASTER] Analysis of download time as a function of the file size"
 		echo "!!![MASTER] Increasing transfer rate to 20Mbps and lowering repetitions to just 10 (for testing)!!!"
 		#----------------
-		rate=20
-		maxRate=20
+		rate=10
+		maxRate=10
+		R=10
+		#----------------
+		S_max=3
+		for ((i=1; i<=proto_count; i++))
+		do
+			proto=${protoList[$i]}
+			echo -e "\t[MASTER] Working on protocol $proto ..."
+			
+			# deal with SPP_MOD
+			tcpTrick
+			
+			# run analysis
+			#echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+		done
+		;;
+	
+	6) 
+		echo "[MASTER] Analysis of download time in browser-like mode"
+		echo "!!![MASTER] Using only 10 repetitions (for testing)!!!"
+		#----------------
 		R=10
 		#----------------
 		S_max=3
