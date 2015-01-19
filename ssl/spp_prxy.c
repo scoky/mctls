@@ -1022,6 +1022,9 @@ int spp_proxy_accept(SSL *s) {
                 
             case SSL3_ST_SR_KEY_EXCH_A:
             case SSL3_ST_SR_KEY_EXCH_B:
+                                #ifdef DEBUG
+				log_time("Waiting for client key exchange\n", &currTime, &prevTime, &originTime); 
+				#endif
                 ret=get_proxy_msg(s, SSL3_ST_SR_KEY_EXCH_A, SSL3_ST_SR_KEY_EXCH_B, SSL3_MT_CLIENT_KEY_EXCHANGE,1);
                                 #ifdef DEBUG
 				log_time("Received client key exchange\n", &currTime, &prevTime, &originTime); 
