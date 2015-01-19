@@ -34,8 +34,37 @@ static int clientID=0;
 static SSL *ssl;                              // SSL instance
 static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
 static int stats=0;                           // Report byte statistics boolean
+static int sizeCheck; 
 
+// Compute the size of a file to be served
+int calculate_file_size(char *filename){ 
 
+    FILE *fp;   
+    int sz = 0;  
+
+    // Open file 
+    fp = fopen(filename,"r");
+ 
+    // Check for errors while opening file
+    if(fp == NULL){
+        printf("Error while opening file %s.\r\n", filename);
+        exit(-1);
+    }   
+    
+    // Seek  to the end of the file and ask for position 
+    fseek(fp, 0L, SEEK_END);
+    sz = ftell(fp);
+    //fseek(fp, 0L, SEEK_SET);
+
+    // Close file 
+    fclose (fp);
+    
+    // Return file size 
+    #ifdef DEBUG
+    printf ("[DEBUG] File requested is <<%s>> with size <<%d bytes>>\n", filename, sz); 
+    #endif 
+    return sz; 
+}
 
 // Read counter of number of proxies in the provided list 
 int read_proxy_count(char *file_name){
@@ -283,7 +312,7 @@ void sendRequest(char *filename){
 		for (i = 0; i < ssl->slices_len; i++){
 			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
 			#ifdef DEBUG
-			printf("Wrote %d bytes\n", r);
+			printf("[DEBUG] Wrote %d bytes\n", r);
 			#endif
 			check_SSL_write_error(r, request_len); 
 		}
@@ -407,6 +436,7 @@ static int http_complex(char *proto, char *fn){
 			#ifdef DEBUG
 			printf("Read %d bytes\n", r);
 			#endif
+			
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					break;
@@ -480,11 +510,23 @@ static int http_complex(char *proto, char *fn){
 }
 
 // Send HTTP get and wait for response (SSL/SPP)
-static int http_request(char *filename, char *proto, bool requestingFile){
+static int http_request(char *filename, char *proto, bool requestingFile, struct timeval *tvEnd){
 	
 	char buf[BUFSIZZ];
 	int r;
 	int len; 
+	bool flag = false; 
+
+    // Compute expected data size
+	int fSize = atoi(filename);
+    if (fSize == 0 && filename[0] != '0'){
+		if (requestingFile){
+			fSize = calculate_file_size(filename);
+		}else{
+	    	fSize = strlen("HTTP/1.0 200 OK\r\n"); 
+		}
+	}   
+	sizeCheck = fSize; 
 
 	// Request file (either by name or by size) 
 	if (requestingFile){
@@ -495,15 +537,23 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 	while(1){
 		// SPP read
 		if (strcmp(proto, "spp") == 0){
+			/*
 			#ifdef DEBUG
-			//printf("[DEBUG] SPP_read\n");
+			printf("[DEBUG] SPP_read\n");
 			#endif 
+			*/
 			SPP_SLICE *slice;		// slice for SPP_read
 			SPP_CTX *ctx;			// context pointer for SPP_read
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
-			#ifdef DEBUG
-			printf("Read %d bytes\n", r);
+			#ifdef DEBUG 
+			printf("[INFO] Read %d bytes\n", r);
 			#endif
+			if ((ssl->read_stats.app_bytes == fSize) && (! flag)){
+				printf("[INFO] Read %d bytes as expected (fSize=%d). Stopping timer\n", ssl->read_stats.app_bytes, fSize);
+				// Stop the timer here (avoid shutdown crap) 
+				gettimeofday(tvEnd, NULL);
+				flag = true; 
+			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					len = r;
@@ -523,10 +573,21 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 	
 		// SSL read
 		if (strcmp(proto, "ssl") == 0){
+			/*
 			#ifdef DEBUG
-			//printf("[DEBUG] SSL_read\n");
-			#endif 
+			printf("[DEBUG] SSL_read\n");
+			#endif 	
+			*/
 			r = SSL_read(ssl, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ((ssl->read_stats.app_bytes == fSize) && (! flag)){
+				printf("[INFO] Read %d bytes as expected (fSize=%d). Stopping timer\n", ssl->read_stats.app_bytes, fSize);
+				// Stop the timer here (avoid shutdown crap) 
+				gettimeofday(tvEnd, NULL);
+				flag = true; 
+			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
 					len = r;
@@ -578,11 +639,12 @@ static int http_request(char *filename, char *proto, bool requestingFile){
 		return(0);
 }
 
+
 // report "BYTE STATISITICS"
 void print_stats(SSL *s) {
     printf("[RESULTS] BYTE STATISITICS:\n");
     printf("[RESULTS] Bytes read: %d\n", s->read_stats.bytes);
-    printf("[RESULTS] Application bytes read: %d\n", s->read_stats.app_bytes);
+    printf("[RESULTS] Application bytes read: %d [Expected %d]\n", s->read_stats.app_bytes, sizeCheck); 
     printf("[RESULTS] Block padding bytes read: %d\n", s->read_stats.pad_bytes);
     printf("[RESULTS] Header bytes read: %d\n", s->read_stats.header_bytes);
     printf("[RESULTS] Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
@@ -596,14 +658,15 @@ void print_stats(SSL *s) {
 
 // Usage function 
 void usage(void){
-	printf("usage: wclient -s -r -w -i -f -o -a -b\n"); 
+	printf("usage: wclient -s -r -w -i -f -o -a -c -b\n"); 
 	printf("-s:   number of slices requested (min 2, 1 for handshake 1 for rest)\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
-	printf("-c:   protocol chosen (ssl ; spp)\n"); 
+	printf("-f:   file for http GET (either via <name> (require file to exhist both at server and client[for testing reasons]) or via <size>)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
-	printf("-f:   file for http GET (either via <name> (require file to exhist) of via <size>)\n"); 
+	printf("-a:   action file for browser-like behavior\n");
+	printf("-c:   protocol chosen (ssl ; spp)\n"); 
 	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
@@ -857,14 +920,12 @@ int main(int argc, char **argv){
                 
 		// Send simple request, wait for 200 OK
 		case 2:  
-			http_request(file_requested, proto, false);
-			gettimeofday(&tvEnd, NULL);
+			http_request(file_requested, proto, false, &tvEnd);
 			break; 
 
 		// Send HTTP GET request and wait for file to be received
 		case 3:  		
-			http_request(file_requested, proto, true);
-			gettimeofday(&tvEnd, NULL);
+			http_request(file_requested, proto, true, &tvEnd);
 			break; 
 
 		// Send several GET request following a browser-like behavior  

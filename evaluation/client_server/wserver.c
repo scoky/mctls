@@ -293,7 +293,7 @@ int serveData(SSL *ssl, int data_size, char *proto){
 	int still_to_send = data_size; 
 	for (;;){
 		// Derive min between how much to send and max buffer size 
-		int toSend = BUFSIZZ; 
+		int toSend = BUFTLS; 
 		if (still_to_send < toSend){
 			toSend = still_to_send; 
 		}
@@ -523,10 +523,9 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 			SPP_SLICE *slice;       
 			SPP_CTX *ctx;           
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
-		#ifdef DEBUG
-		printf("Read %d bytes\n", r);
-		#endif
-
+			#ifdef DEBUG
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
 		}
 	
 		if (strcmp(proto, "ssl") == 0){
@@ -535,11 +534,11 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 
 		if (SSL_get_error(ssl, r) == SSL_ERROR_NONE){
 		} else {
-			berr_exit("SSL read problem");
+			berr_exit("[DEBUG] SSL read problem");
 		}
 		
 		#ifdef DEBUG
-		printf("Request received:\n"); 
+		printf("[DEBUG] Request received:\n"); 
 		printf("%s\n", buf); 
 		#endif
 
@@ -548,12 +547,6 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 			break; 
 		}
 	}
-
-	// Q: do we still want to put Put 200 OK on the wire?
-	/*
-	char *data = "HTTP/1.0 200 OK\r\n"; 
-	sendData(ssl, data, proto); 
-	*/
 
 	// Parse filename from HTTP GET
 	filename = parse_http_get(buf); 
@@ -835,6 +828,8 @@ int main(int argc, char **argv){
 		temp_str = "200_OK";  
 	if (action == 3)
 		temp_str = "serve_file";  
+	if (action == 4)
+        temp_str = "browser_like";  
 	printf("\t[DEBUG] proto=%s; action=%d (%s)\n", proto, action, temp_str); 
 	#endif 
 

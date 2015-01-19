@@ -22,6 +22,7 @@
 #define RANDOM  "random.pem"
 #define PORT	4433
 #define BUFSIZZ 20000
+#define BUFTLS 16384 
 
 extern BIO *bio_err;
 int berr_exit (char *string);
