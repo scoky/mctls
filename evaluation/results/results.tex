@@ -1,0 +1,56 @@
+\documentclass[letter]{report}
+
+\usepackage{epsfig,endnotes}
+\usepackage{epstopdf}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{color}
+\usepackage{subfigure}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{soul}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\begin{document}
+
+%commands from Matteo
+\newcommand{\fig}{{Figure}}
+\newcommand\comment[1]{}
+\newcommand{\eg}{{e.g.,}}
+\newcommand{\ie}{{\it i.e.,}}
+\newcommand{\hh}{{HTTP-2.0}}
+% Add a NOTE
+\newcommand{\NOTE}[1]
+{
+  {\footnotesize\it
+    \begin{center}
+      \begin{tabular}{|c|}
+       \hline
+        \parbox{0.85\columnwidth}{
+          \medskip
+          #1
+          \medskip} \\
+        \hline
+      \end{tabular}
+    \end{center}
+    }
+}
+
+\begin{figure}[!htbp]
+\centering
+\psfig{figure=./fig/time_1st_byte_latency.eps, width=4.1in}
+\label{fig:eval_1}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\psfig{figure=./fig/time_1st_byte_proxy.eps, width=4.1in}
+\label{fig:eval_2}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\psfig{figure=./fig/time_1st_byte_slice.eps, width=4.1in}
+\label{fig:eval_3}
+\end{figure}
+
+\end{document}

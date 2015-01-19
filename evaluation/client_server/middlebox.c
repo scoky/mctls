@@ -533,37 +533,39 @@ int main(int argc, char **argv){
 			switch(c){
 
 			// Print usage
-			case 'h': usage(); 
-					  break; 
+			case 'h':	usage(); 
+						break; 
 
 			// Protocol chosen
-			case 'c': if(! (proto = strdup(optarg) )){
-					  	err_exit("Out of memory");
-					  }
-					  break; 
-			
+			case 'c':	if(! (proto = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						if (strcmp(proto, "spp_mod") == 0){ 
+							proto = "spp"; 
+						}   
+						break; 
 			
 			// Address to forward in case of SSL splitting 
-			case 'a': if(! (address_to_forward = strdup(optarg) )){
-					  	err_exit("Out of memory");
-					  }
-					  break; 
+			case 'a':	if(! (address_to_forward = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						break; 
 			
 			// Port used by mbox 
-			case 'p': if(! (port = atoi(optarg) )){
-						err_exit("A port NUMBER for the middlebox should be given\n");
-					  }
-					  break;
+			case 'p':	if(! (port = atoi(optarg) )){
+							err_exit("A port NUMBER for the middlebox should be given\n");
+						}
+						break;
 										
 			// Middlebox ID, required by SPP
-			case 'm': if(! (prxy_address = strdup(optarg) )){
-						err_exit("Out of memory");
-					  }
-					  break;
+			case 'm':	if(! (prxy_address = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						break;
 	
 			// Default case 
-			default: usage(); 
-					 break; 
+			default:	usage(); 
+						break; 
 		}
     }
 
