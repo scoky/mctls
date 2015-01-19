@@ -298,10 +298,10 @@ int serveData(SSL *ssl, int data_size, char *proto){
 			toSend = still_to_send; 
 		}
 
-		//Allocate buffer with size to sens and fill with zeros
+		//Allocate buffer with size to send and fill with "!"
 		char *buf = (char*) malloc(sizeof(char) * toSend);
 		memset(buf, '!', sizeof(char) * toSend);	
-		#ifdef DEBUG
+		#ifdef VERBOSE
 		printf ("[DEBUG] Buffer=\n%s\n", buf); 
 		#endif 
 		

@@ -606,7 +606,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		}
 		
 		// Write buf to stdout
-		#ifdef DEBUG
+		#ifdef VERBOSE
 		fwrite(buf, 1, len, stdout);
 		#endif 
     }
