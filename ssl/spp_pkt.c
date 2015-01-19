@@ -123,7 +123,7 @@ fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
      * rr->length bytes of encrypted compressed stuff. */
 
     /* check is not needed I believe */
-    if (rr->length > SSL3_RT_MAX_ENCRYPTED_LENGTH+extra) {
+    if (rr->length > SPP_RT_MAX_ENCRYPTED_LENGTH+extra) {
         al=SSL_AD_RECORD_OVERFLOW;
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
         goto f_err;
