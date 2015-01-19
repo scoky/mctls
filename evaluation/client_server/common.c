@@ -2,8 +2,7 @@
 
 BIO *bio_err=0;
 static char *pass;
-static int password_cb(char *buf,int num,
-  int rwflag,void *userdata);
+static int password_cb(char *buf,int num, int rwflag,void *userdata);
 static void sigpipe_handle(int x);
 
 /* A simple error and exit routine*/
@@ -18,8 +17,10 @@ int err_exit(string)
 int berr_exit(string)
   char *string;
   {
-    BIO_printf(bio_err,"%s\n",string);
+    #ifdef DEBUG
+	BIO_printf(bio_err,"%s\n",string);
     ERR_print_errors(bio_err);
+	#endif
     exit(0);
   }
 
