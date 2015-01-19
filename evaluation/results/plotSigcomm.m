@@ -42,6 +42,9 @@ end
 if (opt == 4) 
 	suffix = 'timeFirstByte_proxy'; 
 end
+if (opt == 5) 
+	suffix = 'downloadTime'; 
+end
 
 
 % Main loop 
@@ -49,8 +52,11 @@ for ii = 1 : nProt
 	currProt = strtrim(protocol(ii, :)); 
 	file = sprintf('res_%s_%s', currProt, suffix); 
 	data = dlmread(file); 
-	h = errorbar(data(:, 4).*1000, data(:, 5).*1000); 
-	%h = errorbar(X', data(:, 4).*1000, data(:, 5).*1000); 
+	if (opt < 5) 
+		h = errorbar(data(:, 4).*1000, data(:, 5).*1000); 
+	else
+		h = errorbar(data(:, 4), data(:, 5)); 
+	end
 	if (ii > 3) 
 		set (h, 'color', kind_line(counter), 'LineWidth', 3, 'LineStyle', '--');
 	else 
@@ -70,7 +76,7 @@ for ii = 1 : nProt
 		N_slices = data(1, 2);
 		N = data(1, 3); 
 	end
-	if (opt == 4)
+	if (opt == 4 || opt == 5)
 		N_slices = data(1, 2);
 		rtt = data(1, 3); 
 	end
@@ -86,20 +92,33 @@ end
 if (opt == 4) 
 	xlabel('No. proxies (#)');
 end
+if (opt == 5) 
+	xlabel('File size (KB)');
+end
+if (opt < 5) 
+	ylabel('Time to First Byte (ms)');
+else
+	ylabel('Download Time (sec)');
+end
 
-ylabel('Time to First Byte (ms)');
 legend(leg, 'Location', 'NorthWest');
 grid on 
 set(0,'defaultaxesfontsize',18);
+
+% derive title based on input 
 if (opt == 2) 
 	t = sprintf('Latency=%dms ; N_{prxy}=%d', rtt, N); 
 end
 if (opt == 3) 
 	t = sprintf('S=%d ; N_{prxy}=%d', N_slices, N); 
 end
-if (opt == 4) 
+if (opt == 4)
 	t = sprintf('S=%d ; Latency=%dms', N_slices, rtt); 
 end
+if (opt == 5) 
+	t = sprintf('S=%d ; Latency=%dms; Rate=100Mbps (temp)', N_slices, rtt); 
+end
+% set title
 title(t);
 
 % set xtick label correctly 
@@ -119,5 +138,10 @@ end
 if (opt == 4) 
 	outFile = sprintf ('%s/time_1st_byte_proxy.eps', figFolder); 
 end
+if (opt == 5) 
+	outFile = sprintf ('%s/download_time_fSize.eps', figFolder); 
+end
+
+% Saving file 
 saveas (h, outFile, 'psc2');
 

@@ -1,9 +1,18 @@
 #!/bin/bash 
+# compile the results in a single .pdf  
 
 # variables
 count=1
 paper="results"
 figFolder="./fig"
+
+# For MAC lovers... (to check) 
+if [ "$(uname)" == "Darwin" ]
+then
+	if_mac=1
+else
+	if_mac=0
+fi
 
 # restore beginning of paper
 cat base.tex > $paper".tex"
@@ -26,4 +35,9 @@ echo "\end{document}" >> $paper".tex"
 make $paper
 
 # show 
-evince $paper".pdf"
+if [ $if_mac -eq 0 ] 
+then 
+	evince $paper".pdf" & 
+else
+	open $paper".pdf" & 
+fi

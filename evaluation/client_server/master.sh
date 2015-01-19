@@ -6,6 +6,18 @@ usage(){
     echo -e "opt = {1) handshake (not used), 2) time to first byte f(no. slices) - 3) time to first byte f(delay) - 4)....}"
 Folder="../results"    exit 0
 }
+	
+# Function to print script usage
+tcpTrick(){
+	if [ $proto == "spp_mod" ] 
+	then 
+		rwnd=10
+		cwnd=10
+		echo "Changing initrwnd to $rwnd and initcwnd to $cwnd"
+		sudo ip route change 127.0.0.1 dev lo  proto static initrwnd $rwnd initcwnd $cwnd
+		ip route show 
+	fi
+}
 
 # Set of checks for correctness
 [[ $# -lt 1 ]] && usage
@@ -73,15 +85,35 @@ case $opt in
 		do
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
-			if [ $i -eq $proto_count ] 
-			then 
-				rwnd=10
-				cwnd=10
-				echo "Changing initrwnd to $rwnd and initcwnd to $cwnd"
-				sudo ip route change 127.0.0.1 dev lo  proto static initrwnd $rwnd initcwnd $cwnd
-				ip route show 
-			fi
-			echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+			
+			# deal with SPP_MOD
+			tcpTrick
+
+			# run analysis
+			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+		done
+		;;
+	
+	5) 
+		echo "[MASTER] Analysis of download time as a function of the file size"
+		echo "!!![MASTER] Increasing transfer rate to 20Mbps and lowering repetitions to just 10 (for testing)!!!"
+		#----------------
+		rate=20
+		maxRate=20
+		R=10
+		#----------------
+		S_max=3
+		for ((i=1; i<=proto_count; i++))
+		do
+			proto=${protoList[$i]}
+			echo -e "\t[MASTER] Working on protocol $proto ..."
+			
+			# deal with SPP_MOD
+			tcpTrick
+			
+			# run analysis
+			#echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
 		done
 		;;
 
@@ -94,3 +126,8 @@ then
 	echo "[MATLAB] Running MATLAB...(it can take some time first time)"
 fi
 matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt); quit"
+
+# Generating summary report 
+cd ../results 
+./script.sh 
+cd - 

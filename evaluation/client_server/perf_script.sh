@@ -129,7 +129,7 @@ proto=$3                  # protocol to be used
 expType=$4                # experiment type
 log="log_perf"            # performance log file
 MAX=16                    # hard coded max number of slices as per Kyle
-fSizeMAX=10		          # max file size is 10MB
+fSizeMAX=5		          # max file size is 5MB
 proxyFile="./proxyList"   # contains proxy information 
 resFolder="../results"    # result folder        
 resFile=$resFolder"/res"  # result file 
@@ -260,7 +260,7 @@ case $expType in
 		do
 			# Run R handshake repetitions	
 			echo "[PERF] Testing $R handshakes with $s slices (1 slice is used for handshake)"
-			for((i=1; i<R; i++))
+			for((i=1; i<=R; i++))
 			do
 				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
 				./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1
@@ -277,7 +277,7 @@ case $expType in
 			fi
 			#cat $log | grep Handshake_Dur | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
 			let "fix2=nProxy-1"
-			cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v fix1=$delay -v fix2=$fix2 -v S=2 -f stdev.awk >> $resFile
+			cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v fix1=$delay -v fix2=$fix2 -v S=2 -f stdev.awk > $resFile
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
@@ -314,7 +314,7 @@ case $expType in
 
 			# Run R handshake repetitions	
 			echo "[PERF] Testing $R handshakes with delay $delay (3 slices:  for handshake, 1 for header, 1 for content)"
-			for((i=1; i<R; i++))
+			for((i=1; i<=R; i++))
 			do
 				echo $delay >> .tmp 
 				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
@@ -335,7 +335,7 @@ case $expType in
 			fi
 			paste .tmp .tmpMore > .res
 			let "fix2=nProxy-1"
-			cat .res  |  awk -v fix1=$s -v fix2=$fix2 -v S=5 -f stdev.awk >> $resFile
+			cat .res  |  awk -v fix1=$s -v fix2=$fix2 -v S=5 -f stdev.awk > $resFile
 			rm .tmp .tmpMore 
 			#cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
 		else
@@ -380,7 +380,7 @@ case $expType in
 			
 			# Run R handshake repetitions	
 			echo "[PERF] Testing $R handshakes with $N proxies (3 slices:  for handshake, 1 for header, 1 for content)"
-			for((i=1; i<R; i++))
+			for((i=1; i<=R; i++))
 			do
 				# Logging for future correction
 				echo $N >> .tmp 
@@ -409,7 +409,7 @@ case $expType in
 			paste .tmp .tmpMore > .res
 			
 			# Analyzing (corrected) log 
-			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=1 -f stdev.awk >> $resFile
+			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=1 -f stdev.awk > $resFile
 			rm .tmp .tmpMore 
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
@@ -421,12 +421,18 @@ case $expType in
 
 
 
-	5)	# Test download time as a function of file size for slice value range 
-		echo "Test download time"
+	5)	# Measure download time as a function of file size
+		echo "[PERF] Download time as a function of file size "
 		opt=3
 	
 		# Update res file 
 		resFile=$resFile"_downloadTime"
+
+		# Cleaning
+		if [ -f $resFile ] 
+		then 
+			rm -v $resFile
+		fi
 
 		# Start the server 
 		echo "[PERF] ./wserver -c $proto -o $opt"
@@ -435,25 +441,47 @@ case $expType in
 		# Give server small time to setup 
 		sleep 1
 
-		# Run S_MAX repetitions
-		for((s=2; s<=S_MAX; s++))
-		do
-			# Run until fSize is bigger than fSizeMAX
-			fSize=10
-			let "fSize=10*1024" #(10KB)
-			while [ $fSize -le $fSizeMAX ]
-			do 
-				# Run R handshake repetitions	
-				echo "Test $R file retrievals with file size $fSize ($s slices)"
-				for((i=1; i<R; i++))
-				do
-					echo "[PERF] ./wclient -s $s -c $proto -o $opt -f $fSize"
-					./wclient -s $s -c $proto -o $opt -f $fSize >> $log
-				done
-	
-				let "fSize = 2*fSize"
+		# Setup 3 slices 
+		s=3 
+
+		# Run until fSize is bigger than fSizeMAX
+		fSizeInitial=40
+		fSizeShort=$fSizeInitial
+		let "fSize=fSizeShort*1024" #(10KB)
+		while [ $fSize -le $fSizeMAX ]
+		do 
+			# Run R handshake repetitions	
+			echo "Test $R file retrievals with file size $fSize ($s slices)"
+			for((i=1; i<=R; i++))
+			do
+				echo $fSizeShort >> .tmp
+				echo "[PERF] ./wclient -s $s -c $proto -o $opt -f $fSize"
+				./wclient -s $s -c $proto -o $opt -f $fSize >> $log 2>/dev/null
 			done
+				let "fSize = 2*fSize"
+				let "fSizeShort = 2*fSizeShort"
 		done
+		
+		# Results
+		if [ -f $log ] 
+		then  
+			if [ $debug -eq 1 ]
+			then 
+				echo "#Download Time Analysis" > $resFile
+				echo "#FileSize Slices Delay AvgDur StdDur" >> $resFile 
+			fi
+			let "fix2=nProxy-1"
+			
+			# fixing log file 
+			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
+			paste .tmp .tmpMore > .res
+			
+			# Analyzing (corrected) log 
+			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=$fSizeInitial -f stdev.awk > $resFile
+			rm .tmp .tmpMore 
+		else
+			echo "[PERF] No file <<$log>> created, check for ERRORS!"
+		fi
 		;;
 
 	*)	
