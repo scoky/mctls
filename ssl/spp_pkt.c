@@ -379,7 +379,8 @@ printf("\n");
         }
     }
 
-    if (rr->length > SSL3_RT_MAX_PLAIN_LENGTH+extra) {
+    if ((s->proxy && rr->length > SPP_RT_MAX_PACKET_SIZE+extra) || (!s->proxy && rr->length > SSL3_RT_MAX_PLAIN_LENGTH+extra)) {
+        printf("Data too big!!\n");
         al=SSL_AD_RECORD_OVERFLOW;
         SSLerr(SSL_F_SSL3_GET_RECORD,SSL_R_DATA_LENGTH_TOO_LONG);
         goto f_err;
@@ -1248,7 +1249,7 @@ int spp_write_bytes(SSL *s, int type, const void *buf_, int len) {
 
     n=(len-tot);
     for (;;) {
-	if (n > s->max_send_fragment)
+	if (!s->proxy && n > s->max_send_fragment)
             nw=s->max_send_fragment;
         else
             nw=n;
