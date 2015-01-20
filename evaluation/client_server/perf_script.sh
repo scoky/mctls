@@ -18,7 +18,7 @@ killServer(){
 	#killall -q wserver #>> /dev/null 2>&1
 	if [ $REMOTE -eq 0 ]
 	then  
-		for i in `ps aux | grep wserver | grep -v vi | grep -v grep | cut -f 2 -d " "`
+		for i in `ps aux | grep wserver | grep -v vi | grep -v grep | awk '{print $2}'`
 		do 
 			echo "Killing wserver $i"
 			kill -9 $i >> /dev/null 2>&1
@@ -689,7 +689,93 @@ case $expType in
 		;; 
 
 	8) 
-		echo "[PERF] Byte overhead -- David is working on it"
+		echo "[PERF] Byte overhead -- X axis is a few discrete scenarios"
+		opt=3
+
+		# Define scenarios to test (num slices, num middleboxes, file size)
+		declare -A scenarios
+		scenarios[1,"numSlices"]=2  # TODO: make 1 after client fix
+		scenarios[1,"numMboxes"]=0
+		scenarios[1,"fileSize"]=1024
+		
+		scenarios[2,"numSlices"]=4
+		scenarios[2,"numMboxes"]=0
+		scenarios[2,"fileSize"]=1024
+
+		scenarios[3,"numSlices"]=4
+		scenarios[3,"numMboxes"]=1
+		scenarios[3,"fileSize"]=1024
+
+		let "numScenarios=${#scenarios[@]}/3"
+		echo "[PERF] Testing $numScenarios scenarios"
+
+
+		# Update res file 
+		resFile=$resFile"_byteOverhead_scenarios"
+		if [ -f $resFile ] 
+		then 
+			rm -v $resFile
+		fi
+
+		# Start the server 
+		set -x  # print commands we run
+		# TODO: Add -s cs  (slicing strategy)
+		./wserver -c $proto -o $opt > log_server 2>&1 &
+		{ set +x; } 2>/dev/null  # stop printing commands
+
+		# Give server small time to setup 
+		sleep 1
+		
+		# Make copy of current file 
+		cp $proxyFile $proxyFile"_original"
+
+		# Run each scenario
+		for((s=1; s<=$numScenarios; s++))
+		do
+			
+			# Update proxy file 
+			N=${scenarios[$s,"numMboxes"]}
+			proxyFileUpdate 
+
+			# Proxy setup 
+			organizeMBOXES
+
+			# Run R repetitions	of scenario s
+			echo "[PERF] Testing $R reps with ${scenarios[$s,"numSlices"]} slices, ${scenarios[$s,"numMboxes"]} mboxes, ${scenarios[$s,"fileSize"]} byte file"
+			for((i=1; i<=R; i++))
+			do
+				set -x  # print commands we run
+				# TODO: add -s cs  (slice strategy option)
+				# FIXME: -r and -w should really be min(numSlices, numMboxes)
+				./wclient -s ${scenarios[$s,"numSlices"]}\
+					-r ${scenarios[$s,"numMboxes"]}\
+					-w ${scenarios[$s,"numMboxes"]}\
+					-f ${scenarios[$s,"fileSize"]}\
+					-c $proto -o $opt -b 1 >> $log 2>&1
+				{ set +x; } 2>/dev/null  # stop printing commands
+			done
+			
+			# Reset mboxes 
+			killMbox
+		done
+		
+		# Restore original proxy file (used for other experiments)
+		cp $proxyFile"_original" $proxyFile
+
+		## Results
+		#if [ -f $log ] 
+		#then  
+		#	if [ $debug -eq 1 ]
+		#	then 
+		#		echo "#Handshake Analysis" > $resFile
+		#		echo "#Slices AvgDur StdDur" >> $resFile 
+		#	fi
+		#	#cat $log | grep Handshake_Dur | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
+		#	let "fix2=nProxy-1"
+		#	cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v fix1=$delay -v fix2=$fix2 -v S=2 -f stdev.awk > $resFile
+		#else
+		#	echo "[PERF] No file <<$log>> created, check for ERRORS!"
+		#fi
 		;;
 
 	*)	
