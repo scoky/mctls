@@ -1499,6 +1499,9 @@ struct ssl_st
         
         struct spp_stats_st read_stats;
         struct spp_stats_st write_stats;
+
+        /* used to store the shared secret to encrypt/decrypt proxy key mat */
+        unsigned char proxy_key_mat_shared_secret[EVP_MAX_KEY_LENGTH];
 	};
 
 #endif
