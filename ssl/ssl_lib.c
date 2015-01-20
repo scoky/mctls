@@ -1178,6 +1178,7 @@ int SSL_shutdown(SSL *s)
 	 * 1 for success; but calling it once is usually not enough,
 	 * even if blocking I/O is used (see ssl3_shutdown).
 	 */
+    return 1;
 
 	if (s->handshake_func == 0)
 		{

@@ -921,6 +921,18 @@ err:
     return(-1);
 }
 
+int spp_dispatch_alert(SSL *s) {
+    int ret;
+    SPP_CTX *spp_ctx = s->spp_write_ctx;
+    SPP_SLICE *slice = s->write_slice;
+    s->spp_write_ctx=NULL;
+    s->write_slice=s->def_ctx;
+    ret=ssl3_dispatch_alert(s);
+    s->spp_write_ctx=spp_ctx;
+    s->write_slice=slice;
+    return ret;
+}
+
 static int do_spp_write(SSL *s, int type, const unsigned char *buf,
 			 unsigned int len, int create_empty_fragment) {
     unsigned char *p,*plen;
@@ -1272,15 +1284,4 @@ int spp_write_bytes(SSL *s, int type, const void *buf_, int len) {
 	n-=i;
 	tot+=i;
     }
-}
-
-int spp_dispatch_alert(SSL *s) {
-    int ret;
-    // Switch to the default encryption context before sending alerts
-    SPP_SLICE *last = s->write_slice;
-    s->write_slice = s->def_ctx;
-    ret=ssl3_dispatch_alert(s);
-    // Revert to the previous encryption context
-    s->write_slice = last;
-    return ret;
 }

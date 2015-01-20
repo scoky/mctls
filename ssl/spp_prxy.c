@@ -790,12 +790,14 @@ int spp_proxy_accept(SSL *s) {
                     goto end;
                 else if ((proxy = spp_get_next_proxy(s, NULL, 0)) != NULL && proxy->proxy_id != s->proxy_id) {
                     /* Received certs from proxies between this proxy and the server. */
-                    s->state=SPP_ST_SW_AHEAD_FLUSH;
-                    s->s3->tmp.next_state=SPP_ST_PR_BEHIND_A;
+                    //s->state=SPP_ST_SW_AHEAD_FLUSH;
+                    //s->s3->tmp.next_state=SPP_ST_PR_BEHIND_A;
+                    s->state=SPP_ST_PR_BEHIND_A;
                 } else {
                     /* Send our certificate. */
-                    s->state=SPP_ST_SW_AHEAD_FLUSH;
-                    s->s3->tmp.next_state=SSL3_ST_SW_CERT_A;
+                    //s->state=SPP_ST_SW_AHEAD_FLUSH;
+                    //s->s3->tmp.next_state=SSL3_ST_SW_CERT_A;
+                    s->state=SSL3_ST_SW_CERT_A;
                 }
                 s->init_num=next_st->init_num=0;
 
