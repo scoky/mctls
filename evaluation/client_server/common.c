@@ -106,3 +106,7 @@ void destroy_ctx(ctx)
   {
     SSL_CTX_free(ctx);
   }
+
+void set_nagle(int sock, int flag) {
+	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
+}
