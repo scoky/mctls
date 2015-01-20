@@ -1118,10 +1118,8 @@ int spp_send_end_key_material_server(SSL *s) {
     if (s->state == SPP_ST_CW_PRXY_MAT_A) {
         n = spp_pack_proxy_key_mat(s, temp_buff);
 
-        /*
-        HEREHEREHERE
-        TODO Make the IV random 
-        For now, let's just set it to 0. yolo
+        /* 0 out per some rfc.
+        iv is randomized in spp_encrypt_key_mat_server()
         */
         memset(iv, 0, EVP_MAX_IV_LENGTH);
 
