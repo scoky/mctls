@@ -782,8 +782,8 @@ int main(int argc, char **argv){
 	if (argc == 1){
 		usage(); 
 	}
-	if ((strcmp(proto, "spp") == 0) && slices_len < 2){
-		printf("No. of slices need to be > 1 (1 for handshake and 1 for data transmission"); 
+	if ((strcmp(proto, "spp") == 0) && slices_len < 1){
+		printf("No. of slices need to be > 0"); 
 		usage(); 
 	}
 	if (action < 1 || action > 4){

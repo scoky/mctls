@@ -148,10 +148,7 @@ void check_SSL_write_error(SSL *ssl, int r, int request_len){
 
 // splitting 
 void splitting (SSL *ssl, char *request, int request_len){
-	int beginIndex = 0; 
-	int i; 
-	int inc = request_len / (ssl->slices_len - 1); 
-	int usedSlices; 
+	int beginIndex = 0, i, inc, usedSlices; 
 
 	// For client/server strategy just use half slices 	
 	if (strcmp(strategy, "cs") == 0){
@@ -159,9 +156,12 @@ void splitting (SSL *ssl, char *request, int request_len){
 	} else{
 		 usedSlices = ssl->slices_len; 
 	}
+
+	// Compute increment 
+	inc = request_len / (usedSlices); 
 	
 	// Slicing happens here  
-	for (i = 1; i < usedSlices; i++){
+	for (i = 0; i < usedSlices; i++){
 		
 		char* dest = (char*) malloc(inc); 
 		#ifdef DEBUG
@@ -184,7 +184,7 @@ void splitting (SSL *ssl, char *request, int request_len){
 		beginIndex += inc;
 
 		// Increase pointer for last slice  
-		if ( i == (ssl->slices_len - 2)){
+		if ( i == (usedSlices - 1)){
 			inc = request_len - beginIndex; 
 		} 
 	
