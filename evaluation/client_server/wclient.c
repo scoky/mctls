@@ -36,6 +36,9 @@ static char *proto = "ssl";                   // protocol to use (ssl ; spp)
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 
+// #yoloc99blazeit
+void print_stats(SSL *s);
+
 // Compute the size of a file to be served
 int calculate_file_size(char *filename){ 
 
