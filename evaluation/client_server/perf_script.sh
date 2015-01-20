@@ -760,11 +760,6 @@ case $expType in
 		# Restore original proxy file (used for other experiments)
 		cp $proxyFile"_original" $proxyFile
 
-		# TODO:
-		# - plotting code
-		# - master script
-
-
 		# Results
 		if [ -f $log ] 
 		then  
