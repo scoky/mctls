@@ -137,6 +137,14 @@ case $opt in
 			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
 		done
 		;;
+	
+	7) 
+		echo "[MASTER] Number of connctions -- Matteo is working on it"
+		;;
+
+	8) 
+		echo "[MASTER] Byte overhead -- X axis is a few discrete scenarios"
+		;;
 
 esac
 
