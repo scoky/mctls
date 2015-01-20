@@ -67,11 +67,6 @@ int spp_proxy_connect(SSL *s) {
             case SSL_ST_CONNECT:
             case SSL_ST_BEFORE|SSL_ST_CONNECT:
             case SSL_ST_OK|SSL_ST_CONNECT:
-				// Initialize timers
-				gettimeofday(&currTime, NULL);
-				gettimeofday(&prevTime, NULL);
-				gettimeofday(&originTime, NULL);
-
 				#ifdef DEBUG
 				log_time("Connecting next session\n", &currTime, &prevTime, &originTime); 
 				#endif
@@ -499,23 +494,90 @@ err:
 }
 
 int get_proxy_material(SSL *s, int server) {
-    int slice_id, proxy_id, len;
-    unsigned char * param, *p;
-    SPP_SLICE *slice, *slice2;
+    unsigned char key_mat[1024] = {0};
+    int *key_mat_len = 0;
+    EVP_PKEY *private_key = NULL;
+    unsigned char *key_mat_envelope = NULL;
+    int encrypted_envelope_key_len = 0;
+    unsigned char envelope_iv[EVP_MAX_IV_LENGTH];
+    unsigned char encrypted_envelope_key[128] = {0};
+    int encrypted_key_mat_len = 0;
+    unsigned char encrypted_key_mat[2048]; /* HACK size... */
+    int id;
+
+    // printf("length of msg received by server: %d\n", n);
+
+    /* we need to decrypt the message first... */
+    // printf("getting private key\n");
+    // Get the private key from the correct instance
+    private_key = (server ? s->other_ssl->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey : s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey); 
+
+    key_mat_envelope = (unsigned char *)s->init_msg;
+    // printf("Payload from client:\n");
+    // spp_print_buffer(key_mat_envelope, n);
     
-    param=p=(unsigned char *)s->init_msg;
-    
-    /* Server or client identifier */
-    //printf("PROXY MAT MSG header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
-    n1s(p, proxy_id);
-    
-    // Message is not for this proxy, ignore it
-    if (proxy_id != s->proxy_id) {
+    /* Get the ID */
+    n1s(key_mat_envelope, id);
+    if (id != s->proxy_id) {
+        /* Material not intended for this proxy */
         return 1;
     }
+
+    /* get length of encrypted envelope key */
+    n2l3(key_mat_envelope, encrypted_envelope_key_len);
+    
+
+    /* now pull out the encrypted envelope key */
+    memcpy(encrypted_envelope_key, key_mat_envelope, encrypted_envelope_key_len); // );
+    // printf("encrypted envelope key:\n");
+    // spp_print_buffer(encrypted_envelope_key, encrypted_envelope_key_len);
+
+    /* advance pointer! */
+    key_mat_envelope += encrypted_envelope_key_len;
+
+    /* read iv */
+    // printf("reading iv\n");
+    memcpy(envelope_iv, key_mat_envelope, EVP_MAX_IV_LENGTH);
+    // printf("envelope_iv:\n");
+    // // printf("%s\n", envelope_iv);
+    // spp_print_buffer(envelope_iv, EVP_MAX_IV_LENGTH);
+    /* advance pointer! */
+    key_mat_envelope += EVP_MAX_IV_LENGTH;
+
+    /* get legnth of encrypted key material */
+    n2l3(key_mat_envelope, encrypted_key_mat_len);
+
+    /* pull the encrypted key material out! */
+    memcpy(encrypted_key_mat, key_mat_envelope, encrypted_key_mat_len);
+    // printf("Encrypted key material:\n");
+    // spp_print_buffer(encrypted_key_mat, encrypted_key_mat_len);
+
+    printf("opening envelope!\n");
+
+    key_mat_len = envelope_open(
+        private_key,
+        encrypted_key_mat,
+        encrypted_key_mat_len,
+        encrypted_envelope_key,
+        encrypted_envelope_key_len,
+        envelope_iv,
+        key_mat,
+        s->proxy_key_mat_shared_secret
+        );
+
+    // printf("key mat len: %d\n", key_mat_len);
+    // spp_print_buffer(key_mat, key_mat_len);
+    
+    return spp_proxy_unpack_mat(s, key_mat, key_mat_len, server);
+}
+
+int spp_proxy_unpack_mat(SSL *s, unsigned char *p, long n, int server) {
+    int slice_id, len;
+    SPP_SLICE *slice, *slice2;
+    unsigned char *param=p;
     
     /* More to read */
-    while (p-param < s->init_num) {
+    while (p-param < n) {
         n1s(p, slice_id);
         //printf("Slice %d received\n", slice_id);
         slice = SPP_get_slice_by_id(s, slice_id);
@@ -557,7 +619,7 @@ int get_proxy_material(SSL *s, int server) {
         
     }
     /* Should now have read the full message. */
-    if (p-param != s->init_num) {
+    if (p-param != n) {
         printf("Did not read the whole message, %d != %d\n", p-param, s->init_num);
         goto err;
     }
@@ -627,6 +689,10 @@ int spp_proxy_accept(SSL *s) {
             case SSL_ST_ACCEPT:
             case SSL_ST_BEFORE|SSL_ST_ACCEPT:
             case SSL_ST_OK|SSL_ST_ACCEPT:
+                                // Initialize timers
+				gettimeofday(&currTime, NULL);
+				gettimeofday(&prevTime, NULL);
+				gettimeofday(&originTime, NULL);
                                 #ifdef DEBUG
 				log_time("Before handshake\n", &currTime, &prevTime, &originTime); 
 				#endif

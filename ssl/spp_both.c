@@ -793,13 +793,35 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
     unsigned char *p,*d;
     int n,i,j,found;
     SPP_SLICE *slice;
+    EVP_PKEY *pub_key = NULL;
+    EVP_PKEY **pub_keys = malloc(1 * sizeof(EVP_PKEY *));
+    unsigned char shared_secret[EVP_MAX_KEY_LENGTH];
+    // unsigned char *encrypted_key_mat = NULL;
+    /* THIS PROBABLY NEEDS TO BE CHANGED TO BE MORE DYNAMIC AND HAVE THE REAL LENGTH*/
+    unsigned char encrypted_key_mat[1024];
+    int encrypted_key_mat_len = 0; //[1] = {0};
+    unsigned char envelope_iv[EVP_MAX_IV_LENGTH];
+    // unsigned char *envelope_iv = NULL;
+    unsigned char **encrypted_envelope_keys = malloc(1 * sizeof(unsigned char *));
+    // unsigned char encrypted_envelope_keys[1][128]
+    int encrypted_envelope_key_len[1] = {0};
+    //unsigned char *key_mat;
 
+    /* I'm not sure about this buffer size... got it by printing it out when
+    running code... should probably be doing things better :'(
+    Also, note that unsigned chars are used in various places, but this buffer
+    is a char?!??!
+
+    HACK The size of this buffer should be different...
+    It is dangerous right now and we risk overflowing later on...
+    */
+    char temp_buff[21848] = {0};
+    
     if (s->state == SPP_ST_CW_PRXY_MAT_A) {
-        d=(unsigned char *)s->init_buf->data;
-        p= &(d[4]);
-        
+
+        // Pack the message into the temp buffer
+        p=d=&(temp_buff[0]);
         n = 0;
-        s1n(proxy->proxy_id, p);
         for (i = 0; i < proxy->read_slice_ids_len; i++) {
             slice = SPP_get_slice_by_id(s, proxy->read_slice_ids[i]);
             if (slice == NULL)
@@ -827,20 +849,111 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
                 s2n(0, p);
             }
         }
-        n = p-d-4;
+        n = p-d;
+
+        /* Encrypt using envelopes. What this means is that the data we are
+        sending will be encrypted with a randomly generated shared secret key.
+        The shared secret key is then encrypted via the RSA pub key of the
+        destination.
+        */
+       
+        d = (unsigned char *)s->init_buf->data;
+        p = &(d[4]);
+
+        /* Need to free this later on still */
+        //key_mat = malloc(n * sizeof(unsigned char *));
         
+        //pub_key = X509_get_pubkey(SSL_get_peer_certificate(s));
+        pub_key = X509_get_pubkey(proxy->peer);
+        pub_keys[0] = pub_key;
+
+        encrypted_envelope_keys[0] = malloc(RSA_size(pub_keys[0]->pkey.rsa));
+
+
+        memset(envelope_iv, 0, sizeof envelope_iv);  /* per RFC 1510 */
+
+        /* seal the envelope */
+        encrypted_key_mat_len = envelope_seal(
+            pub_keys,
+            temp_buff,
+            n,
+            encrypted_envelope_keys,
+            &encrypted_envelope_key_len,
+            envelope_iv,
+            encrypted_key_mat,
+            shared_secret);
+
+        /* store the shared secret */
+        memcpy(s->proxy_key_mat_shared_secret, shared_secret, sizeof(shared_secret));
+
+
         *(d++)=SPP_MT_PROXY_KEY_MATERIAL;
+
+
+        /* calculate the size of the payload */
+        n = 4; /* to store length of encrypted envelope key and destination ID*/
+        n += encrypted_envelope_key_len[0]; /* to store the encrypted envelope key */
+        n += EVP_MAX_IV_LENGTH; /* to store the iv */
+        n += 3; /* to store the length of the encrypted data */
+        n += encrypted_key_mat_len; /* to store the encrypted key material */
+
+        // printf("total legnth of message: %d\n", n);
         l2n3(n,d);
+
+        //p = &(((unsigned char *)s->init_buf->data)[4]);
+        // p = &(d[4]);
+
+        /* If we are server, we send to client (1), otherwise we send to server (2)*/
+        s1n(proxy->proxy_id, d);
+        
+        /* Now we need to handle writing encryption stuff! */
+
+        /* write the length of the encrypted key */
+        l2n3(encrypted_envelope_key_len[0], d);
+        // l2n3(1, d);
+
+
+        /* write the encrypted envelope key */
+        memcpy(d, encrypted_envelope_keys[0], encrypted_envelope_key_len[0]);
+        /* free the allocated mem */
+        free(encrypted_envelope_keys[0]);
+
+        /* advance pointer! */
+        d += encrypted_envelope_key_len[0];
+
+        memcpy(d, envelope_iv, EVP_MAX_IV_LENGTH);
+
+        /* advance pointer */
+        d += EVP_MAX_IV_LENGTH;
+
+        /* write the legnth of encrypted key material */
+        l2n3(encrypted_key_mat_len, d);
+
+        /* write the encrypted key material */
+
+        memcpy(d, encrypted_key_mat, encrypted_key_mat_len);
+
+        /* advance pointer! */
+        d += encrypted_key_mat_len;
+
+        // printf("after copying relevant stuff (is %d bytes)...\n", n);
+        // spp_print_buffer(p, n);
+
+
+        // memcpy(&(d2[4]), temp_buff, n);
 
         s->state=SPP_ST_CW_PRXY_MAT_B;
         /* number of bytes to write */
+
+        /*
+        Here we should realy ensure that we are writing the size of the
+        encrypted key material
+        */
         s->init_num=n+4;
         s->init_off=0;
-        
-#ifdef DEBUG
-        printf("Sending proxy key material\n");
+
+        printf("Sending proxy key material, n=%d\n", n);
         spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
-#endif
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
@@ -852,11 +965,8 @@ err:
 
 int spp_send_end_key_material_client(SSL *s) {
 
-    BIO *bio_out = NULL;
     EVP_PKEY *pub_key = NULL;
-    EVP_PKEY *private_key = NULL;
     EVP_PKEY **pub_keys = malloc(1 * sizeof(EVP_PKEY *));
-    int cipher_len = 0;
     unsigned char shared_secret[EVP_MAX_KEY_LENGTH];
     // unsigned char *encrypted_key_mat = NULL;
     /* THIS PROBABLY NEEDS TO BE CHANGED TO BE MORE DYNAMIC AND HAVE THE REAL LENGTH*/
@@ -866,25 +976,9 @@ int spp_send_end_key_material_client(SSL *s) {
     // unsigned char *envelope_iv = NULL;
     unsigned char **encrypted_envelope_keys = malloc(1 * sizeof(unsigned char *));
     // unsigned char encrypted_envelope_keys[1][128]
-
     int encrypted_envelope_key_len[1] = {0};
-    unsigned char *key_mat, *d2;
-
     unsigned char *p,*d;
-    int n,i;
-    unsigned long alg_k;
-    const EVP_CIPHER *c;
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *clnt_ecdh = NULL;
-    const EC_POINT *srvr_ecpoint = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-    int encoded_pt_len = 0;
-    BN_CTX * bn_ctx = NULL;
-#endif
-    const EVP_MD *m;
-    EVP_MD_CTX md;
-    EVP_CIPHER_CTX *cipher;
+    int n;
 
     /* I'm not sure about this buffer size... got it by printing it out when
     running code... should probably be doing things better :'(
@@ -911,7 +1005,7 @@ int spp_send_end_key_material_client(SSL *s) {
         p = &(d[4]);
 
         /* Need to free this later on still */
-        key_mat = malloc(n * sizeof(unsigned char *));
+        //key_mat = malloc(n * sizeof(unsigned char *));
 
         pub_key = X509_get_pubkey(SSL_get_peer_certificate(s));
         pub_keys[0] = pub_key;
@@ -942,7 +1036,7 @@ int spp_send_end_key_material_client(SSL *s) {
 
 
         /* calculate the size of the payload */
-        n = 3; /* to store length of encrypted envelope key */
+        n = 4; /* to store length of encrypted envelope key and destination ID*/
         n += encrypted_envelope_key_len[0]; /* to store the encrypted envelope key */
         n += EVP_MAX_IV_LENGTH; /* to store the iv */
         n += 3; /* to store the length of the encrypted data */
@@ -951,11 +1045,12 @@ int spp_send_end_key_material_client(SSL *s) {
         // printf("total legnth of message: %d\n", n);
         l2n3(n,d);
 
-        p = &(((unsigned char *)s->init_buf->data)[4]);
+        //p = &(((unsigned char *)s->init_buf->data)[4]);
         // p = &(d[4]);
 
-
-
+        /* If we are server, we send to client (1), otherwise we send to server (2)*/
+        s1n(s->server == 0 ? 2 : 1, d);
+        
         /* Now we need to handle writing encryption stuff! */
 
         /* write the length of the encrypted key */
@@ -1014,26 +1109,11 @@ err:
 
 int spp_send_end_key_material_server(SSL *s) {
     unsigned char *p,*d;
-    int n,i;
-    unsigned long alg_k;
+    int n;
     unsigned char iv[EVP_MAX_IV_LENGTH];
     unsigned char encrypted_key_mat[2048];
     int encrypted_key_mat_len = 0;
     char temp_buff[21848] = {0};
-
-    const EVP_CIPHER *c;
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *clnt_ecdh = NULL;
-    const EC_POINT *srvr_ecpoint = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-    int encoded_pt_len = 0;
-    BN_CTX * bn_ctx = NULL;
-#endif
-    const EVP_MD *m;
-    EVP_MD_CTX md;
-    EVP_CIPHER_CTX *cipher;
-    
 
     if (s->state == SPP_ST_CW_PRXY_MAT_A) {
         n = spp_pack_proxy_key_mat(s, temp_buff);
@@ -1066,11 +1146,13 @@ int spp_send_end_key_material_server(SSL *s) {
         p = &(d[4]);
 
         /* Now we need to copy relevant info into the full buffer */
-        n = encrypted_key_mat_len; /* the actual encrypted key material */
+        n = encrypted_key_mat_len+1; /* the actual encrypted key material and 1 byte for the proxy_id*/
         n += 3; /* for the length of the encrypted key material */
         n += 3; /* for the length of the iv */
         n += EVP_MAX_IV_LENGTH; /* for the length of the iv HACK: This should be dynamic? */
 
+        s1n(s->server == 0 ? 2 : 1, p);
+        
         /* copy in the length of the encrypted key material */
         l2n3(encrypted_key_mat_len, p);
 
@@ -1107,34 +1189,10 @@ err:
 int spp_send_end_key_material(SSL *s) {
     unsigned char *p,*d;
     int n,i;
-    unsigned long alg_k;
-    const EVP_CIPHER *c;
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *clnt_ecdh = NULL;
-    const EC_POINT *srvr_ecpoint = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-    int encoded_pt_len = 0;
-    BN_CTX * bn_ctx = NULL;
-#endif
-    const EVP_MD *m;
-    EVP_MD_CTX md;
-    EVP_CIPHER_CTX *cipher;
-    
-    int is_exp;
-    struct sess_cert_st /* SESS_CERT */ *sess_cert;
-
-    is_exp=SSL_C_IS_EXPORT(s->s3->tmp.new_cipher);
-    c=s->s3->tmp.new_sym_enc;
-    m=s->s3->tmp.new_hash;
 
     if (s->state == SPP_ST_CW_PRXY_MAT_A) {
         d=(unsigned char *)s->init_buf->data;
         p= &(d[4]);
-
-        alg_k=s->s3->tmp.new_cipher->algorithm_mkey;
-
-        sess_cert = s->session->sess_cert;
         
         n = 0;
         s1n(s->server == 0 ? 2 : 1, p);
@@ -1174,8 +1232,6 @@ int spp_send_end_key_material(SSL *s) {
 
     /* SPP_ST_CW_PRXY_MAT_B */
     return(ssl3_do_write(s,SSL3_RT_HANDSHAKE));
-err:
-    return(-1);
 }
 
 int spp_get_end_key_material_client(SSL *s) {
@@ -1185,36 +1241,10 @@ int spp_get_end_key_material_client(SSL *s) {
     int encrypted_key_mat_len, key_mat_len = 0;
     unsigned char iv[EVP_MAX_IV_LENGTH];
     int iv_len = 0;
-
-
-#ifndef OPENSSL_NO_RSA
-    unsigned char *q,md_buf[EVP_MAX_MD_SIZE*2];
-#endif
-    EVP_MD_CTX md_ctx;
     unsigned char *param,*p;
-    int al,j,ok;
-    long i,param_len,n,alg_k,alg_a;
-    EVP_PKEY *pkey=NULL;
-    const EVP_MD *md = NULL;
-#ifndef OPENSSL_NO_RSA
-    RSA *rsa=NULL;
-#endif
-#ifndef OPENSSL_NO_DH
-    DH *dh=NULL;
-#endif
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *ecdh = NULL;
-    BN_CTX *bn_ctx = NULL;
-    EC_POINT *srvr_ecpoint = NULL;
-    int curve_nid = 0;
-    int encoded_pt_len = 0;
-    EC_KEY *clnt_ecdh = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-#endif
-    int id,slice_id,len;
-    SPP_SLICE *slice;
-    struct sess_cert_st /* SESS_CERT */ *sess_cert;
+    int ok;
+    long n;
+    int id;
 
     n=s->method->ssl_get_message(s,
         SPP_ST_CR_PRXY_MAT_A,
@@ -1226,6 +1256,14 @@ int spp_get_end_key_material_client(SSL *s) {
 
     /* unpack our data */
     p = (unsigned char*)s->init_msg;
+    
+    /* Get the ID */
+    n1s(p, id);
+    if (id != 1) {
+        /* Material not intended for client */
+        return -1;
+    }
+    
     /* encrypted key mat len */
     n2l3(p, encrypted_key_mat_len);
 
@@ -1256,68 +1294,12 @@ int spp_get_end_key_material_client(SSL *s) {
     printf("key mat len: %d\n", key_mat_len);
     printf("client get key material, key mat:\n");
     spp_print_buffer(key_mat, key_mat_len);
-    n = key_mat_len;
-    param=p=(unsigned char*)key_mat;
-    /* Server or client identifier */
-    //printf("Message header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
-    n1s(p, id);
-    if (id != 1 && id != 2) {
-        goto err;
-    }
     
-    /* More to read */
-    while (p-param < n) {
-        n1s(p, slice_id);
-        //printf("Slice %d received\n", slice_id);
-        slice = SPP_get_slice_by_id(s, slice_id);
-        if (slice == NULL)            
-            goto err;
-        
-        n2s(p, len);
-        if (len > EVP_MAX_KEY_LENGTH)
-            goto err;        
-        memcpy(slice->other_read_mat, p, len);
-        p += len;
-        
-        n2s(p, len);
-        if (len > EVP_MAX_KEY_LENGTH)
-            goto err;
-        memcpy(slice->other_write_mat, p, len);
-        p += len;
-        
-        slice->write_access = 1;
-        slice->read_access = 1;        
-    }
-    /* Should now have read the full message. */
-    if (p-param != n) {
-        printf("Did not read the whole message, %d != %d\n", p-param, n);
-        goto err;
-    }
-    /* Check to make sure we have material for all slices. 
-     * and generate the contexts. */
-    for (n = 0; n < s->slices_len; n++) {
-        if (s->slices[n]->write_access == 0 || s->slices[n]->read_access == 0) {
-            printf("Slice %d missing\n", s->slices[n]->slice_id);
-            goto err;
-        }
-        
-        /* Do not init yet. Save this for on sending the change cipher state message. */
-        /*if (spp_init_slice_st(s, s->slices[n]) <= 0) {
-            printf("Slice %d init failure\n", s->slices[n]->slice_id);
-            goto err;
-        }*/
-    }
-    
-    return 1;
-err:
-    return(-1);
-
+    return spp_unpack_proxy_key_mat(s, key_mat, key_mat_len);
 }
 
 int spp_get_end_key_material_server(SSL *s) {
 
-
-    unsigned char *cipher_text = NULL;
     unsigned char key_mat[1024] = {0};
     int *key_mat_len = 0;
     EVP_PKEY *private_key = NULL;
@@ -1326,37 +1308,9 @@ int spp_get_end_key_material_server(SSL *s) {
     unsigned char envelope_iv[EVP_MAX_IV_LENGTH];
     unsigned char encrypted_envelope_key[128] = {0};
     int encrypted_key_mat_len = 0;
-
     unsigned char encrypted_key_mat[2048]; /* HACK size... */
-
-#ifndef OPENSSL_NO_RSA
-    unsigned char *q,md_buf[EVP_MAX_MD_SIZE*2];
-#endif
-    EVP_MD_CTX md_ctx;
-    unsigned char *param,*p;
-    int al,j,ok;
-    long i,param_len,n,alg_k,alg_a;
-    EVP_PKEY *pkey=NULL;
-    const EVP_MD *md = NULL;
-#ifndef OPENSSL_NO_RSA
-    RSA *rsa=NULL;
-#endif
-#ifndef OPENSSL_NO_DH
-    DH *dh=NULL;
-#endif
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *ecdh = NULL;
-    BN_CTX *bn_ctx = NULL;
-    EC_POINT *srvr_ecpoint = NULL;
-    int curve_nid = 0;
-    int encoded_pt_len = 0;
-    EC_KEY *clnt_ecdh = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-#endif
-    int id,slice_id,len;
-    SPP_SLICE *slice;
-    struct sess_cert_st /* SESS_CERT */ *sess_cert;
+    int ok,id;
+    long n;
 
     n=s->method->ssl_get_message(s,
         SPP_ST_CR_PRXY_MAT_A,
@@ -1375,6 +1329,13 @@ int spp_get_end_key_material_server(SSL *s) {
     key_mat_envelope = (unsigned char *)s->init_msg;
     // printf("Payload from client:\n");
     // spp_print_buffer(key_mat_envelope, n);
+    
+    /* Get the ID */
+    n1s(key_mat_envelope, id);
+    if (id != 2) {
+        /* Material not intended for server */
+        return -1;
+    }
 
     /* get length of encrypted envelope key */
     n2l3(key_mat_envelope, encrypted_envelope_key_len);
@@ -1422,93 +1383,16 @@ int spp_get_end_key_material_server(SSL *s) {
     // spp_print_buffer(key_mat, key_mat_len);
 
     /* if we are lucky, key_mat conatins the unencrypted key material! */
-    n = key_mat_len;
-    param=p=key_mat;
-
-    /* Server or client identifier */
-    //printf("Message header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
-    n1s(p, id);
-    if (id != 1 && id != 2) {
-        goto err;
-    }
-    
-    /* More to read */
-    while (p-param < n) {
-        n1s(p, slice_id);
-        //printf("Slice %d received\n", slice_id);
-        slice = SPP_get_slice_by_id(s, slice_id);
-        if (slice == NULL)            
-            goto err;
-        
-        n2s(p, len);
-        if (len > EVP_MAX_KEY_LENGTH)
-            goto err;        
-        memcpy(slice->other_read_mat, p, len);
-        p += len;
-        
-        n2s(p, len);
-        if (len > EVP_MAX_KEY_LENGTH)
-            goto err;
-        memcpy(slice->other_write_mat, p, len);
-        p += len;
-        
-        slice->write_access = 1;
-        slice->read_access = 1;        
-    }
-    /* Should now have read the full message. */
-    if (p-param != n) {
-        printf("Did not read the whole message, %d != %d\n", p-param, n);
-        goto err;
-    }
-    /* Check to make sure we have material for all slices. 
-     * and generate the contexts. */
-    for (n = 0; n < s->slices_len; n++) {
-        if (s->slices[n]->write_access == 0 || s->slices[n]->read_access == 0) {
-            printf("Slice %d missing\n", s->slices[n]->slice_id);
-            goto err;
-        }
-        
-        /* Do not init yet. Save this for on sending the change cipher state message. */
-        /*if (spp_init_slice_st(s, s->slices[n]) <= 0) {
-            printf("Slice %d init failure\n", s->slices[n]->slice_id);
-            goto err;
-        }*/
-    }
-    
-    return 1;
-err:
-    return(-1);
+    return spp_unpack_proxy_key_mat(s, key_mat, key_mat_len);
 }
 
+/* Old method to be removed. This is an unencrypted proxykeymat */
 int spp_get_end_key_material(SSL *s) { 
-#ifndef OPENSSL_NO_RSA
-    unsigned char *q,md_buf[EVP_MAX_MD_SIZE*2];
-#endif
-    EVP_MD_CTX md_ctx;
     unsigned char *param,*p;
-    int al,j,ok;
-    long i,param_len,n,alg_k,alg_a;
-    EVP_PKEY *pkey=NULL;
-    const EVP_MD *md = NULL;
-#ifndef OPENSSL_NO_RSA
-    RSA *rsa=NULL;
-#endif
-#ifndef OPENSSL_NO_DH
-    DH *dh=NULL;
-#endif
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *ecdh = NULL;
-    BN_CTX *bn_ctx = NULL;
-    EC_POINT *srvr_ecpoint = NULL;
-    int curve_nid = 0;
-    int encoded_pt_len = 0;
-    EC_KEY *clnt_ecdh = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-#endif
+    int ok;
+    long n;
     int id,slice_id,len;
     SPP_SLICE *slice;
-    struct sess_cert_st /* SESS_CERT */ *sess_cert;
 
     n=s->method->ssl_get_message(s,
         SPP_ST_CR_PRXY_MAT_A,
@@ -1551,7 +1435,7 @@ int spp_get_end_key_material(SSL *s) {
     }
     /* Should now have read the full message. */
     if (p-param != n) {
-        printf("Did not read the whole message, %d != %d\n", p-param, n);
+        printf("Did not read the whole message, %d != %d\n", (int)(p-param), n);
         goto err;
     }
     /* Check to make sure we have material for all slices. 
@@ -1916,30 +1800,65 @@ int spp_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek
     return(npubk);
 }
 
+int spp_unpack_proxy_key_mat(SSL *s, unsigned char *p, long n) {
+    int len, slice_id;
+    SPP_SLICE *slice;
+    unsigned char *param=p;
+    
+    /* More to read */
+    while (p-param < n) {
+        n1s(p, slice_id);
+        //printf("Slice %d received\n", slice_id);
+        slice = SPP_get_slice_by_id(s, slice_id);
+        if (slice == NULL) {        
+            printf("Invalid slice id: %d\n", slice_id);
+            goto err;
+        }
+        
+        n2s(p, len);
+        if (len > EVP_MAX_KEY_LENGTH)
+            goto err;        
+        memcpy(slice->other_read_mat, p, len);
+        p += len;
+        
+        n2s(p, len);
+        if (len > EVP_MAX_KEY_LENGTH)
+            goto err;
+        memcpy(slice->other_write_mat, p, len);
+        p += len;
+        
+        slice->write_access = 1;
+        slice->read_access = 1;        
+    }
+    /* Should now have read the full message. */
+    if (p-param != n) {
+        printf("Did not read the whole message, %d != %d\n", p-param, n);
+        goto err;
+    }
+    /* Check to make sure we have material for all slices. 
+     * and generate the contexts. */
+    for (n = 0; n < s->slices_len; n++) {
+        if (s->slices[n]->write_access == 0 || s->slices[n]->read_access == 0) {
+            printf("Slice %d missing\n", s->slices[n]->slice_id);
+            goto err;
+        }
+        
+        /* Do not init yet. Save this for on sending the change cipher state message. */
+        /*if (spp_init_slice_st(s, s->slices[n]) <= 0) {
+            printf("Slice %d init failure\n", s->slices[n]->slice_id);
+            goto err;
+        }*/
+    }
+    return 1;
+err:
+    printf("Error in unpacking key material\n");
+    return -1;
+}
+
 /* TODO Make this work and use it in spp_send_end_key_material_client/server !*/
 int spp_pack_proxy_key_mat(SSL *s, unsigned char *proxy_key_mat) {
     int n, i = 0;
-    int is_exp;
-    struct sess_cert_st /* SESS_CERT */ *sess_cert;
-    const EVP_CIPHER *c;
     unsigned char *p, *d;
-    unsigned long alg_k;
-
-#ifndef OPENSSL_NO_ECDH
-    EC_KEY *clnt_ecdh = NULL;
-    const EC_POINT *srvr_ecpoint = NULL;
-    EVP_PKEY *srvr_pub_pkey = NULL;
-    unsigned char *encodedPoint = NULL;
-    int encoded_pt_len = 0;
-    BN_CTX * bn_ctx = NULL;
-#endif
-    const EVP_MD *m;
-    EVP_MD_CTX md;
-    EVP_CIPHER_CTX *cipher;
-
-    is_exp=SSL_C_IS_EXPORT(s->s3->tmp.new_cipher);
-    c=s->s3->tmp.new_sym_enc;
-    m=s->s3->tmp.new_hash;
 
     /* I'm not sure about this buffer size... got it by printing it out when
     running code... should probably be doing things better :'(
@@ -1951,32 +1870,25 @@ int spp_pack_proxy_key_mat(SSL *s, unsigned char *proxy_key_mat) {
     */
     // char temp_buff[21848] = {0};
 
+    /* NOTE: data in the init_buf is really a char?!?! s->init_buf->data; */
+    d=(unsigned char *)proxy_key_mat;
+    // p= &(d[4]);
+    // p= &(d[0]);
+    p = d;
 
-    if (s->state == SPP_ST_CW_PRXY_MAT_A) {
-        /* NOTE: data in the init_buf is really a char?!?! s->init_buf->data; */
-        d=(unsigned char *)proxy_key_mat;
-        // p= &(d[4]);
-        // p= &(d[0]);
-        p = d;
+    n = 0;
 
-        alg_k=s->s3->tmp.new_cipher->algorithm_mkey;
-        sess_cert = s->session->sess_cert;
-
-        n = 0;
-        s1n(s->server == 0 ? 2 : 1, p);
-
-        for (i = 0; i < s->slices_len; i++) {
-            s1n(s->slices[i]->slice_id, p);
-            s2n(EVP_MAX_KEY_LENGTH, p);
-            memcpy(p, s->slices[i]->read_mat, EVP_MAX_KEY_LENGTH);
-            p += EVP_MAX_KEY_LENGTH;
-            s2n(EVP_MAX_KEY_LENGTH, p);    
-            memcpy(p, s->slices[i]->write_mat, EVP_MAX_KEY_LENGTH);
-            p += EVP_MAX_KEY_LENGTH;
-        }
-        // n = p-d -4;
-        n = p - d;
+    for (i = 0; i < s->slices_len; i++) {
+        s1n(s->slices[i]->slice_id, p);
+        s2n(EVP_MAX_KEY_LENGTH, p);
+        memcpy(p, s->slices[i]->read_mat, EVP_MAX_KEY_LENGTH);
+        p += EVP_MAX_KEY_LENGTH;
+        s2n(EVP_MAX_KEY_LENGTH, p);    
+        memcpy(p, s->slices[i]->write_mat, EVP_MAX_KEY_LENGTH);
+        p += EVP_MAX_KEY_LENGTH;
     }
+    // n = p-d -4;
+    n = p - d;
     return n;
 }
 

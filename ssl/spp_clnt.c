@@ -327,7 +327,7 @@ int spp_connect(SSL *s) {
                     s->state = SPP_ST_CW_PRXY_MAT_A;
                     s->init_num=0;
                 }
-                ret=spp_send_end_key_material(s);
+                ret=spp_send_end_key_material_client(s);
                 
                 //s->s3->tmp.next_state=SPP_ST_CR_PRXY_MAT_A;
                 //s->state=SSL3_ST_CW_FLUSH;
@@ -349,7 +349,7 @@ int spp_connect(SSL *s) {
                     s->state = SPP_ST_CR_PRXY_MAT_A;
                     s->init_num=0;
                 }
-                ret=spp_get_end_key_material(s);
+                ret=spp_get_end_key_material_client(s);
                 // Logging with time information 
 				#ifdef DEBUG
 				log_time("Received proxy key material\n", &currTime, &prevTime, &originTime); 				
