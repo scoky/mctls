@@ -901,7 +901,7 @@ int main(int argc, char **argv){
 						break; 
 				
 				// Serve some content 
-				case 3: http_serve_request(ssl, newsock, proto, true, action);
+				case 3: http_serve_request(ssl, newsock, proto, false, action);
 						break;
 			
 				// Serve a browser like behavior 

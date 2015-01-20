@@ -557,6 +557,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				// Stop the timer here (avoid shutdown crap) 
 				gettimeofday(tvEnd, NULL);
 				flag = true; 
+				goto shutdown;
 			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:

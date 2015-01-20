@@ -204,7 +204,7 @@ int shut_down_connections(SSL* ssl)
 	#endif
 
 	//shutdown(SSL_get_fd(ssl), SHUT_WR);
-	shutdown(SSL_get_fd(ssl), 1);
+	//shutdown(SSL_get_fd(ssl), 1);
 	r = SSL_shutdown(ssl);
 	
 	if (r == 0)
@@ -300,6 +300,8 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		}
 	}
 
+	// NEW SHUT DOWN 
+	shut_down_connections(next_ssl);
 	// The previous connection has been terminated by the client... we just free the SSL object... 
 	//SSL_free(prev_ssl);
 	// All good 
@@ -366,7 +368,6 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 	#ifdef DEBUG
 	fprintf(stderr, "[middlebox-n] Triggering connection with previous hop to close too\n");
 	#endif
-	shut_down_connections(prev_ssl);
 	//SSL_free(prev_ssl);
 	// All good 
     return(0);
