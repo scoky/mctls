@@ -151,9 +151,17 @@ void splitting (SSL *ssl, char *request, int request_len){
 	int beginIndex = 0; 
 	int i; 
 	int inc = request_len / (ssl->slices_len - 1); 
-		
+	int usedSlices; 
+
+	// For client/server strategy just use half slices 	
+	if (strcmp(strategy, "cs") == 0){
+		 usedSlices = ssl->slices_len / 2; 
+	} else{
+		 usedSlices = ssl->slices_len; 
+	}
+	
 	// Slicing happens here  
-	for (i = 1; i < ssl->slices_len; i++){
+	for (i = 1; i < usedSlices; i++){
 		
 		char* dest = (char*) malloc(inc); 
 		#ifdef DEBUG
@@ -178,9 +186,7 @@ void splitting (SSL *ssl, char *request, int request_len){
 		// Increase pointer for last slice  
 		if ( i == (ssl->slices_len - 2)){
 			inc = request_len - beginIndex; 
-		} else if (strcmp(strategy, "exp") == 0){
-			inc = 2 * inc; 
-		}
+		} 
 	
 		// free memory 
 		free (dest); 
@@ -762,7 +768,8 @@ void usage(void){
 	printf("usage: wserver -c -o -s\n");
 	printf("-c:   protocol requested: ssl, spp.\n");
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
-	printf("-s:   content slicing strategy {uni; exp}\n");
+	printf("-s:   content slicing strategy {uni; cs}\n");
+	printf("{uni[DEFAUL]=split response equally among slices ; cs=split uniformly among half slices, assuming other half is used by the client}\n");
 	exit(-1);
 }
 

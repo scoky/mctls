@@ -502,10 +502,14 @@ static int http_complex(char *proto, char *fn){
 		}
     
 	done:
+		//  Print byte statistics
 		if (stats){
 			print_stats(ssl);        
 		}
+		// Free ssl 
 		SSL_free(ssl);
+		
+		// All good 
 		return(0);
 }
 
