@@ -30,6 +30,7 @@ int err_exit(char *string);
 
 SSL_CTX *initialize_ctx(char *keyfile, char *password, char *protocol);
 void destroy_ctx(SSL_CTX *ctx);
+void set_nagle(int sock, int flag);
 
 #ifndef ALLOW_OLD_VERSIONS
 #if (OPENSSL_VERSION_NUMBER < 0x00905100L)

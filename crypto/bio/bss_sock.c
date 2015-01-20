@@ -56,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
-#define DISABLE_DELACK
+//#define DISABLE_DELACK
 
 #include <stdio.h>
 #include <errno.h>
