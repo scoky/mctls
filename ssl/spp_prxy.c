@@ -510,7 +510,6 @@ int get_proxy_material(SSL *s, int server) {
     /* we need to decrypt the message first... */
     // printf("getting private key\n");
     // Get the private key from the correct instance
-    private_key = (server ? s->other_ssl->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey : s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey); 
 
     key_mat_envelope = (unsigned char *)s->init_msg;
     // printf("Payload from client:\n");
@@ -522,6 +521,8 @@ int get_proxy_material(SSL *s, int server) {
         /* Material not intended for this proxy */
         return 1;
     }
+    
+    private_key = (server ? s->other_ssl->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey : s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey); 
 
     /* get length of encrypted envelope key */
     n2l3(key_mat_envelope, encrypted_envelope_key_len);
@@ -565,8 +566,8 @@ int get_proxy_material(SSL *s, int server) {
         s->proxy_key_mat_shared_secret
         );
 
-    // printf("key mat len: %d\n", key_mat_len);
-    // spp_print_buffer(key_mat, key_mat_len);
+    printf("key mat len: %d\n", key_mat_len);
+    spp_print_buffer(key_mat, key_mat_len);
     
     return spp_proxy_unpack_mat(s, key_mat, key_mat_len, server);
 }
@@ -579,10 +580,10 @@ int spp_proxy_unpack_mat(SSL *s, unsigned char *p, long n, int server) {
     /* More to read */
     while (p-param < n) {
         n1s(p, slice_id);
-        //printf("Slice %d received\n", slice_id);
+        printf("Slice %d received\n", slice_id);
         slice = SPP_get_slice_by_id(s, slice_id);
         slice2 = SPP_get_slice_by_id(s->other_ssl, slice_id);
-        if (slice == NULL)            
+        if (slice == NULL)        
             goto err;
         
         n2s(p, len);
@@ -620,10 +621,11 @@ int spp_proxy_unpack_mat(SSL *s, unsigned char *p, long n, int server) {
     }
     /* Should now have read the full message. */
     if (p-param != n) {
-        printf("Did not read the whole message, %d != %d\n", p-param, s->init_num);
+        printf("Did not read the whole message, %d != %d\n", p-param, n);
         goto err;
     }
     
+    printf("Done\n");
     return 1;
 err:
     printf("Error reading proxy key material\n");
@@ -1140,9 +1142,11 @@ int spp_proxy_accept(SSL *s) {
                 // Receive proxy key material for each proxy and the server
                 // Pass all messages on
                 for (i = 0; i <= s->proxies_len; i++) {
+                    printf("Waiting for proxy material message\n");
                     s->state = next_st->state = SPP_ST_SR_PRXY_MAT_A;
                     ret=get_proxy_msg(next_st, SPP_ST_SR_PRXY_MAT_A, SPP_ST_SR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL, 1);
                     if (ret <= 0) goto end;
+                    printf("Got material message\n");
                     ret=get_proxy_material(next_st, 1); // From server
                     if (ret <= 0) goto end;
                     s->init_num=next_st->init_num=0;

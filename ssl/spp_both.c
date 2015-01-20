@@ -884,7 +884,7 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
             shared_secret);
 
         /* store the shared secret */
-        memcpy(s->proxy_key_mat_shared_secret, shared_secret, sizeof(shared_secret));
+        //memcpy(s->proxy_key_mat_shared_secret, shared_secret, sizeof(shared_secret));
 
 
         *(d++)=SPP_MT_PROXY_KEY_MATERIAL;
