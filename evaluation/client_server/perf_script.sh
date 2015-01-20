@@ -7,7 +7,7 @@ usage(){
     echo -e "MAX_S   = max number of slices (min is 2)"
     echo -e "MAX_R   = number of repetition of handshake per slice value"
     echo -e "proto   = protocol requested (ssl; spp; fwd)"
-    echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=ping-like (f[N_proxy]) ; 5=file download (f[size(1K-10MB)])}"
+    echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=ping-like (f[N_proxy]) ; 5=file download (f[size(1K-10MB)]) ; 6=browser-like behavior ; 7=test number of connections per second ; 8=byte analysis}"
     exit 0
 }
 
@@ -455,9 +455,9 @@ case $expType in
 			for((i=1; i<=R; i++))
 			do
 				echo $fSizeShort >> .tmp
-				echo "[PERF] ./wclient -s $s -c $proto -o $opt -f $fSize"
+				echo "[PER] ./wclient -s $s -c $proto -o $opt -f $fSize"
 				#echo "./wclient -s $s -c $proto -o $opt -f $fSize >> $log 2>/dev/null"
-				./wclient -s $s -c $proto -o $opt -f $fSize >> $log 2>/dev/null
+				./wclient -s $s -c $proto -o $opt -f $fSize -r 1 -w 1 >> $log 2>/dev/null
 			done
 				let "fSize = 2*fSize"
 				let "fSizeShort = 2*fSizeShort"
@@ -552,6 +552,16 @@ case $expType in
 		fi
 		;;
 
+	7) 
+		echo "[PERF] Number of connctions -- Matteo is working on it"
+		# -----------------
+		#$path"/openssl" s_time -connect 127.0.0.1:8423 -new -time 10 -proto spp -slice 3
+		# ----------------
+		;; 
+
+	8) 
+		echo "[PERF] Byte overhead -- David is working on it"
+		;;
 
 	*)	
 		;;
