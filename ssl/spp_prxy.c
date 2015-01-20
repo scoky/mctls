@@ -906,11 +906,11 @@ int spp_proxy_accept(SSL *s) {
                 if ((proxy = spp_get_next_proxy(s, this_proxy, 0)) != NULL) {
                     // Flush our cert in both directions
                     // Need to receive and forward certificates from proxies between this proxy and the client
-                    s->state=SSL3_ST_SW_FLUSH;
+                    s->state=SPP_ST_SW_AHEAD_FLUSH;
                     s->s3->tmp.next_state=SPP_ST_PR_AHEAD_A;
                 } else {
                     // No proxies between us and client, wait for client key exchange
-                    s->state=SSL3_ST_SW_FLUSH;
+                    s->state=SPP_ST_SW_AHEAD_FLUSH;
                     s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
                 }
                 break;
@@ -957,8 +957,9 @@ int spp_proxy_accept(SSL *s) {
                     s->init_num=next_st->init_num=0;
                     if (s->s3->tmp.message_type == SSL3_MT_SERVER_DONE) {
                         if ((proxy = spp_get_next_proxy(s, proxy, 0)) == NULL) {
-                            s->state=SPP_ST_CW_BEHIND_FLUSH;
-                            s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
+                            //s->state=SPP_ST_CW_BEHIND_FLUSH;
+                            //s->s3->tmp.next_state=SSL3_ST_SR_KEY_EXCH_A;
+                            s->state=SSL3_ST_SR_KEY_EXCH_A;
                             break;
                         } 
                         //printf("Receiving message from ahead proxy %d\n", proxy->proxy_id);
