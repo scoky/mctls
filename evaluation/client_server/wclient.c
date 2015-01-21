@@ -134,7 +134,7 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies){
 		
 		// Generate a proxy from IP address just read 
 		char *newLine;  
-		newLine = (char *)malloc(strlen(line));    
+		newLine = (char *)malloc(strlen(line)+1);    
 		strcpy(newLine, line);
 		proxies[count] = SPP_generate_proxy(ssl, newLine);
 		count++; 
@@ -934,7 +934,7 @@ int main(int argc, char **argv){
 		char *newPurpose;  
 		char str[30]; 
 		sprintf (str, "slices_%d", (i + 2)); 
-		newPurpose = (char *)malloc(strlen(str));    
+		newPurpose = (char *)malloc(strlen(str)+1);    
 		strcpy(newPurpose, str);
 		slice_set[i] = SPP_generate_slice(ssl, newPurpose); 
 		#ifdef DEBUG
