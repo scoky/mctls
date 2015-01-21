@@ -12,15 +12,15 @@
 
 int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_len,
     unsigned char **encrypted_key, int *encrypted_key_len, unsigned char *iv,
-    unsigned char *ciphertext, unsigned char *shared_secret_key);
+    unsigned char *ciphertext, unsigned char **shared_secret_key, int *shared_secret_key_len);
 int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_len,
     unsigned char *encrypted_key, int encrypted_key_len, unsigned char *iv,
-    unsigned char *plaintext, unsigned char *shared_secret_key);
+    unsigned char *plaintext, unsigned char **shared_secret_key, int *shared_secret_key_len);
 int spp_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek,
-         int *ekl, unsigned char *iv, EVP_PKEY **pubk, int npubk, unsigned char *key);
+         int *ekl, unsigned char *iv, EVP_PKEY **pubk, int npubk, unsigned char **key, int *key_len);
 int spp_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
     const unsigned char *ek, int ekl, const unsigned char *iv,
-    EVP_PKEY *priv, unsigned char *shared_secret);
+    EVP_PKEY *priv, unsigned char **shared_secret, int *shared_secret_key_len);
 int spp_encrypt_key_mat_server(unsigned char *symmetric_key, int symmetric_key_len,
     unsigned char *iv, unsigned char *plain_text, int plain_text_len, unsigned char *cipher_text);
 int spp_decrypt_key_mat_client(unsigned char *symmetric_key, int symmetric_key_len,
@@ -813,7 +813,8 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
     SPP_SLICE *slice;
     EVP_PKEY *pub_key = NULL;
     EVP_PKEY **pub_keys = OPENSSL_malloc(1 * sizeof(EVP_PKEY *));
-    unsigned char shared_secret[EVP_MAX_KEY_LENGTH];
+    unsigned char *shared_secret=NULL;
+    int shared_secret_len;
     // unsigned char *encrypted_key_mat = NULL;
     /* THIS PROBABLY NEEDS TO BE CHANGED TO BE MORE DYNAMIC AND HAVE THE REAL LENGTH*/
     unsigned char encrypted_key_mat[1024];
@@ -899,10 +900,17 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
             &encrypted_envelope_key_len,
             envelope_iv,
             encrypted_key_mat,
-            shared_secret);
+            &shared_secret,
+            &shared_secret_len);
 
         /* store the shared secret */
         //memcpy(s->proxy_key_mat_shared_secret, shared_secret, sizeof(shared_secret));
+        /* Don't need to save the shared secrets with proxies.*/
+        if (shared_secret != NULL) { 
+            OPENSSL_cleanse(shared_secret,shared_secret_len);
+            /* Before we free the key, let's copy it out to the shared_secret... */
+            OPENSSL_free(shared_secret);
+        }
 
 
         *(d++)=SPP_MT_PROXY_KEY_MATERIAL;
@@ -985,7 +993,8 @@ int spp_send_end_key_material_client(SSL *s) {
 
     EVP_PKEY *pub_key = NULL;
     EVP_PKEY **pub_keys = OPENSSL_malloc(1 * sizeof(EVP_PKEY *));
-    unsigned char shared_secret[EVP_MAX_KEY_LENGTH];
+    //unsigned char *shared_secret;
+    //int shared_secret_len;
     // unsigned char *encrypted_key_mat = NULL;
     /* THIS PROBABLY NEEDS TO BE CHANGED TO BE MORE DYNAMIC AND HAVE THE REAL LENGTH*/
     unsigned char encrypted_key_mat[1024];
@@ -1042,10 +1051,11 @@ int spp_send_end_key_material_client(SSL *s) {
             &encrypted_envelope_key_len,
             envelope_iv,
             encrypted_key_mat,
-            shared_secret);
+            &s->proxy_key_mat_shared_secret,
+            &s->proxy_key_mat_shared_secret_len);
 
-        /* store the shared secret */
-        memcpy(s->proxy_key_mat_shared_secret, shared_secret, sizeof(shared_secret));
+        /* store the shared secret */ // Already stored
+        //memcpy(s->proxy_key_mat_shared_secret, shared_secret, sizeof(shared_secret));
 
 
 
@@ -1141,17 +1151,27 @@ int spp_send_end_key_material_server(SSL *s) {
         */
         memset(iv, 0, EVP_MAX_IV_LENGTH);
 
+        if (s->proxy_key_mat_shared_secret == NULL) {
+            goto err;
+        }
+        
         printf("Proxy key material shared secret (server):\n");
-        spp_print_buffer(s->proxy_key_mat_shared_secret, EVP_MAX_KEY_LENGTH);
+        spp_print_buffer(s->proxy_key_mat_shared_secret, s->proxy_key_mat_shared_secret_len);
 
         encrypted_key_mat_len = spp_encrypt_key_mat_server(
             s->proxy_key_mat_shared_secret,
-            EVP_MAX_KEY_LENGTH,
+            s->proxy_key_mat_shared_secret_len,
             iv,
             temp_buff,
             n,
             encrypted_key_mat
             );
+        
+        // Release the shared secret 
+        OPENSSL_cleanse(s->proxy_key_mat_shared_secret,s->proxy_key_mat_shared_secret_len);
+        OPENSSL_free(s->proxy_key_mat_shared_secret);
+        s->proxy_key_mat_shared_secret = NULL;
+        s->proxy_key_mat_shared_secret_len = 0;
 
         printf("server->client key material:\n");
         spp_print_buffer(temp_buff, n);
@@ -1199,6 +1219,7 @@ int spp_send_end_key_material_server(SSL *s) {
     /* SPP_ST_CW_PRXY_MAT_B */
     return(ssl3_do_write(s,SSL3_RT_HANDSHAKE));
 err:
+    printf("Error in spp_send_end_key_material_server\n");
     return(-1);
 }
 
@@ -1303,18 +1324,28 @@ int spp_get_end_key_material_client(SSL *s) {
     if (p-d != n) {
         goto err;
     }
+    if (s->proxy_key_mat_shared_secret == NULL) {
+        goto err;
+    }
 
     printf("Proxy key material shared secret (client):\n");
-    spp_print_buffer(s->proxy_key_mat_shared_secret, EVP_MAX_KEY_LENGTH);
+    spp_print_buffer(s->proxy_key_mat_shared_secret, s->proxy_key_mat_shared_secret_len);
 
     /* decrypt the key material */
     key_mat_len = spp_decrypt_key_mat_client(
         s->proxy_key_mat_shared_secret,
-        EVP_MAX_KEY_LENGTH,
+        s->proxy_key_mat_shared_secret_len,
         iv,
         encrypted_key_mat,
         encrypted_key_mat_len,
         key_mat);
+    
+    // Release the shared secret 
+    OPENSSL_cleanse(s->proxy_key_mat_shared_secret,s->proxy_key_mat_shared_secret_len);
+    OPENSSL_free(s->proxy_key_mat_shared_secret);
+    s->proxy_key_mat_shared_secret = NULL;
+    s->proxy_key_mat_shared_secret_len = 0;
+    
     printf("key mat len: %d\n", key_mat_len);
     printf("client get key material, key mat:\n");
     spp_print_buffer(key_mat, key_mat_len);
@@ -1411,8 +1442,8 @@ int spp_get_end_key_material_server(SSL *s) {
         encrypted_envelope_key_len,
         envelope_iv,
         key_mat,
-        s->proxy_key_mat_shared_secret
-        );
+        &s->proxy_key_mat_shared_secret,
+        &s->proxy_key_mat_shared_secret_len);
 
     // printf("key mat len: %d\n", key_mat_len);
     // spp_print_buffer(key_mat, key_mat_len);
@@ -1503,7 +1534,7 @@ TODO Proper error handling
 */
 int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_len,
     unsigned char *encrypted_key, int encrypted_key_len, unsigned char *iv,
-    unsigned char *plaintext, unsigned char *shared_secret_key)
+    unsigned char *plaintext, unsigned char **shared_secret_key, int *shared_secret_key_len)
 {
     EVP_CIPHER_CTX *ctx;
 
@@ -1524,7 +1555,7 @@ int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_
      * provided and priv_key, whilst the encrypted session key is held in
      * encrypted_key */
     if(1 != spp_OpenInit(ctx, EVP_aes_256_cbc(), encrypted_key,
-        encrypted_key_len, iv, priv_key, shared_secret_key)) {
+        encrypted_key_len, iv, priv_key, shared_secret_key, shared_secret_key_len)) {
         //handleErrors();
         printf("envelope_open error 2\n");
     }
@@ -1565,7 +1596,7 @@ TODO Proper error handling
 */
 int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_len,
     unsigned char **encrypted_key, int *encrypted_key_len, unsigned char *iv,
-    unsigned char *ciphertext, unsigned char *shared_secret_key)
+    unsigned char *ciphertext, unsigned char **shared_secret_key, int *shared_secret_key_len)
 {
     EVP_CIPHER_CTX *ctx;
 
@@ -1588,7 +1619,7 @@ int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_le
      * this example the array size is just one. This operation also
      * generates an IV and places it in iv. */
      // printf("Running SealInit\n");
-    if(1 != spp_SealInit(ctx, EVP_aes_256_cbc(), encrypted_key, encrypted_key_len, iv, pub_key, 1, shared_secret_key)) {
+    if(1 != spp_SealInit(ctx, EVP_aes_256_cbc(), encrypted_key, encrypted_key_len, iv, pub_key, 1, shared_secret_key, shared_secret_key_len)) {
         printf("ERROR2\n");
         // handleErrors();
     }
@@ -1629,7 +1660,7 @@ TODO Proper error handling
 
 int spp_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
     const unsigned char *ek, int ekl, const unsigned char *iv,
-    EVP_PKEY *priv, unsigned char *shared_secret)
+    EVP_PKEY *priv, unsigned char **shared_secret, int *shared_secret_key_len)
     {
     unsigned char *key=NULL;
     int i,size=0,ret=0;
@@ -1651,7 +1682,8 @@ int spp_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
     }
 
     size=RSA_size(priv->pkey.rsa);
-    key=(unsigned char *)OPENSSL_malloc(size+2);
+    *shared_secret=key=(unsigned char *)OPENSSL_malloc(size+2);
+    *shared_secret_key_len=size+2;
     if (key == NULL)
         {
         /* ERROR */
@@ -1660,7 +1692,7 @@ int spp_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
         }
 
     i=EVP_PKEY_decrypt_old(key,ek,ekl,priv);
-    memcpy(shared_secret, key, (size + 2));
+    //memcpy(shared_secret, key, (size + 2));
     if ((i <= 0) || !EVP_CIPHER_CTX_set_key_length(ctx, i)) {
         /* ERROR */
         goto err;
@@ -1669,11 +1701,12 @@ int spp_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
 
     ret=1;
 err:
-    if (key != NULL) OPENSSL_cleanse(key,size);
+    // Do not free or cleanse the key. Instead, it is returned in shared_secret.
+    //if (key != NULL) OPENSSL_cleanse(key,size);
 
     /* Before we free the key, let's copy it out to the shared_secret... */
 
-    OPENSSL_free(key);
+    //OPENSSL_free(key);
     return(ret);
     }
 
@@ -1798,7 +1831,7 @@ HACK NO IDEA IF REUSING THE SHARED SECRET KEY LATER ON COMPROMISES THE INTEGRITY
 OF THE ENCRYPTION ALGORITHM!!!!!!
 */
 int spp_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek,
-         int *ekl, unsigned char *iv, EVP_PKEY **pubk, int npubk, unsigned char *key)
+         int *ekl, unsigned char *iv, EVP_PKEY **pubk, int npubk, unsigned char **key, int *key_len)
     {
     // unsigned char key[EVP_MAX_KEY_LENGTH];
     int i;
@@ -1813,12 +1846,15 @@ int spp_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek
     }
     if ((npubk <= 0) || !pubk)
         return 1;
-    if (EVP_CIPHER_CTX_rand_key(ctx, key) <= 0)
+    *key_len = EVP_CIPHER_CTX_key_length(ctx);
+    printf("Key length = %d\n", *key_len);
+    *key = (unsigned char*)OPENSSL_malloc(*key_len);
+    if (EVP_CIPHER_CTX_rand_key(ctx, *key) <= 0)
         return 0;
     if (EVP_CIPHER_CTX_iv_length(ctx))
         RAND_pseudo_bytes(iv,EVP_CIPHER_CTX_iv_length(ctx));
 
-    if(!EVP_EncryptInit_ex(ctx,NULL,NULL,key,iv)) return 0;
+    if(!EVP_EncryptInit_ex(ctx,NULL,NULL,*key,iv)) return 0;
 
 
     for (i=0; i<npubk; i++)
@@ -1831,7 +1867,7 @@ int spp_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek
         // printf("Key: %s\n", key);
         // EVP_PKEY_print_public(bio_out, pubk[i], 4, NULL);
 
-        ekl[i]=EVP_PKEY_encrypt_old(ek[i],key,EVP_CIPHER_CTX_key_length(ctx),
+        ekl[i]=EVP_PKEY_encrypt_old(ek[i],*key,EVP_CIPHER_CTX_key_length(ctx),
             pubk[i]);
         if (ekl[i] <= 0) return(-1);
     }
