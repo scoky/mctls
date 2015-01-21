@@ -7,7 +7,7 @@ function compute()
 	sumsq = 0
 	avg = sum / count
 	for( x = 0; x < count; x++){
-		sumsq += ((array[x]-(sum/(count)))**2)
+		sumsq += ((array[x]-(sum/(count)))^2)
 	}
 	print S " " fix1 " " fix2 " " avg " " sqrt(sumsq/(count))
 }
