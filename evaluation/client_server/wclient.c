@@ -32,9 +32,16 @@ static int clientID=0;
 
 // -- Moved up here just because of thread 
 static SSL *ssl;                              // SSL instance
+static int plain_socket;
 static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
+static ExperimentInfo *experiment_info;       // for printing stats at the end
+
+
+void print_stats(SSL *s);
+
+
 
 // Compute the size of a file to be served
 int calculate_file_size(char *filename){ 
@@ -308,24 +315,34 @@ void sendRequest(char *filename){
 		#ifdef DEBUG
 		printf("[DEBUG] SPP_write\n");
 		#endif 
-		int i; 
-		for (i = 0; i < ssl->slices_len; i++){
-			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
-			#ifdef DEBUG
-			printf("[DEBUG] Wrote %d bytes\n", r);
-			#endif
-			check_SSL_write_error(r, request_len); 
-		}
+		// Use slice 0 as default for sending (HEADER)
+		int r = SPP_write_record(ssl, request, request_len, ssl->slices[0]);
+		#ifdef DEBUG
+		printf("[DEBUG] Wrote %d bytes\n", r);
+		#endif
+		check_SSL_write_error(r, request_len); 
 	} 
-	
 	// SSL write
-	if (strcmp(proto, "ssl") == 0){
+	else if (strcmp(proto, "ssl") == 0){
 		#ifdef DEBUG
 		printf("[DEBUG] SSL_write\n");
 		#endif 
 		int r = SSL_write(ssl, request, request_len);
 		check_SSL_write_error(r, request_len); 
 	}
+	// socket write
+	else if (strcmp(proto, "pln") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] Plain socket write\n");
+		#endif 
+	    int r = write(plain_socket, request, request_len);
+	    if ( r <= 0 )
+	    {
+	    	printf("Something went wrong with writing to the socket!\n");
+	    }
+		
+	}
+
 }
 
 
@@ -452,9 +469,8 @@ static int http_complex(char *proto, char *fn){
 					berr_exit("SSL read problem");
 			}
 		} 
-	
 		// SSL read
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			#ifdef DEBUG
 			printf("[DEBUG] Waiting on SSL_read...\n");
 			#endif 
@@ -473,6 +489,14 @@ static int http_complex(char *proto, char *fn){
 				default:
 					berr_exit("SSL read problem");
 			}
+		}		
+		else if (strcmp(proto, "pln") == 0){
+			r = read(plain_socket, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ( r <= 0 ) /* done reading */
+				goto done;
 		}
 		
 		// Write buf to stdout
@@ -502,10 +526,14 @@ static int http_complex(char *proto, char *fn){
 		}
     
 	done:
+		//  Print byte statistics
 		if (stats){
 			print_stats(ssl);        
 		}
+		// Free ssl 
 		SSL_free(ssl);
+		
+		// All good 
 		return(0);
 }
 
@@ -527,6 +555,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		}
 	}   
 	sizeCheck = fSize; 
+	experiment_info->file_size = fSize;
 
 	// Request file (either by name or by size) 
 	if (requestingFile){
@@ -553,6 +582,8 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				// Stop the timer here (avoid shutdown crap) 
 				gettimeofday(tvEnd, NULL);
 				flag = true; 
+				break; 
+				//goto shutdown;
 			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
@@ -572,7 +603,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		} 
 	
 		// SSL read
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			/*
 			#ifdef DEBUG
 			printf("[DEBUG] SSL_read\n");
@@ -587,6 +618,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				// Stop the timer here (avoid shutdown crap) 
 				gettimeofday(tvEnd, NULL);
 				flag = true; 
+				break; 
 			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
@@ -603,6 +635,15 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				default:
 					berr_exit("SSL read problem");
 			}
+		}
+		// SSL read
+		else if (strcmp(proto, "pln") == 0){
+			r = read(plain_socket, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ( r <= 0 ) /* done reading */
+				goto done;
 		}
 		
 		// Write buf to stdout
@@ -637,6 +678,39 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		}
 		SSL_free(ssl);
 		return(0);
+
+	// Normal
+	// Shutdown 
+	#ifdef DEBUG
+	printf("[DEBUG] Shutdown was requested\n"); 
+	#endif 
+	r = SSL_shutdown(ssl);
+
+	switch(r){
+		case 1:
+			break; // Success 
+		case 0:
+
+		case -1:
+
+		default:
+			#ifdef DEBUG 
+			printf ("Shutdown failed with code %d\n", r);
+			#endif 
+			berr_exit("Shutdown failed"); 
+	}
+    
+	// print stats
+	if (stats){
+		print_stats(ssl);
+	}
+	
+	// Free memory 
+	SSL_free(ssl);
+	
+	// All good 
+	return(0);
+
 }
 
 
@@ -653,20 +727,32 @@ void print_stats(SSL *s) {
     printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
     printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
     printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
+
+	// In one line (so it's easy for plotting script).
+	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total
+	printf("[RESULTS] ByteStatsSummary %d %d %d %d %d %d %d %d\n",
+		experiment_info->num_slices,
+		experiment_info->num_proxies,
+		experiment_info->file_size,
+		s->read_stats.bytes + s->write_stats.bytes,
+		s->read_stats.app_bytes + s->write_stats.app_bytes,
+		s->read_stats.pad_bytes + s->write_stats.pad_bytes,
+		s->read_stats.header_bytes + s->write_stats.header_bytes,
+		s->read_stats.handshake_bytes + s->write_stats.handshake_bytes);
 }
 
 
 // Usage function 
 void usage(void){
 	printf("usage: wclient -s -r -w -i -f -o -a -c -b\n"); 
-	printf("-s:   number of slices requested (min 2, 1 for handshake 1 for rest)\n"); 
+	printf("-s:   number of slices requested (min 1)\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
 	printf("-f:   file for http GET (either via <name> (require file to exhist both at server and client[for testing reasons]) or via <size>)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-a:   action file for browser-like behavior\n");
-	printf("-c:   protocol chosen (ssl ; spp)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; pln)\n"); 
 	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
@@ -703,6 +789,7 @@ int main(int argc, char **argv){
 	struct timeval tvEndConnect; 
 	struct timeval tvBegin, tvEnd; 
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
+	experiment_info = (ExperimentInfo*)malloc(sizeof(ExperimentInfo));
 
 	
 	// Handle user input parameters
@@ -714,6 +801,7 @@ int main(int argc, char **argv){
 			case 's':	if(! (slices_len = atoi(optarg) )){
 							err_exit("Bogus number of slices specified (no. of slices need to be > 1)");
 						}
+						experiment_info->num_slices = slices_len;
 						break;
 		
 			// Number of proxies with read access (per slice)
@@ -770,6 +858,7 @@ int main(int argc, char **argv){
 
 	// Read number of proxy from file 
 	N_proxies = read_proxy_count(filename); 
+	experiment_info->num_proxies = N_proxies - 1;
 	
 	// Check that input parameters are correct 
 	#ifdef DEBUG
@@ -778,15 +867,15 @@ int main(int argc, char **argv){
 	if (argc == 1){
 		usage(); 
 	}
-	if ((strcmp(proto, "spp") == 0) && slices_len < 2){
-		printf("No. of slices need to be > 1 (1 for handshake and 1 for data transmission"); 
+	if ((strcmp(proto, "spp") == 0) && slices_len < 1){
+		printf("No. of slices need to be > 0"); 
 		usage(); 
 	}
 	if (action < 1 || action > 4){
 		usage(); 
 	}
-	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0)){
-		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
+	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0) && (strcmp(proto, "pln") != 0)){
+		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl, pln\n"); 
 		usage(); 
 	}
 	if (N_proxies == 0){
@@ -828,6 +917,8 @@ int main(int argc, char **argv){
 	#ifdef DEBUG
 	printf("[DEBUG] CLIENT-ID=%d host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", clientID, host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
 	#endif 
+
+
 
 	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
@@ -899,17 +990,21 @@ int main(int argc, char **argv){
 	printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
 	#endif
 	sock = tcp_connect(host, port);
-	
+	plain_socket = sock;
 	// Connect TCP socket to SSL socket 
-	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
-    SSL_set_bio(ssl, sbio, sbio);
 
-
-	// SSL Connect 
-	gettimeofday(&tvBeginConnect, NULL);
-	doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
-	gettimeofday(&tvEndConnect, NULL);
-	timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
+	// don't init ssl for unencrypted data...
+	if (strcmp(proto, "pln") != 0) 
+	{
+		sbio = BIO_new_socket(sock, BIO_NOCLOSE);
+    	SSL_set_bio(ssl, sbio, sbio);
+    
+		// SSL Connect 
+		gettimeofday(&tvBeginConnect, NULL);
+		doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
+		gettimeofday(&tvEndConnect, NULL);
+		timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
+	}
 
 	// Switch across possible client-server behavior
 	// // NOTE: here we can add more complex strategies
@@ -957,6 +1052,7 @@ int main(int argc, char **argv){
 	for (i = 0; i < slices_len; i++){
 		free(slice_set[i]); 
 	}
+	free(experiment_info);
 
 	// Report time statistics
 	if (action > 1){
