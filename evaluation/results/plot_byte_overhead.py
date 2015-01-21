@@ -30,19 +30,28 @@ def records(filepath):
                 padding_total = int(fields[5])
                 header_total = int(fields[6])
                 handshake_total = int(fields[7])
+                mac_total = int(fields[8])
+                alert_total = int(fields[9])
 
                 yield scenario, total_bytes, app_total, padding_total,\
-                    header_total, handshake_total
+                    header_total, handshake_total, mac_total, alert_total
 
 def load_data(data, res_file, protocol):
+    scenarios = []  # so we know the order
     for scenario, total_bytes, app_total, padding_total,\
-        header_total, handshake_total in records(res_file):
+        header_total, handshake_total, mac_total, alert_total,\
+        in records(res_file):
 
         data[scenario][protocol]['total'] = total_bytes
         data[scenario][protocol]['app'] = app_total
         data[scenario][protocol]['padding'] = padding_total
         data[scenario][protocol]['header'] = header_total
         data[scenario][protocol]['handshake'] = handshake_total
+        data[scenario][protocol]['mac'] = mac_total
+
+        scenarios.append(scenario)
+
+    return scenarios
 
 
 def main():
@@ -50,13 +59,13 @@ def main():
     # scenario -> protocol -> data type -> value
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-    load_data(data, SPP_FILE, 'spp')
+    scenarios = load_data(data, SPP_FILE, 'spp')
     load_data(data, SSL_FILE, 'ssl')
     load_data(data, FWD_FILE, 'fwd')
 
-    scenarios = data.keys()
+    #scenarios = data.keys()
     protocols = data[scenarios[0]].keys()
-    byte_types = ('app', 'header', 'padding', 'handshake')
+    byte_types = ('app', 'header', 'padding', 'handshake', 'mac')
 
 
 
