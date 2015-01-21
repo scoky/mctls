@@ -778,6 +778,10 @@ int main(int argc, char **argv){
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
 	experiment_info = (ExperimentInfo*)malloc(sizeof(ExperimentInfo));
 
+#ifdef DEBUG
+	printf("\n\n******************** CLIENT STARTING ********************\n");
+#endif
+
 	
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "s:r:w:i:f:c:o:a:b:")) != -1){

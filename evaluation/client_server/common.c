@@ -9,6 +9,10 @@ static void sigpipe_handle(int x);
 int err_exit(string)
   char *string;
   {
+  	#ifdef DEBUG
+    printf("[ERROR] %s\n",string);
+	#endif
+
     fprintf(stderr,"%s\n",string);
     exit(0);
   }
