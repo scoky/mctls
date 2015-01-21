@@ -3,8 +3,17 @@
 # Function to print script usage
 usage(){
     echo -e "Usage: $0 opt remote [plotCommand]"
-    echo -e "opt = {(1) handshake (not used), (2) time to first byte f(no. slices) - (3) time to first byte f(delay) - (4)....}"
-    echo -e "remote = {(0) local experiments (1) Amazon experiments}"
+    echo -e "opt = {(0) (1) (2) (3) (4) (5) (6) (7) (8)}"
+    echo -e "\t(0) Pull new code and compile"
+	echo -e "\t(1) Handshake duration (not used)" 
+	echo -e "\t(2) Time to first byte f(no. slices)"
+	echo -e "\t(3) Time to first byte f(delay)"
+	echo -e "\t(4) Time to byte as a function of the number of proxies"
+	echo -e "\t(5) Download time as a function of the file size"
+	echo -e "\t(6) Download time in browser-like mode -- CDF"
+	echo -e "\t(7) Number of connections per second"
+	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
+	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
     echo -e "[plotCommand = {matlab, ...} add your own to the script (default is no plotting)]"
 Folder="../results"    exit 0
 }
@@ -238,8 +247,18 @@ then
 		;;
 	
 	7) 
-		echo "[MASTER] Number of connctions -- Matteo is working on it"
+		echo "[MASTER] Analysis of number of connections per second"
+		R=5
+		S_max=16
+		for ((i=1; i<=proto_count; i++))
+		do
+			proto=${protoList[$i]}
+			echo -e "\t[MASTER] Working on protocol $proto (10 second per parameter value and repetition)"
+			#echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+		done
 		;;
+		
 
 	8) 
 		echo "[MASTER] Byte overhead -- X axis is a few discrete scenarios"

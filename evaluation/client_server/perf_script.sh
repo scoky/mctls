@@ -626,11 +626,16 @@ case $expType in
 		fi
 		;;
 
-	7) 
+	7)  # Port to work remotely as well
 		echo "[PERF] Number of connections (f[#slices])"
 		opt=1
 		strategy="uni"
+		testDur=2       
 		pathApps=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
+		s=4
+		cipher="DH"     # check this???
+		#pathAppsLocal=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
+        #pathAppsRemote="/home/$user/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
 
 		# Update res file 
 		resFile=$resFile"_connections_slice"
@@ -647,19 +652,18 @@ case $expType in
 		sleep 1
 
 		# Get next hop address 
-		nextHop=`cat $proxyFile | awk '{if(count==1) print $0; else count+=1}'`
+		nextHop=`cat $proxyFile | awk '{if(count==1)print $0; count+=1}'`
 
 		# Run S_MAX repetitions
-		for((s=1; s<=S_MAX; s++))
+		for((s=1; s<=S_MAX; s=2*s))
 		do
 			# Run R handshake repetitions	
-			echo "[PERF] Testing $R handshakes with $s slices (1 slice is used for handshake)"
+			echo "[PERF] Testing $R handshakes with $s slices (worst case, all mboxes get READ/WRITE access)"
 			for((i=1; i<=R; i++))
 			do
-				echo $i >> .tmp 
-				echo "[PERF] $pathApps"/openssl" s_time -connect $nextHop -new -time 10 -proto spp -slice 3 -read $s - write $s >> $log 2>&1"
-				
-				#$pathApps"/openssl" s_time -connect $nextHop -new -time 10 -proto spp -slice 3 -read $s - write $s >> $log 2>&1
+				echo $s >> .tmp 
+				#echo "$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 >> $log 2>&1"
+				$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 -cipher $cipher >> $log 2>&1
 			done
 		done
 
@@ -685,7 +689,7 @@ case $expType in
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
 		
-		echo "[PERF] Number of connctions (f[#proxies]) -- PENDING"
+		#echo "[PERF] Number of connctions (f[#proxies]) -- PENDING"
 		;; 
 
 	8) 
