@@ -495,7 +495,7 @@ int tcp_forwarder(int prev, int next)
 // Usage function 
 void usage(void){
 	printf("usage: mbox -c -a -p -m\n"); 
-	printf("-c:   protocol chosen (ssl ; spp; fwd)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; fwd; pln)\n"); 
 	printf("-a:   {for ssl splitting only: address to forward in ip:port format}\n");
 	printf("-p:   {port number that the box will listen at (default 8423)}\n");
 	printf("-m:   {id of this proxy in ip:port format.}\n");
