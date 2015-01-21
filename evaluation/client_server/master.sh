@@ -144,6 +144,28 @@ case $opt in
 			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 		done
 		;;
+	
+	7) 
+		echo "[MASTER] Number of connctions -- Matteo is working on it"
+		;;
+
+	8) 
+		echo "[MASTER] Byte overhead -- X axis is a few discrete scenarios"
+		echo "[MASTER] NOTE: This test ignores network parameters"
+		R=1  # byte overhead shouldn't vary
+		for ((i=1; i<=proto_count; i++))
+		do
+			proto=${protoList[$i]}
+			echo -e "\t[MASTER] Working on protocol $proto ..."
+			
+			# deal with SPP_MOD
+			tcpTrick
+			
+			# run analysis
+			# TODO: use local/Amazon flag here once supported (instead of 0)
+			./perf_script.sh $S_max $R $proto $opt 0 >> $log
+		done
+		;;
 
 esac
 

@@ -36,6 +36,9 @@ static char *proto = "ssl";                   // protocol to use (ssl ; spp)
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 
+// #yoloc99blazeit
+void print_stats(SSL *s);
+
 // Compute the size of a file to be served
 int calculate_file_size(char *filename){ 
 
@@ -693,6 +696,18 @@ void print_stats(SSL *s) {
     printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
     printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
     printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
+
+	// In one line (so it's easy for plotting script).
+	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total
+	printf("[RESULTS] ByteStatsSummary %d %d %d %d %d %d %d %d\n",
+		ssl->slices_len,
+		ssl->proxies_len,
+		sizeCheck,
+		s->read_stats.bytes + s->write_stats.bytes,
+		s->read_stats.app_bytes + s->write_stats.app_bytes,
+		s->read_stats.pad_bytes + s->write_stats.pad_bytes,
+		s->read_stats.header_bytes + s->write_stats.header_bytes,
+		s->read_stats.handshake_bytes + s->write_stats.handshake_bytes);
 }
 
 

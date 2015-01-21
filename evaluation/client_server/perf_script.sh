@@ -719,8 +719,7 @@ case $expType in
 
 		# Start the server 
 		set -x  # print commands we run
-		# TODO: Add -s cs  (slicing strategy)
-		./wserver -c $proto -o $opt > log_server 2>&1 &
+		./wserver -c $proto -o $opt -s cs > log_server 2>&1 &
 		{ set +x; } 2>/dev/null  # stop printing commands
 
 		# Give server small time to setup 
@@ -745,7 +744,6 @@ case $expType in
 			for((i=1; i<=R; i++))
 			do
 				set -x  # print commands we run
-				# TODO: add -s cs  (slice strategy option)
 				# FIXME: -r and -w should really be min(numSlices, numMboxes)
 				./wclient -s ${scenarios[$s,"numSlices"]}\
 					-r ${scenarios[$s,"numMboxes"]}\
@@ -762,20 +760,18 @@ case $expType in
 		# Restore original proxy file (used for other experiments)
 		cp $proxyFile"_original" $proxyFile
 
-		## Results
-		#if [ -f $log ] 
-		#then  
-		#	if [ $debug -eq 1 ]
-		#	then 
-		#		echo "#Handshake Analysis" > $resFile
-		#		echo "#Slices AvgDur StdDur" >> $resFile 
-		#	fi
-		#	#cat $log | grep Handshake_Dur | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
-		#	let "fix2=nProxy-1"
-		#	cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v fix1=$delay -v fix2=$fix2 -v S=2 -f stdev.awk > $resFile
-		#else
-		#	echo "[PERF] No file <<$log>> created, check for ERRORS!"
-		#fi
+		# Results
+		if [ -f $log ] 
+		then  
+			if [ $debug -eq 1 ]
+			then 
+				echo "#Byte Overhead Analysis" > $resFile
+				echo "#NumSlices NumMboxes FileSize TotalBytes AppTotal PaddingTotal HeaderTotal HandshakeTotal" >> $resFile 
+			fi
+			cat $log | grep "ByteStatsSummary" | cut -f 3,4,5,6,7,8,9,10 -d " " | awk -f filter_scenarios.awk > $resFile
+		else
+			echo "[PERF] No file <<$log>> created, check for ERRORS!"
+		fi
 		;;
 
 	*)	
