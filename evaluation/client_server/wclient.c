@@ -709,11 +709,15 @@ void print_stats(SSL *s) {
     printf("[RESULTS] Block padding bytes read: %d\n", s->read_stats.pad_bytes);
     printf("[RESULTS] Header bytes read: %d\n", s->read_stats.header_bytes);
     printf("[RESULTS] Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
+    printf("[RESULTS] MAC bytes read: %d\n", s->read_stats.mac_bytes);
+    printf("[RESULTS] Alert bytes read: %d\n", s->read_stats.alert_bytes);
     printf("[RESULTS] Bytes write: %d\n", s->write_stats.bytes);
     printf("[RESULTS] Application bytes write: %d\n", s->write_stats.app_bytes);
     printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
     printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
     printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
+    printf("[RESULTS] MAC bytes write: %d\n", s->write_stats.mac_bytes);
+    printf("[RESULTS] Alert bytes write: %d\n", s->write_stats.alert_bytes);
 
 	// In one line (so it's easy for plotting script).
 	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total
