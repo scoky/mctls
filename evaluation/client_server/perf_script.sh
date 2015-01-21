@@ -111,7 +111,7 @@ organizeMBOXES(){
 				command="killall mbox"
 				ssh -i $key $user@$addr $command 
 				command="cd $remoteFolder; ./mbox -c $proto -p $port -m $proxy"  
-				ssh -i $key $user@$addr $command  > log_mbox_$address 2>&1 &
+				ssh -i $key $user@$addr $command  > log_mbox_$addr 2>&1 &
 			fi
 		fi
 		
@@ -725,8 +725,8 @@ case $expType in
 		# Give server small time to setup 
 		sleep 1
 		
-		# Make copy of current file 
-		cp $proxyFile $proxyFile"_original"
+		# Make copy of current file (not needed anymore)
+		# cp $proxyFile $proxyFile"_original"
 
 		# Run each scenario
 		for((s=1; s<=$numScenarios; s++))
