@@ -1,3 +1,6 @@
 [submodule "evaluation/realworld_web/web-profiler"]
 	path = evaluation/realworld_web/web-profiler
 	url = git@github.com:dtnaylor/web-profiler.git
+[submodule "evaluation/results/myplot"]
+	path = evaluation/results/myplot
+	url = git@github.com:dtnaylor/myplot.git
