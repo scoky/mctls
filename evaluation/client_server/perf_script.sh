@@ -134,6 +134,8 @@ organizeMBOXES(){
 			fi
 		fi
 	done
+
+	sleep 1
 }
 
 
