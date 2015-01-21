@@ -101,18 +101,18 @@ then
 			do
 				if [ $count -gt 0 ] 
 				then 
-					addr=`echo $i | cut -f 1 -d " "`
+					addr=`echo $i | cut -f 1 -d ":"`
 					comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
 					command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
 					echo "[MASTER] Working on machine $addr"
 		            ssh -o StrictHostKeyChecking=no -i $key $user@$addr "$command" >> $logCompile 2>&1 &
-		            #echo "ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr "$command" >> $logCompile 2>&1 &"
+					#echo "ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr "$command" >> $logCompile 2>&1 &"
 				fi 
 				let "count++"
 			done
 		fi
-		
-		echo "[MASTER] Compilation of last version completed"
+	
+		# check that compilation is done and ok 	
 		if [ $remote -eq 0 ] 
 		then 
 			currTime=`date | awk '{print $2"_"$3"_"$4;}'`
@@ -121,8 +121,29 @@ then
 			echo "[MASTER] Current time is $currTime."
 			echo "[MASTER] Libraries were last compiled:"
 			ls -lrth  $p | grep lib | awk '{print "\t" $NF ": "$6"_"$7"_"$8}'
+		else
+			active=`ps aux | grep ssh | grep amazon | grep script | wc -l`
+			while [ $active -gt 0 ] 
+			do 
+				echo "[MASTER] Still $active compilation running remotely"
+				active=`ps aux | grep ssh | grep amazon | grep script | wc -l`
+				sleep 10
+			done
+			count=0
+			for i in `cat "./proxyList_amazon"`
+			do
+				if [ $count -gt 0 ] 
+				then 
+					addr=`echo $i | cut -f 1 -d ":"`
+					command="cd $remoteFolder; cd evaluation/client_server; ./checkLibrary.sh"
+		            ssh -o StrictHostKeyChecking=no -i $key $user@$addr "$command"
+				fi
+				let "count++"
+			done
 		fi
-		# add remote support here 
+		
+		# all good, just exit 
+		echo "[MASTER] Compilation of last version completed"
 		exit 0
 		;;
 	1) 
