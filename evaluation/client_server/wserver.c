@@ -165,9 +165,9 @@ void splitting (SSL *ssl, char *request, int request_len){
 		
 		char* dest = (char*) malloc(inc); 
 		#ifdef DEBUG
-		printf("[DEBUG] Write sub-record with slice [%d ; %s]. [S1 is for handshake ; S2 is for the client]\n"\
+		printf("[DEBUG] Write sub-record with slice [%d ; %s]. (strategy <<%s>>)\n"\
 			"[DEBUG] Sub-record size is %d (beginIndex=%d -- endIndex=%d)\n", \
-			ssl->slices[i]->slice_id, ssl->slices[i]->purpose, inc, beginIndex, (beginIndex + inc)); 
+			ssl->slices[i]->slice_id, ssl->slices[i]->purpose, strategy, inc, beginIndex, (beginIndex + inc)); 
 		#endif
     	memset(dest, 0, inc);
 		memcpy(dest, request + beginIndex,  inc); 
@@ -184,7 +184,7 @@ void splitting (SSL *ssl, char *request, int request_len){
 		beginIndex += inc;
 
 		// Increase pointer for last slice  
-		if ( i == (usedSlices - 1)){
+		if ( i == (usedSlices - 2)){
 			inc = request_len - beginIndex; 
 		} 
 	

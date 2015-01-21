@@ -311,14 +311,12 @@ void sendRequest(char *filename){
 		#ifdef DEBUG
 		printf("[DEBUG] SPP_write\n");
 		#endif 
-		int i; 
-		for (i = 0; i < ssl->slices_len; i++){
-			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
-			#ifdef DEBUG
-			printf("[DEBUG] Wrote %d bytes\n", r);
-			#endif
-			check_SSL_write_error(r, request_len); 
-		}
+		// Use slice 0 as default for sending (HEADER)
+		int r = SPP_write_record(ssl, request, request_len, ssl->slices[0]);
+		#ifdef DEBUG
+		printf("[DEBUG] Wrote %d bytes\n", r);
+		#endif
+		check_SSL_write_error(r, request_len); 
 	} 
 	
 	// SSL write
