@@ -35,7 +35,7 @@ killMbox(){
 	if [ $REMOTE -eq 0 ]
 	then  
 		#killall -q mbox #>> /dev/null 2>&1
-		for i in `ps aux | grep mbox | grep -v vi | grep -v grep | cut -f 2 -d " "`
+		for i in `ps aux | grep mbox | grep -v vi | grep -v grep | awk '{print $2}'`
 		do 
 			echo "[PERF] Killing mbox $i"
 			kill -9 $i >> /dev/null  2>&1
