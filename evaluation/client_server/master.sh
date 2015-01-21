@@ -14,7 +14,12 @@ usage(){
 	echo -e "\t(7) Number of connections per second"
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
 	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
+<<<<<<< HEAD
+	echo -e "run    = {(1) run experiment, (0) no run just plot"
+    echo -e "[plotCommand = {matlab, ...} add your own to the script (default is no plotting)]"
+=======
     echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
+>>>>>>> 6bcf6ad04b0d097e3a1aec13277c5614e5d0ff78
 Folder="../results"    exit 0
 }
 	
@@ -31,7 +36,7 @@ tcpTrick(){
 }
 
 # Set of checks for correctness
-[[ $# -lt 2 ]] && usage
+[[ $# -lt 3 ]] && usage
 
 # Static parameters
 resFolder="../results"    # result folder 
@@ -45,6 +50,7 @@ log="log_script"          # log file
 logCompile="log_compile"  # log file 
 opt=$1                    # user choice for experiment
 remote=$2                 # user choice, local or Amazon exp
+RUN_EXP=$3                # run experiment or not 
 plotCommand="none"        # Usere selection for plotting 
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
@@ -61,9 +67,9 @@ localFolder=$HOME"WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol
 proto_count=${#protoList[@]}
 
 # read user plot input if provided
-if [[ $# -eq 3 ]]
+if [[ $# -eq 4 ]]
 then 
-	plotCommand=$3
+	plotCommand=$4
 fi
 
 #cleanup 
@@ -87,8 +93,12 @@ fi
 #cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initrwnd
 	
 # no run if u only want to plot 
+<<<<<<< HEAD
+if [ $RUN_EXP -eq 1 -o $opt -eq 0 ]
+=======
 NORUN=0
 if [ $NORUN -eq 0 -o $opt -eq 0 ]
+>>>>>>> 6bcf6ad04b0d097e3a1aec13277c5614e5d0ff78
 then
 # switch on user selection 
 	case $opt in 
