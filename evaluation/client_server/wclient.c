@@ -36,6 +36,7 @@ static int plain_socket;
 static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
+static ExperimentInfo *experiment_info;       // for printing stats at the end
 
 
 void print_stats(SSL *s);
@@ -314,14 +315,12 @@ void sendRequest(char *filename){
 		#ifdef DEBUG
 		printf("[DEBUG] SPP_write\n");
 		#endif 
-		int i; 
-		for (i = 0; i < ssl->slices_len; i++){
-			int r = SPP_write_record(ssl, request, request_len, ssl->slices[i]);
-			#ifdef DEBUG
-			printf("[DEBUG] Wrote %d bytes\n", r);
-			#endif
-			check_SSL_write_error(r, request_len); 
-		}
+		// Use slice 0 as default for sending (HEADER)
+		int r = SPP_write_record(ssl, request, request_len, ssl->slices[0]);
+		#ifdef DEBUG
+		printf("[DEBUG] Wrote %d bytes\n", r);
+		#endif
+		check_SSL_write_error(r, request_len); 
 	} 
 	// SSL write
 	else if (strcmp(proto, "ssl") == 0){
@@ -558,6 +557,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		}
 	}   
 	sizeCheck = fSize; 
+	experiment_info->file_size = fSize;
 
 	// Request file (either by name or by size) 
 	if (requestingFile){
@@ -707,9 +707,9 @@ void print_stats(SSL *s) {
 	// In one line (so it's easy for plotting script).
 	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total
 	printf("[RESULTS] ByteStatsSummary %d %d %d %d %d %d %d %d\n",
-		ssl->slices_len,
-		ssl->proxies_len,
-		sizeCheck,
+		experiment_info->num_slices,
+		experiment_info->num_proxies,
+		experiment_info->file_size,
 		s->read_stats.bytes + s->write_stats.bytes,
 		s->read_stats.app_bytes + s->write_stats.app_bytes,
 		s->read_stats.pad_bytes + s->write_stats.pad_bytes,
@@ -765,6 +765,7 @@ int main(int argc, char **argv){
 	struct timeval tvEndConnect; 
 	struct timeval tvBegin, tvEnd; 
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
+	experiment_info = (ExperimentInfo*)malloc(sizeof(ExperimentInfo));
 
 	
 	// Handle user input parameters
@@ -776,6 +777,7 @@ int main(int argc, char **argv){
 			case 's':	if(! (slices_len = atoi(optarg) )){
 							err_exit("Bogus number of slices specified (no. of slices need to be > 1)");
 						}
+						experiment_info->num_slices = slices_len;
 						break;
 		
 			// Number of proxies with read access (per slice)
@@ -832,6 +834,7 @@ int main(int argc, char **argv){
 
 	// Read number of proxy from file 
 	N_proxies = read_proxy_count(filename); 
+	experiment_info->num_proxies = N_proxies - 1;
 	
 	// Check that input parameters are correct 
 	#ifdef DEBUG
@@ -1028,6 +1031,7 @@ int main(int argc, char **argv){
 	for (i = 0; i < slices_len; i++){
 		free(slice_set[i]); 
 	}
+	free(experiment_info);
 
 	// Report time statistics
 	if (action > 1){
