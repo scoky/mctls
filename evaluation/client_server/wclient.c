@@ -37,6 +37,9 @@ static char *proto = "ssl";                   // protocol to use (ssl ; spp)
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 
+void print_stats(SSL *s);
+
+
 // Compute the size of a file to be served
 int calculate_file_size(char *filename){ 
 
@@ -331,8 +334,12 @@ void sendRequest(char *filename){
 		#ifdef DEBUG
 		printf("[DEBUG] Plain socket write\n");
 		#endif 
-		int r = SSL_write(ssl, request, request_len);
-		check_SSL_write_error(r, request_len); 
+	    int r = write(plain_socket, request, request_len);
+	    if ( r <= 0 )
+	    {
+	    	printf("Something went wrong with writing to the socket!\n");
+	    }
+		
 	}
 
 }
@@ -461,9 +468,8 @@ static int http_complex(char *proto, char *fn){
 					berr_exit("SSL read problem");
 			}
 		} 
-	
 		// SSL read
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			#ifdef DEBUG
 			printf("[DEBUG] Waiting on SSL_read...\n");
 			#endif 
@@ -482,6 +488,14 @@ static int http_complex(char *proto, char *fn){
 				default:
 					berr_exit("SSL read problem");
 			}
+		}		
+		else if (strcmp(proto, "pln") == 0){
+			r = read(plain_socket, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ( r <= 0 ) /* done reading */
+				goto done;
 		}
 		
 		// Write buf to stdout
@@ -586,7 +600,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		} 
 	
 		// SSL read
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			/*
 			#ifdef DEBUG
 			printf("[DEBUG] SSL_read\n");
@@ -617,6 +631,15 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				default:
 					berr_exit("SSL read problem");
 			}
+		}
+		// SSL read
+		else if (strcmp(proto, "pln") == 0){
+			r = read(plain_socket, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ( r <= 0 ) /* done reading */
+				goto done;
 		}
 		
 		// Write buf to stdout
