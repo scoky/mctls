@@ -14,7 +14,7 @@ usage(){
 	echo -e "\t(7) Number of connections per second"
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
 	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
-    echo -e "[plotCommand = {matlab, ...} add your own to the script (default is no plotting)]"
+    echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
 Folder="../results"    exit 0
 }
 	
@@ -87,7 +87,7 @@ fi
 #cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initrwnd
 	
 # no run if u only want to plot 
-NORUN=1
+NORUN=0
 if [ $NORUN -eq 0 -o $opt -eq 0 ]
 then
 # switch on user selection 
@@ -292,6 +292,12 @@ then
 	cd ../results 
 	../results/script.sh 
 	cd - 
+elif [ $plotCommand == "myplot" ]
+then
+	echo "[MASTER] Plotting results (option $opt)"
+	cd ../results
+	./plot_byte_overhead.py
+	cd -
 else 
 	echo "[MASTER] No plotting requested or plotting type <<$plotCommand>> not supported"
 fi
