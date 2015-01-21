@@ -7,7 +7,7 @@
 #include <openssl/buffer.h>
 #include <openssl/rand.h>
 
-//#define DEBUG
+#define DEBUG
 #define MAX_EMPTY_RECORDS 10 /* Might not be needed */
 /* Read record from the underlying communication medium 
  * This method attempts to read and decrypt the . */
