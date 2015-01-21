@@ -35,7 +35,7 @@ killMbox(){
 	if [ $REMOTE -eq 0 ]
 	then  
 		#killall -q mbox #>> /dev/null 2>&1
-		for i in `ps aux | grep mbox | grep -v vi | grep -v grep | cut -f 2 -d " "`
+		for i in `ps aux | grep mbox | grep -v vi | grep -v grep | awk '{print $2}'`
 		do 
 			echo "[PERF] Killing mbox $i"
 			kill -9 $i >> /dev/null  2>&1
@@ -111,7 +111,7 @@ organizeMBOXES(){
 				command="killall mbox"
 				ssh -i $key $user@$addr $command 
 				command="cd $remoteFolder; ./mbox -c $proto -p $port -m $proxy"  
-				ssh -i $key $user@$addr $command  > log_mbox_$address 2>&1 &
+				ssh -i $key $user@$addr $command  > log_mbox_$addr 2>&1 &
 			fi
 		fi
 		
@@ -626,11 +626,16 @@ case $expType in
 		fi
 		;;
 
-	7) 
+	7)  # Port to work remotely as well
 		echo "[PERF] Number of connections (f[#slices])"
 		opt=1
 		strategy="uni"
+		testDur=2       
 		pathApps=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
+		s=4
+		cipher="DH"     # check this???
+		#pathAppsLocal=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
+        #pathAppsRemote="/home/$user/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
 
 		# Update res file 
 		resFile=$resFile"_connections_slice"
@@ -647,19 +652,18 @@ case $expType in
 		sleep 1
 
 		# Get next hop address 
-		nextHop=`cat $proxyFile | awk '{if(count==1) print $0; else count+=1}'`
+		nextHop=`cat $proxyFile | awk '{if(count==1)print $0; count+=1}'`
 
 		# Run S_MAX repetitions
-		for((s=1; s<=S_MAX; s++))
+		for((s=1; s<=S_MAX; s=2*s))
 		do
 			# Run R handshake repetitions	
-			echo "[PERF] Testing $R handshakes with $s slices (1 slice is used for handshake)"
+			echo "[PERF] Testing $R handshakes with $s slices (worst case, all mboxes get READ/WRITE access)"
 			for((i=1; i<=R; i++))
 			do
-				echo $i >> .tmp 
-				echo "[PERF] $pathApps"/openssl" s_time -connect $nextHop -new -time 10 -proto spp -slice 3 -read $s - write $s >> $log 2>&1"
-				
-				#$pathApps"/openssl" s_time -connect $nextHop -new -time 10 -proto spp -slice 3 -read $s - write $s >> $log 2>&1
+				echo $s >> .tmp 
+				#echo "$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 >> $log 2>&1"
+				$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 -cipher $cipher >> $log 2>&1
 			done
 		done
 
@@ -685,7 +689,7 @@ case $expType in
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
 		
-		echo "[PERF] Number of connctions (f[#proxies]) -- PENDING"
+		#echo "[PERF] Number of connctions (f[#proxies]) -- PENDING"
 		;; 
 
 	8) 
@@ -725,8 +729,8 @@ case $expType in
 		# Give server small time to setup 
 		sleep 1
 		
-		# Make copy of current file 
-		cp $proxyFile $proxyFile"_original"
+		# Make copy of current file (not needed anymore)
+		# cp $proxyFile $proxyFile"_original"
 
 		# Run each scenario
 		for((s=1; s<=$numScenarios; s++))
