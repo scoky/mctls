@@ -3,7 +3,8 @@
 # Function to print script usage
 usage(){
     echo -e "Usage: $0 opt"
-    echo -e "opt = {1) handshake (not used), 2) time to first byte f(no. slices) - 3) time to first byte f(delay) - 4)....}"
+    echo -e "opt = {(1) handshake (not used), (2) time to first byte f(no. slices) - (3) time to first byte f(delay) - (4)....}"
+    echo -e "remote = {(0) local experiments (1) Amazon experiments}"
 Folder="../results"    exit 0
 }
 	
@@ -20,7 +21,7 @@ tcpTrick(){
 }
 
 # Set of checks for correctness
-[[ $# -lt 1 ]] && usage
+[[ $# -lt 2 ]] && usage
 
 # Static parameters
 resFolder="../results"    # result folder 
@@ -31,7 +32,8 @@ maxRate=8                 # max rate with no traffic
 delay=20                  # delay 
 iface="lo"                # interface
 log="log_script"          # log file 
-opt=$1                    # user choice 
+opt=$1                    # user choice for experiment
+remote=$2                 # user choice, local or Amazon exp
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
@@ -46,11 +48,10 @@ then
 	rm -v $log 
 fi
 
-
-echo "TCP INIT CWND"
-cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initcwnd
-echo "TCP INIT RWND"
-cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initrwnd
+#echo "TCP INIT CWND"
+#cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initcwnd
+#echo "TCP INIT RWND"
+#cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initrwnd
 	
 # switch on user selection 
 case $opt in 
@@ -63,7 +64,13 @@ case $opt in
 		do
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
-			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+			if [ $remote -eq 0 ]
+			then
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+			else
+				#./perf_script.sh $S_max $R $proto $opt $remote >> $log
+				echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
+			fi
 		done
 			;;
 
@@ -74,7 +81,7 @@ case $opt in
 		do
 			proto=${proto[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
-			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 		done
 		;;
 
@@ -90,7 +97,7 @@ case $opt in
 			tcpTrick
 
 			# run analysis
-			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 		done
 		;;
 	
@@ -113,7 +120,7 @@ case $opt in
 			
 			# run analysis
 			#echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
-			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 		done
 		;;
 	
@@ -134,7 +141,29 @@ case $opt in
 			
 			# run analysis
 			#echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
-			./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log
+			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+		done
+		;;
+	
+	7) 
+		echo "[MASTER] Number of connctions -- Matteo is working on it"
+		;;
+
+	8) 
+		echo "[MASTER] Byte overhead -- X axis is a few discrete scenarios"
+		echo "[MASTER] NOTE: This test ignores network parameters"
+		R=1  # byte overhead shouldn't vary
+		for ((i=1; i<=proto_count; i++))
+		do
+			proto=${protoList[$i]}
+			echo -e "\t[MASTER] Working on protocol $proto ..."
+			
+			# deal with SPP_MOD
+			tcpTrick
+			
+			# run analysis
+			# TODO: use local/Amazon flag here once supported (instead of 0)
+			./perf_script.sh $S_max $R $proto $opt 0 >> $log
 		done
 		;;
 
@@ -146,7 +175,7 @@ then
 	echo "[MASTER] Plotting results (option $opt)"
 	echo "[MATLAB] Running MATLAB...(it can take some time first time)"
 fi
-matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt); quit"
+matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote); quit"
 
 # Generating summary report 
 cd ../results 

@@ -37,7 +37,9 @@ static char *proto = "ssl";                   // protocol to use (ssl ; spp)
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 
+
 void print_stats(SSL *s);
+
 
 
 // Compute the size of a file to be served
@@ -580,7 +582,8 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				// Stop the timer here (avoid shutdown crap) 
 				gettimeofday(tvEnd, NULL);
 				flag = true; 
-				goto shutdown;
+				break; 
+				//goto shutdown;
 			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
@@ -615,6 +618,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				// Stop the timer here (avoid shutdown crap) 
 				gettimeofday(tvEnd, NULL);
 				flag = true; 
+				break; 
 			}
 			switch(SSL_get_error(ssl, r)){
 				case SSL_ERROR_NONE:
@@ -674,6 +678,39 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		}
 		SSL_free(ssl);
 		return(0);
+
+	// Normal
+	// Shutdown 
+	#ifdef DEBUG
+	printf("[DEBUG] Shutdown was requested\n"); 
+	#endif 
+	r = SSL_shutdown(ssl);
+
+	switch(r){
+		case 1:
+			break; // Success 
+		case 0:
+
+		case -1:
+
+		default:
+			#ifdef DEBUG 
+			printf ("Shutdown failed with code %d\n", r);
+			#endif 
+			berr_exit("Shutdown failed"); 
+	}
+    
+	// print stats
+	if (stats){
+		print_stats(ssl);
+	}
+	
+	// Free memory 
+	SSL_free(ssl);
+	
+	// All good 
+	return(0);
+
 }
 
 
@@ -690,13 +727,25 @@ void print_stats(SSL *s) {
     printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
     printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
     printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
+
+	// In one line (so it's easy for plotting script).
+	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total
+	printf("[RESULTS] ByteStatsSummary %d %d %d %d %d %d %d %d\n",
+		ssl->slices_len,
+		ssl->proxies_len,
+		sizeCheck,
+		s->read_stats.bytes + s->write_stats.bytes,
+		s->read_stats.app_bytes + s->write_stats.app_bytes,
+		s->read_stats.pad_bytes + s->write_stats.pad_bytes,
+		s->read_stats.header_bytes + s->write_stats.header_bytes,
+		s->read_stats.handshake_bytes + s->write_stats.handshake_bytes);
 }
 
 
 // Usage function 
 void usage(void){
 	printf("usage: wclient -s -r -w -i -f -o -a -c -b\n"); 
-	printf("-s:   number of slices requested (min 2, 1 for handshake 1 for rest)\n"); 
+	printf("-s:   number of slices requested (min 1)\n"); 
 	printf("-r:   number of proxies with read access (per slice)\n"); 
 	printf("-w:   number of proxies with write access (per slice)\n"); 
 	printf("-i:   integrity check\n"); 
