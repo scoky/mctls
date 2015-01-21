@@ -583,6 +583,9 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				printf("[INFO] Read %d bytes as expected (fSize=%d). Stopping timer\n", ssl->read_stats.app_bytes, fSize);
 				// Stop the timer here (avoid shutdown crap) 
 				gettimeofday(tvEnd, NULL); 
+				#ifdef VERBOSE
+				fwrite(buf, 1, len, stdout);
+				#endif
 				break; 
 				//goto shutdown;
 			}
@@ -617,6 +620,10 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 			if (ssl->read_stats.app_bytes == fSize){
 				printf("[INFO] Read %d bytes as expected (fSize=%d). Stopping timer\n", ssl->read_stats.app_bytes, fSize);
 				gettimeofday(tvEnd, NULL);
+				// Write buf to stdout
+				#ifdef VERBOSE
+				fwrite(buf, 1, len, stdout);
+				#endif
 				break; 
 			}
 			switch(SSL_get_error(ssl, r)){
@@ -651,6 +658,10 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				printf("[DEBUG] File transfer done, done reading socket...\n"); 
 				#endif 
 				gettimeofday(tvEnd, NULL);
+				// Write buf to stdout
+				#ifdef VERBOSE
+				fwrite(buf, 1, len, stdout);
+				#endif 
 				goto done;
 			}
 		}
