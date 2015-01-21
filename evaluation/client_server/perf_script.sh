@@ -283,7 +283,8 @@ fi
 
 
 # Start middlebox - and in proper way - if needed 
-if [ $expType -ne 3 ]
+# FIXME: should it be 3 or 8,  or  4 or 8?
+if [ $expType -ne 3 -o $expType -ne 8 ]
 then  
 	organizeMBOXES
 fi
