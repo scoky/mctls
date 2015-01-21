@@ -411,8 +411,10 @@ printf("\n");
 
     if (rr->type == SSL3_RT_APPLICATION_DATA)
         s->read_stats.app_bytes += rr->length;
-    else if (rr->type == SSL3_RT_HANDSHAKE)
+    else if (rr->type == SSL3_RT_HANDSHAKE || rr->type == SSL3_RT_CHANGE_CIPHER_SPEC)
         s->read_stats.handshake_bytes += rr->length;
+    else if (rr->type == SSL3_RT_ALERT)
+        s->read_stats.alert_bytes += rr->length;
     
 #if 0
     fprintf(stderr, "Ultimate Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -1062,8 +1064,10 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* Stats */
     if (type == SSL3_RT_APPLICATION_DATA)
         s->write_stats.app_bytes += len;
-    else if (type == SSL3_RT_HANDSHAKE)
+    else if (type == SSL3_RT_HANDSHAKE || type == SSL3_RT_CHANGE_CIPHER_SPEC)
         s->write_stats.handshake_bytes += len;
+    else if (type == SSL3_RT_ALERT)
+        s->write_stats.alert_bytes += len;
     s->write_stats.header_bytes += SPP_RT_HEADER_LENGTH;
 #ifdef DEBUG
     fprintf(stderr, "Writing record header: ");
