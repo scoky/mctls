@@ -194,7 +194,7 @@ void splitting (SSL *ssl, char *request, int request_len){
 }
 
 // Send some data (SSL and SPP) 
-void sendData(SSL *ssl, char *request, char *proto, int request_len){
+void sendData(SSL *ssl, int s, char *request, char *proto, int request_len){
 
 	int r; 
 
@@ -210,13 +210,16 @@ void sendData(SSL *ssl, char *request, char *proto, int request_len){
 	if (strcmp(proto, "spp") == 0){
 		// TO DO implement further splitting here 
 		splitting(ssl, request, request_len); 
-	}
-		
+	}	
 	// SSL
-	if (strcmp(proto, "ssl") == 0){
+	else if (strcmp(proto, "ssl") == 0){
 		r = SSL_write(ssl, request, request_len); 
 		check_SSL_write_error(ssl, r, request_len);
 	}
+	else if (strcmp(proto, "pln") == 0){
+		r = write(s, request, request_len); 
+	}
+
 }
 
 // Simple test for SPP handshake 
@@ -247,30 +250,32 @@ static int http_simple_response(SSL *ssl, int s, char *proto){
 	// put 200 OK on the wire 
 	char *data = "HTTP/1.0 200 OK\r\n"; 
 	int request_len = strlen(data);
-	sendData(ssl, data, proto, request_len); 
+	sendData(ssl, s,  data, proto, request_len); 
 
-	// Shutdown SSL - TO DO (check what happens here) 
-	int r = SSL_shutdown(ssl);
-	if( !r ){
-		shutdown(s, 1);
-		r = SSL_shutdown(ssl);
-    }
+	if (strcmp(proto, "pln") != 0)
+	{
+		// Shutdown SSL - TO DO (check what happens here) 
+		int r = SSL_shutdown(ssl);
+		if( !r ){
+			shutdown(s, 1);
+			r = SSL_shutdown(ssl);
+	    }
 
-	// Verify that shutdown was good 
-	switch(r){  
-		case 1:
-       		break; // Success
-		case 0:
-		case -1:
-		default: // Error 
-			#ifdef DEBUG 
-			printf ("Shutdown failed with code %d\n", r); 
-			#endif 
-			berr_exit("Shutdown failed");
+		// Verify that shutdown was good 
+		switch(r){  
+			case 1:
+	       		break; // Success
+			case 0:
+			case -1:
+			default: // Error 
+				#ifdef DEBUG 
+				printf ("Shutdown failed with code %d\n", r); 
+				#endif 
+				berr_exit("Shutdown failed");
+		}
+		// free SSL 
+	    SSL_free(ssl);
 	}
-	
-	// free SSL 
-    SSL_free(ssl);
 	
 	// All good	
 	return 0; 
@@ -289,7 +294,7 @@ char* parse_http_get(char *buf){
 }
 
 // Serve a given amount of data 
-int serveData(SSL *ssl, int data_size, char *proto){ 
+int serveData(SSL *ssl, int s,  int data_size, char *proto){ 
 	
 	// Logging
 	#ifdef DEBUG
@@ -313,7 +318,7 @@ int serveData(SSL *ssl, int data_size, char *proto){
 		
 		// Send <<buf>> on SPP/SSL connection 
 		if (strcmp(proto, "spp") == 0){
-			sendData(ssl, buf, proto, sizeof(char) * toSend); 
+			sendData(ssl, s, buf, proto, sizeof(char) * toSend); 
 		}
 		if (strcmp(proto, "ssl") == 0){
 			int r = SSL_write(ssl, buf, toSend);
@@ -339,7 +344,7 @@ int serveData(SSL *ssl, int data_size, char *proto){
 
 // Serve a file -- solution extracted from original s_client 
 // NOTES: (1) modified not to use BIO ; (2) re-negotiation currently not used
-int serveFile(SSL *ssl, char *filename, char *proto){ 
+int serveFile(SSL *ssl, int s, char *filename, char *proto){ 
 	
  	FILE *fp;				// file descriptot 
 	int file_size = 0;		// size of file being sent 
@@ -351,7 +356,7 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 		#endif 
 		char *data = "Error opening file\r\n"; 
 		int request_len = strlen(data);
-		sendData(ssl, data, proto, request_len); 
+		sendData(ssl, s, data, proto, request_len); 
 		fclose(fp); 
 		return -1; 
 	}else{
@@ -385,7 +390,7 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 	}
 
 	// Send <<buf>> on SPP/SSL connection 
-	sendData(ssl, buf, proto, file_size); 
+	sendData(ssl, s, buf, proto, file_size); 
 		
 	// Close file
 	fclose(fp); 
@@ -398,7 +403,7 @@ int serveFile(SSL *ssl, char *filename, char *proto){
 
 // Serve a file -- solution extracted from original s_client 
 // NOTES: (1) modified not to use BIO ; (2) re-negotiation currently not used
-int serveFile_old(SSL *ssl, char *filename, char *proto){ 
+int serveFile_old(SSL *ssl, int s, char *filename, char *proto){ 
 	
  	FILE *fp;				// file descriptot 
 	char buf[BUFSIZZ];		// buffer for data to send
@@ -412,7 +417,7 @@ int serveFile_old(SSL *ssl, char *filename, char *proto){
 		#endif 
 		char *data = "Error opening file\r\n"; 
 		int request_len = strlen(data);
-		sendData(ssl, data, proto, request_len); 
+		sendData(ssl, s, data, proto, request_len); 
 		fclose(fp); 
 		return -1; 
 	}else{
@@ -459,7 +464,7 @@ int serveFile_old(SSL *ssl, char *filename, char *proto){
 		// Send <<buf>> on SPP/SSL connection 
 		if (strcmp(proto, "spp") == 0){
 			int request_len = strlen(buf);
-			sendData(ssl, buf, proto, request_len); 
+			sendData(ssl, s, buf, proto, request_len); 
 		}
 		if (strcmp(proto, "ssl") == 0){
 			int r = SSL_write(ssl, buf, toSend);
@@ -529,20 +534,21 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 			SPP_SLICE *slice;       
 			SPP_CTX *ctx;           
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
+			if (SSL_get_error(ssl, r) != SSL_ERROR_NONE)
+				berr_exit("[DEBUG] SSL read problem");
 			#ifdef DEBUG
 			printf("[DEBUG] Read %d bytes\n", r);
 			#endif
 		}
-	
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			r = SSL_read(ssl, buf, BUFSIZZ);
+			if (SSL_get_error(ssl, r) != SSL_ERROR_NONE)
+				berr_exit("[DEBUG] SSL read problem");
+		}
+		else if (strcmp(proto, "pln") == 0){
+			r = read(s, buf, BUFSIZZ);
 		}
 
-		if (SSL_get_error(ssl, r) == SSL_ERROR_NONE){
-		} else {
-			berr_exit("[DEBUG] SSL read problem");
-		}
-		
 		#ifdef DEBUG
 		printf("[DEBUG] Request received:\n"); 
 		printf("%s\n", buf); 
@@ -578,9 +584,9 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 		// Serve requested file either by name or by size  
 		if (action == 3){
 			if (fSize == 0){
-				serveFile(ssl, filename, proto); 
+				serveFile(ssl, s, filename, proto); 
 			} else {
-				serveData(ssl, fSize, proto); 
+				serveData(ssl, s,  fSize, proto); 
 			}
 		}
 		if (action == 4){
@@ -589,7 +595,7 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 			sscanf(filename, "%d", &data_size); 
 
 			// serve data with size above 
-			serveData(ssl, data_size, proto); 
+			serveData(ssl, s,  data_size, proto); 
 		}
 	}
 
@@ -766,7 +772,7 @@ static int http_serve_SSL(SSL *ssl, int s){
 // Usage function 
 void usage(void){
 	printf("usage: wserver -c -o -s\n");
-	printf("-c:   protocol requested: ssl, spp.\n");
+	printf("-c:   protocol requested: ssl, spp, pln.\n");
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-s:   content slicing strategy {uni; cs}\n");
 	printf("{uni[DEFAUL]=split response equally among slices ; cs=split uniformly among half slices, assuming other half is used by the client}\n");
@@ -786,7 +792,7 @@ int main(int argc, char **argv){
 	extern char *optarg;                // user input parameters
 	int c;                              // user iput from getopt
 	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
-
+	int status;
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "c:o:s:")) != -1){
 		switch(c){
@@ -873,22 +879,27 @@ int main(int argc, char **argv){
 			printf("[DEBUG] child process close old socket (why?) and operate on new one\n");
 			#endif
 			close(sock);
-			sbio = BIO_new_socket(newsock, BIO_NOCLOSE);
-			ssl = SSL_new(ctx);
-			SSL_set_bio(ssl, sbio, sbio);
-			
-			// Wait on SSL Accept 
-			if((r = SSL_accept(ssl) <= 0)){
-				berr_exit("SSL accept error");
-			} else {
-				#ifdef DEBUG
-				if (strcmp(proto, "ssl") == 0){ 		
-					printf("[DEBUG] SSL accept OK\n"); 
-				}else{
-					printf("[DEBUG] SPP accept OK\n"); 
+
+			if (strcmp(proto, "pln") != 0) 
+			{
+				sbio = BIO_new_socket(newsock, BIO_NOCLOSE);
+				ssl = SSL_new(ctx);
+				SSL_set_bio(ssl, sbio, sbio);
+				
+				// Wait on SSL Accept 
+				if((r = SSL_accept(ssl) <= 0)){
+					berr_exit("SSL accept error");
+				} else {
+					#ifdef DEBUG
+					if (strcmp(proto, "ssl") == 0){ 		
+						printf("[DEBUG] SSL accept OK\n"); 
+					}else{
+						printf("[DEBUG] SPP accept OK\n"); 
+					}
+					#endif
 				}
-				#endif
 			}
+
   			
 			// Switch across possible client-server behavior 
 			// NOTE: here we can add more complex strategies
@@ -933,7 +944,7 @@ int main(int argc, char **argv){
 			close(newsock); 
 		}
 	}
-	
+	wait(&status);
 	// Clean context
 	destroy_ctx(ctx);
 	

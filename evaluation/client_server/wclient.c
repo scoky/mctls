@@ -32,12 +32,15 @@ static int clientID=0;
 
 // -- Moved up here just because of thread 
 static SSL *ssl;                              // SSL instance
+static int plain_socket;
 static char *proto = "ssl";                   // protocol to use (ssl ; spp)  
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 
-// #yoloc99blazeit
+
 void print_stats(SSL *s);
+
+
 
 // Compute the size of a file to be served
 int calculate_file_size(char *filename){ 
@@ -318,15 +321,27 @@ void sendRequest(char *filename){
 		#endif
 		check_SSL_write_error(r, request_len); 
 	} 
-	
 	// SSL write
-	if (strcmp(proto, "ssl") == 0){
+	else if (strcmp(proto, "ssl") == 0){
 		#ifdef DEBUG
 		printf("[DEBUG] SSL_write\n");
 		#endif 
 		int r = SSL_write(ssl, request, request_len);
 		check_SSL_write_error(r, request_len); 
 	}
+	// socket write
+	else if (strcmp(proto, "pln") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] Plain socket write\n");
+		#endif 
+	    int r = write(plain_socket, request, request_len);
+	    if ( r <= 0 )
+	    {
+	    	printf("Something went wrong with writing to the socket!\n");
+	    }
+		
+	}
+
 }
 
 
@@ -453,9 +468,8 @@ static int http_complex(char *proto, char *fn){
 					berr_exit("SSL read problem");
 			}
 		} 
-	
 		// SSL read
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			#ifdef DEBUG
 			printf("[DEBUG] Waiting on SSL_read...\n");
 			#endif 
@@ -474,6 +488,14 @@ static int http_complex(char *proto, char *fn){
 				default:
 					berr_exit("SSL read problem");
 			}
+		}		
+		else if (strcmp(proto, "pln") == 0){
+			r = read(plain_socket, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ( r <= 0 ) /* done reading */
+				goto done;
 		}
 		
 		// Write buf to stdout
@@ -579,7 +601,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		} 
 	
 		// SSL read
-		if (strcmp(proto, "ssl") == 0){
+		else if (strcmp(proto, "ssl") == 0){
 			/*
 			#ifdef DEBUG
 			printf("[DEBUG] SSL_read\n");
@@ -611,6 +633,15 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 				default:
 					berr_exit("SSL read problem");
 			}
+		}
+		// SSL read
+		else if (strcmp(proto, "pln") == 0){
+			r = read(plain_socket, buf, BUFSIZZ);
+			#ifdef DEBUG 
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+			if ( r <= 0 ) /* done reading */
+				goto done;
 		}
 		
 		// Write buf to stdout
@@ -719,7 +750,7 @@ void usage(void){
 	printf("-f:   file for http GET (either via <name> (require file to exhist both at server and client[for testing reasons]) or via <size>)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-a:   action file for browser-like behavior\n");
-	printf("-c:   protocol chosen (ssl ; spp)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; pln)\n"); 
 	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
@@ -838,8 +869,8 @@ int main(int argc, char **argv){
 	if (action < 1 || action > 4){
 		usage(); 
 	}
-	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0)){
-		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl\n"); 
+	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0) && (strcmp(proto, "pln") != 0)){
+		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl, pln\n"); 
 		usage(); 
 	}
 	if (N_proxies == 0){
@@ -881,6 +912,8 @@ int main(int argc, char **argv){
 	#ifdef DEBUG
 	printf("[DEBUG] CLIENT-ID=%d host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", clientID, host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
 	#endif 
+
+
 
 	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
@@ -952,17 +985,21 @@ int main(int argc, char **argv){
 	printf("[DEBUG] Opening socket to host: %s, port %d\n", host, port);
 	#endif
 	sock = tcp_connect(host, port);
-	
+	plain_socket = sock;
 	// Connect TCP socket to SSL socket 
-	sbio = BIO_new_socket(sock, BIO_NOCLOSE);
-    SSL_set_bio(ssl, sbio, sbio);
 
-
-	// SSL Connect 
-	gettimeofday(&tvBeginConnect, NULL);
-	doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
-	gettimeofday(&tvEndConnect, NULL);
-	timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
+	// don't init ssl for unencrypted data...
+	if (strcmp(proto, "pln") != 0) 
+	{
+		sbio = BIO_new_socket(sock, BIO_NOCLOSE);
+    	SSL_set_bio(ssl, sbio, sbio);
+    
+		// SSL Connect 
+		gettimeofday(&tvBeginConnect, NULL);
+		doConnect (proto, slices_len, N_proxies, slice_set, proxies); 
+		gettimeofday(&tvEndConnect, NULL);
+		timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
+	}
 
 	// Switch across possible client-server behavior
 	// // NOTE: here we can add more complex strategies
