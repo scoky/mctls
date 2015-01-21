@@ -537,6 +537,9 @@ int main(int argc, char **argv){
 						if (strcmp(proto, "spp_mod") == 0){ 
 							proto = "spp"; 
 						}   
+						if (strcmp(proto, "pln") == 0){ 
+							proto = "fwd"; 
+						}  
 						break; 
 			
 			// Address to forward in case of SSL splitting 
