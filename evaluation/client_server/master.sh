@@ -109,11 +109,16 @@ then
 			make
 			cd - 
 		else
-			echo "[MASTER] Pull code (git) and recompile at machine in file <<$machines>>"
+			echo "[MASTER] Pull code (git) and recompile at machine in file <<$machinesFile>>"
+			if [ ! -f $machineFile ] 
+			then 
+				echo "[MASTER] ERROR! File <<$machinesFile>> is missing"
+				exit 0 
+			fi
 			for line in `cat $machineFile`
 			do
-				#comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make; sudo make install; cd evaluation/client_server; make clean; make"
-				comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
+				comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make; sudo make install; cd evaluation/client_server; make clean; make"
+				#comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
 				command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
 				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
@@ -177,8 +182,8 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto (Running <<$R>> tests per configuration)"
 			if [ $remote -eq 0 ]
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
-				#./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+				#echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 			else
 				#echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
 				./perf_script.sh $S_max $R $proto $opt $remote >> $log
@@ -188,10 +193,10 @@ then
 
 	3) 
 		echo "[MASTER] Analysis of first time to byte as a function of latency"
-		S_max=3
+		S_max=4
 		for ((i=1; i<=proto_count; i++))
 		do
-			proto=${proto[$i]}
+			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 		done
@@ -199,15 +204,12 @@ then
 
 	4) 
 		echo "[MASTER] Analysis of first time to byte as a function of the number of proxies"
-		S_max=3
+		S_max=4
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
-			# deal with SPP_MOD
-			tcpTrick
-
 			# run analysis
 			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 		done
@@ -221,7 +223,7 @@ then
 		maxRate=10
 		R=10
 		#----------------
-		S_max=3
+		S_max=4
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
@@ -242,7 +244,7 @@ then
 		#----------------
 		R=10
 		#----------------
-		S_max=3
+		S_max=4
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
