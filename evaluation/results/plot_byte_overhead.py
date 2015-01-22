@@ -15,6 +15,9 @@ SSL_FILE = './res_ssl_byteOverhead_scenarios'
 FWD_FILE = './res_fwd_byteOverhead_scenarios'
 
 
+def data_size(string):
+    return float(string)/1024.0
+
 
 def records(filepath):
     with open(filepath, 'r') as f:
@@ -22,16 +25,16 @@ def records(filepath):
             if line[0] != '#':
                 fields = line.strip().split()
 
-                scenario = 'Slices: %s\nMboxes: %s\nFile Size: %s' %\
-                    (fields[0], fields[1], fields[2])
+                scenario = 'Slice: %s\nMbox: %s\nFile: %0.0f kB' %\
+                    (fields[0], fields[1], data_size(fields[2]))
 
-                total_bytes = int(fields[3])
-                app_total = int(fields[4])
-                padding_total = int(fields[5])
-                header_total = int(fields[6])
-                handshake_total = int(fields[7])
-                mac_total = int(fields[8])
-                alert_total = int(fields[9])
+                total_bytes = data_size(fields[3])
+                app_total = data_size(fields[4])
+                padding_total = data_size(fields[5])
+                header_total = data_size(fields[6])
+                handshake_total = data_size(fields[7])
+                mac_total = data_size(fields[8])
+                alert_total = data_size(fields[9])
 
                 yield scenario, total_bytes, app_total, padding_total,\
                     header_total, handshake_total, mac_total, alert_total
@@ -87,7 +90,7 @@ def main():
         labels.append(protocol)
 
     myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
-        xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (B)',\
+        xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (kB)',\
         filename='./fig/bytes_total.pdf')
     
     
@@ -110,8 +113,9 @@ def main():
         labels.append(protocol)
 
     myplot.stackbar(xs, ys, labels=labels, xtick_label_rotation=0,\
-        xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (B)',\
+        xtick_label_horizontal_alignment='center', ylabel='Data Transmitted (kB)',\
         stackbar_pattern_labels=byte_types,\
+        width_scale=1.1,\
         filename='./fig/bytes_breakdown.pdf')
 
 
