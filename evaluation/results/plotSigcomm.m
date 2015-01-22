@@ -55,14 +55,21 @@ end
 if (opt == 6) 
 	suffix = 'downloadTime_browser'; 
 end
-
+if (opt == 7) 
+	if (remote == 0) 
+		suffix = 'connections_slice'; 
+	else
+		suffix = 'remote_connections_slice'; 
+	end	
+end
 
 
 % Main loop 
 for ii = 1 : nProt
 	currProt = strtrim(protocol(ii, :)); 
-	file = sprintf('res_%s_%s', currProt, suffix); 
+	file = sprintf('res_%s_%s', currProt, suffix) 
 	data = dlmread(file); 
+	
 	if (opt < 5) 
 		if (remote == 1)  
 			h = errorbar(data(:, 3).*1000, data(:, 4).*1000); 
@@ -74,6 +81,8 @@ for ii = 1 : nProt
 	elseif (opt == 6) 
 			h = cdfplot(data(:, 4)); 
 			% h1 = cdfplot(data(:, 5)); % here we can plot CDF of stdev...
+	elseif (opt == 7) 
+			h = errorbar(data(:, 4), data(:, 5)); 
 	end
 	if (ii > 3) 
 		set (h, 'color', kind_line(counter), 'LineWidth', 3, 'LineStyle', '--');
@@ -86,7 +95,7 @@ for ii = 1 : nProt
 	%	leg = [leg, {sprintf('%s', currProt)}];
 	%end
 	counter = counter + 1; 
-	if (opt == 2) 
+	if (opt == 2 || opt == 7) 
 		rtt = data(1, 2); 
 		N = data(1, 3); 
 	end
@@ -101,7 +110,7 @@ for ii = 1 : nProt
 end
 
 % X axis labels
-if (opt == 2) 
+if (opt == 2 || opt == 7) 
 	xlabel('No. slices (#)');
 end
 if (opt == 3) 
@@ -123,6 +132,8 @@ elseif (opt == 5)
 	ylabel('Download Time (sec)');
 elseif (opt == 6) 
 	ylabel('CDF (0-1)');
+elseif (opt == 7) 
+	ylabel('Connection per second (cps)');
 end
 
 % More plot details 
@@ -131,7 +142,7 @@ grid on
 set(0,'defaultaxesfontsize',18);
 
 % derive title based on input 
-if (opt == 2) 
+if (opt == 2 || opt == 7) 
 	if (remote == 0)  
 		t = sprintf('Latency=%dms ; N_{prxy}=%d ; LOCAL', rtt, N); 
 	else
@@ -197,6 +208,13 @@ if (opt == 6)
 		outFile = sprintf ('%s/download_time_browser-like.eps', figFolder); 
 	else
 		outFile = sprintf ('%s/download_time_browser-like_remote.eps', figFolder); 
+	end
+end
+if (opt == 7) 
+	if (remote == 0)  
+		outFile = sprintf ('%s/connection_per_second.eps', figFolder); 
+	else
+		outFile = sprintf ('%s/connection_per_second_remote.eps', figFolder); 
 	end
 end
 

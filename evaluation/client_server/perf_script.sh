@@ -52,7 +52,23 @@ killMbox(){
 	fi
 }
 
-# Organize MBOXES, address, etc. 
+# Start a server instance (either remote or local)
+start_server(){
+	echo "[PERF] Starting server: ./wserver -c $proto -o $opt -s $strategy"
+	if [ $REMOTE -eq 0 ] 
+	then 
+		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
+	else 
+		command="cd $remoteFolder; ./wserver -c $proto -o $opt -s $strategy" 
+		ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &
+	fi 
+	
+	# Give server some time to setup 
+	echo "[PERF] Sleeping $timeSleep to allow server setup"
+	sleep $timeSleep
+}
+
+# Start and organzie mboxes (routing) as per configuration file (either remote or local)
 organizeMBOXES(){
 	
 	firstLine=1    # flag for first line 
@@ -116,7 +132,7 @@ organizeMBOXES(){
 		fi
 		
 		# Start proxy with SSL
-		if [ $proto == "ssl" -o $proto == "fwd" ]
+		if [ $proto == "ssl" -o $proto == "fwd" -o $proto == "pln" ]
 		then 
 			# Logging 
 			echo "[PERF] Starting proxy $proxy (port extracted: $port - Next proxy: $nextProxy)"
@@ -134,6 +150,8 @@ organizeMBOXES(){
 			fi
 		fi
 	done
+
+	sleep 1
 }
 
 
@@ -178,7 +196,7 @@ debug=0                   # more logging
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
-#protoList[4]="spp_mod"
+protoList[4]="pln"
 #-------------------------------REMOTE ADDITION
 REMOTE=$5                   # 1=remote ; 0=local 
 key="amazon.pem"           # amazon key 
@@ -199,12 +217,6 @@ then
 	echo "[PERF] Currently max number of slices is $MAX"
 	exit 0
 fi
-
-if [ $S_MAX -lt 2 ] 
-then 
-	echo "[PERF] Currently min number of slices is 2"
-	exit 0
-fi 
 
 # check that protocol requested is supported
 found=0
@@ -283,10 +295,10 @@ fi
 
 
 # Start middlebox - and in proper way - if needed 
-if [ $expType -ne 3 ]
-then  
-	organizeMBOXES
-fi
+#if [ $expType -ne 3 ]
+#then  
+#	organizeMBOXES
+#fi
 
 # Make sure server is not running
 killServer
@@ -312,18 +324,10 @@ case $expType in
 		fi
 
 		# Start the server 
-		echo "[PERF] Starting server: ./wserver -c $proto -o $opt -s $strategy"
-		if [ $REMOTE -eq 0 ] 
-		then 
-			./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
-		else 
-			command="cd $remoteFolder; ./wserver -c $proto -o $opt -s $strategy" 
-			ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &
-		fi 
-
-		# Give server some time to setup 
-		echo "[PERF] Sleeping $timeSleep to allow server setup"
-		sleep $timeSleep
+		start_server
+		
+		# Start middleboxes 
+		organizeMBOXES
 
 		# Run S_MAX repetitions
 		for((s=1; s<=S_MAX; s=2*s))
@@ -369,14 +373,13 @@ case $expType in
 		then 
 			rm -v $resFile
 		fi
+
 		# Start the server 
-		echo "[PERF] ./wserver -c $proto -o $opt"
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
+		start_server
 
-		# Give server small time to setup 
-		sleep 1
-
-
+		# Start middleboxes 
+		organizeMBOXES
+		
 		# Run client  along with network setup 
 		for((delay=5; delay<=MAX_DELAY; delay=2*delay))
 		do
@@ -430,12 +433,8 @@ case $expType in
 		fi
 
 		# Start the server 
-		echo "[PERF] ./wserver -c $proto -o $opt"
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
-
-		# Give server small time to setup 
-		sleep 1
-
+		start_server
+		
 		# 4 slices (1 req header, 1 req body) (1 resp header, 1 resp body)
 		s=4
 		strategy="cs"
@@ -449,7 +448,7 @@ case $expType in
 			# Update proxy file 
 			proxyFileUpdate 
 
-			# Proxy setup 
+			# Start middleboxes 
 			organizeMBOXES
 			
 			# Run R handshake repetitions	
@@ -463,9 +462,6 @@ case $expType in
 				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
 				./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1
 			done
-
-			# Reset mboxes 
-			killMbox
 		done
 
 		# Results
@@ -510,13 +506,12 @@ case $expType in
 		then 
 			rm -v $resFile
 		fi
-
-		# Start the server 
-		echo "[PERF] ./wserver -c $proto -o $opt"
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
 	
-		# Give server small time to setup 
-		sleep 1
+		# Start the server 
+		start_server
+
+		# Start middleboxes 
+		organizeMBOXES
 
 		# Run until fSize is bigger than fSizeMAX
 		fSizeInitial=40
@@ -576,11 +571,10 @@ case $expType in
 		fi
 
 		# Start the server 
-		echo "[PERF] ./wserver -c $proto -o $opt"
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
+		start_server
 	
-		# Give server small time to setup 
-		sleep 1
+		# Start middleboxes 
+		organizeMBOXES
 
 		# Run until no action 
 		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
@@ -626,11 +620,11 @@ case $expType in
 		fi
 		;;
 
-	7)  # Port to work remotely as well
+	7)  
 		echo "[PERF] Number of connections (f[#slices])"
 		opt=1
 		strategy="uni"
-		testDur=2       
+		testDur=10       
 		pathApps=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
 		s=4
 		cipher="DH"     # check this???
@@ -645,12 +639,11 @@ case $expType in
 		fi
 
 		# Start the server 
-		echo "[PERF] ./wserver -c $proto -o $opt"
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
-
-		# Give server small time to setup 
-		sleep 1
-
+		start_server
+		
+		# Start middleboxes 
+		organizeMBOXES
+		
 		# Get next hop address 
 		nextHop=`cat $proxyFile | awk '{if(count==1)print $0; count+=1}'`
 
@@ -695,6 +688,7 @@ case $expType in
 	8) 
 		echo "[PERF] Byte overhead -- X axis is a few discrete scenarios"
 		opt=3
+		strategy="cs"
 
 		# Define scenarios to test (num slices, num middleboxes, file size)
 		declare -A scenarios
@@ -709,6 +703,14 @@ case $expType in
 		scenarios[3,"numSlices"]=4
 		scenarios[3,"numMboxes"]=1
 		scenarios[3,"fileSize"]=1024
+		
+		scenarios[4,"numSlices"]=8
+		scenarios[4,"numMboxes"]=1
+		scenarios[4,"fileSize"]=1024
+
+		scenarios[5,"numSlices"]=4
+		scenarios[5,"numMboxes"]=1
+		scenarios[5,"fileSize"]=10240
 
 		let "numScenarios=${#scenarios[@]}/3"
 		echo "[PERF] Testing $numScenarios scenarios"
@@ -721,17 +723,9 @@ case $expType in
 			rm -v $resFile
 		fi
 
-		# Start the server 
-		set -x  # print commands we run
-		./wserver -c $proto -o $opt -s cs > log_server 2>&1 &
-		{ set +x; } 2>/dev/null  # stop printing commands
-
-		# Give server small time to setup 
-		sleep 1
+		# Start the server
+		start_server
 		
-		# Make copy of current file (not needed anymore)
-		# cp $proxyFile $proxyFile"_original"
-
 		# Run each scenario
 		for((s=1; s<=$numScenarios; s++))
 		do
@@ -756,9 +750,6 @@ case $expType in
 					-c $proto -o $opt -b 1 >> $log 2>&1
 				{ set +x; } 2>/dev/null  # stop printing commands
 			done
-			
-			# Reset mboxes 
-			killMbox
 		done
 		
 		# Restore original proxy file (used for other experiments)
@@ -772,7 +763,7 @@ case $expType in
 				echo "#Byte Overhead Analysis" > $resFile
 				echo "#NumSlices NumMboxes FileSize TotalBytes AppTotal PaddingTotal HeaderTotal HandshakeTotal" >> $resFile 
 			fi
-			cat $log | grep "ByteStatsSummary" | cut -f 3,4,5,6,7,8,9,10 -d " " | awk -f filter_scenarios.awk > $resFile
+			cat $log | grep "ByteStatsSummary" | cut -f 3,4,5,6,7,8,9,10,11,12 -d " " | awk -f filter_scenarios.awk > $resFile
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
@@ -781,7 +772,6 @@ case $expType in
 	*)	
 		;;
 esac 
-
 
 # Cleanup
 if [ $# -eq 8 ]

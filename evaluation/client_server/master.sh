@@ -14,8 +14,9 @@ usage(){
 	echo -e "\t(7) Number of connections per second"
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
 	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
-    echo -e "[plotCommand = {matlab, ...} add your own to the script (default is no plotting)]"
-Folder="../results"    exit 0
+	echo -e "run    = {(1) run experiment, (0) no run just plot"
+    echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
+	exit 0
 }
 	
 # Function to print script usage
@@ -31,7 +32,7 @@ tcpTrick(){
 }
 
 # Set of checks for correctness
-[[ $# -lt 2 ]] && usage
+[[ $# -lt 3 ]] && usage
 
 # Static parameters
 resFolder="../results"    # result folder 
@@ -45,11 +46,12 @@ log="log_script"          # log file
 logCompile="log_compile"  # log file 
 opt=$1                    # user choice for experiment
 remote=$2                 # user choice, local or Amazon exp
+RUN_EXP=$3                # run experiment or not 
 plotCommand="none"        # Usere selection for plotting 
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
-#protoList[4]="pln""     
+protoList[4]="pln"     
 key="amazon.pem"           # amazon key 
 user="ubuntu"              # amazon user 
 
@@ -61,9 +63,9 @@ localFolder=$HOME"WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol
 proto_count=${#protoList[@]}
 
 # read user plot input if provided
-if [[ $# -eq 3 ]]
+if [[ $# -eq 4 ]]
 then 
-	plotCommand=$3
+	plotCommand=$4
 fi
 
 #cleanup 
@@ -87,8 +89,7 @@ fi
 #cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initrwnd
 	
 # no run if u only want to plot 
-NORUN=1
-if [ $NORUN -eq 0 -o $opt -eq 0 ]
+if [ $RUN_EXP -eq 1 -o $opt -eq 0 ]
 then
 # switch on user selection 
 	case $opt in 
@@ -167,10 +168,11 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto (Running <<$R>> tests per configuration)"
 			if [ $remote -eq 0 ]
 			then
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+				#./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote >> $log
 				#echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
+				./perf_script.sh $S_max $R $proto $opt $remote >> $log
 			fi
 		done
 			;;
@@ -292,6 +294,12 @@ then
 	cd ../results 
 	../results/script.sh 
 	cd - 
+elif [ $plotCommand == "myplot" ]
+then
+	echo "[MASTER] Plotting results (option $opt)"
+	cd ../results
+	./plot_byte_overhead.py
+	cd -
 else 
 	echo "[MASTER] No plotting requested or plotting type <<$plotCommand>> not supported"
 fi

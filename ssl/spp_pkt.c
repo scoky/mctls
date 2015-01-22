@@ -255,6 +255,7 @@ printf("\n");
             spp_print_buffer(mac, mac_size);
 #endif
             //printf("Grabbed %d bytes of mac, for 3 %d sized macs\n", mac_size, spp_ctx->mac_length);
+            s->read_stats.mac_bytes += mac_size;
             mac_size = spp_ctx->mac_length;
             spp_ctx->write_mac = &(spp_ctx->read_mac[mac_size]);
             spp_ctx->integrity_mac = &(spp_ctx->write_mac[mac_size]);
@@ -347,6 +348,7 @@ printf("\n");
                     mac = &rr->data[rr->length];
                     }
 
+            s->read_stats.mac_bytes += mac_size;
             i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
             if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
                     enc_err = -1;
@@ -411,8 +413,10 @@ printf("\n");
 
     if (rr->type == SSL3_RT_APPLICATION_DATA)
         s->read_stats.app_bytes += rr->length;
-    else if (rr->type == SSL3_RT_HANDSHAKE)
+    else if (rr->type == SSL3_RT_HANDSHAKE || rr->type == SSL3_RT_CHANGE_CIPHER_SPEC)
         s->read_stats.handshake_bytes += rr->length;
+    else if (rr->type == SSL3_RT_ALERT)
+        s->read_stats.alert_bytes += rr->length;
     
 #if 0
     fprintf(stderr, "Ultimate Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -1062,8 +1066,10 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
     /* Stats */
     if (type == SSL3_RT_APPLICATION_DATA)
         s->write_stats.app_bytes += len;
-    else if (type == SSL3_RT_HANDSHAKE)
+    else if (type == SSL3_RT_HANDSHAKE || type == SSL3_RT_CHANGE_CIPHER_SPEC)
         s->write_stats.handshake_bytes += len;
+    else if (type == SSL3_RT_ALERT)
+        s->write_stats.alert_bytes += len;
     s->write_stats.header_bytes += SPP_RT_HEADER_LENGTH;
 #ifdef DEBUG
     fprintf(stderr, "Writing record header: ");
@@ -1118,6 +1124,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
 #ifdef DEBUG
         printf("Generating 3MAC\n");
 #endif
+        s->write_stats.mac_bytes += mac_size*3;
         /* Must have read access, so write the read MAC. */
         spp_copy_mac_state(s, slice->read_mac, 1);
         if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
@@ -1152,6 +1159,7 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
         /* This will only happen when sending the finished message at the end of the handshake. 
          * Instead of using a slice, use the parameters computed via the standard TLS handshake to 
          * both encrypt and generate MAC. */
+        s->write_stats.mac_bytes += mac_size;
         if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
             goto err;
 	wr->length+=mac_size;

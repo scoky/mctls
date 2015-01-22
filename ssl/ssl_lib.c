@@ -398,11 +398,11 @@ SSL *SSL_new(SSL_CTX *ctx)
         s->spp_server_address = NULL;
         /* Stats variables */
         s->read_stats.bytes = s->read_stats.app_bytes = s->read_stats.pad_bytes 
-                = s->read_stats.header_bytes = s->read_stats.handshake_bytes = 0;
+                = s->read_stats.header_bytes = s->read_stats.handshake_bytes
+                = s->read_stats.alert_bytes = s->read_stats.mac_bytes = 0;
         s->write_stats.bytes = s->write_stats.app_bytes = s->write_stats.pad_bytes 
-                = s->write_stats.header_bytes = s->write_stats.handshake_bytes = 0;
-        s->proxy_key_mat_shared_secret=NULL;
-        s->proxy_key_mat_shared_secret_len=0;
+                = s->write_stats.header_bytes = s->write_stats.handshake_bytes
+                = s->write_stats.alert_bytes = s->write_stats.mac_bytes = 0;
 
 	return(s);
 err:

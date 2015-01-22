@@ -9,6 +9,10 @@ static void sigpipe_handle(int x);
 int err_exit(string)
   char *string;
   {
+  	#ifdef DEBUG
+    printf("[ERROR] %s\n",string);
+	#endif
+
     fprintf(stderr,"%s\n",string);
     exit(0);
   }
@@ -77,6 +81,13 @@ SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
 	}
 
     ctx = SSL_CTX_new(meth);
+
+    /* Specify the cipher suites that may be used. */
+	/*
+    if (!SSL_CTX_set_cipher_list(ctx, "DHE-RSA-AES256-SHA")) {
+	printf("Failed seting cipher list.\n");
+    }
+	*/
 
     /* Load our keys and certificates*/
     if(!(SSL_CTX_use_certificate_chain_file(ctx,
