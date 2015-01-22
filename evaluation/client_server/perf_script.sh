@@ -68,15 +68,12 @@ start_server(){
 	sleep $timeSleep
 }
 
-# Start and organzie mboxes (routing) as per configuration file (either remote or local)
-organizeMBOXES(){
-	
+# Read mboxes and server addresses and ports 
+readMboxes(){
 	firstLine=1    # flag for first line 
 	count=1        # int for proxy ID
 	nProxy=1       # number of proxies
 	
-	# Kill mbox pending
-	killMbox
 	
 	# load proxy list in memory 
 	while read proxy
@@ -100,7 +97,14 @@ organizeMBOXES(){
 			let "count++"
 		fi
 	done < $proxyFile
+}
 
+# Start and organzie mboxes (routing) 
+organizeMBOXES(){
+	
+	# Kill mbox pending
+	killMbox
+	
 	# Start proxy according to protocol requested 
 	for ((i=1; i<nProxy; i++))
 	do
@@ -151,6 +155,7 @@ organizeMBOXES(){
 		fi
 	done
 
+	# Sleep 1 second (for Kyle)  
 	sleep 1
 }
 
@@ -294,11 +299,8 @@ then
 fi
 
 
-# Start middlebox - and in proper way - if needed 
-#if [ $expType -ne 3 ]
-#then  
-#	organizeMBOXES
-#fi
+# Read mboxes (and server) address from config file
+readMboxes
 
 # Make sure server is not running
 killServer
