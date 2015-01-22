@@ -5,7 +5,7 @@ BEGIN{
 }
 {
 	if($1 != numSlices || $2 != numMboxes || $3 != fileSize){
-		print $1 " " $2 " " $3 " " $4 " " $5 " " $6 " " $7 " " $8
+		print $1 " " $2 " " $3 " " $4 " " $5 " " $6 " " $7 " " $8 " " $9 " " $10
 
 		numSlices = $1
 		numMboxes = $2
