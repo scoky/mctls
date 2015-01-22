@@ -56,7 +56,7 @@ key="amazon.pem"           # amazon key
 user="ubuntu"              # amazon user 
 
 # folder for compilations
-remoteFolder="/home/$user/secure_proxy_protocol" 
+remoteFolder="./secure_proxy_protocol" 
 localFolder=$HOME"WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol"
 
 # derive proto size 
@@ -94,34 +94,39 @@ then
 # switch on user selection 
 	case $opt in 
 	0)
-		echo "[MASTER] Pull code (git) and recompile"
+		machineFile="machines"
 		count=0
+		echo "[MASTER] Compilation of last version STARTED"
 		if [ $remote -eq 0 ] 
 		then
+			echo "[MASTER] Pull code (git) and recompile at local machine (check your path. Current path is <<$localFolder>>!!!!)"
 			cd $localFolder
 			git pull
 			make
-			sudo make install
+			sudo make install_sw
 			cd evaluation/client_server
 			make clean
 			make
 			cd - 
 		else
-			for i in `cat "./proxyList_amazon"`
+			echo "[MASTER] Pull code (git) and recompile at machine in file <<$machines>>"
+			for line in `cat $machineFile`
 			do
-				if [ $count -gt 0 ] 
-				then 
-					addr=`echo $i | cut -f 1 -d ":"`
-					comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
-					command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
-					echo "[MASTER] Working on machine $addr"
-		            ssh -o StrictHostKeyChecking=no -i $key $user@$addr "$command" >> $logCompile 2>&1 &
-					#echo "ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr "$command" >> $logCompile 2>&1 &"
-				fi 
-				let "count++"
+				#comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make; sudo make install; cd evaluation/client_server; make clean; make"
+				comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
+				command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
+				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
+				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
+				user=`echo $line | cut -f 1 -d "@"`
+				echo "[MASTER] Working on machine <<$addr:$port>> (with user <<$user>>)"
+				if [ $addr == "tid.system-ns.net" ]
+				then
+		            ssh -o StrictHostKeyChecking=no -p $port $user@$addr "$command" >> $logCompile 2>&1 &
+                else
+		            ssh -o StrictHostKeyChecking=no -p $port -i $key $user@$addr "$command" >> $logCompile 2>&1 &
+				fi            
 			done
-		fi
-	
+		fi	
 		# check that compilation is done and ok 	
 		if [ $remote -eq 0 ] 
 		then 
@@ -132,28 +137,32 @@ then
 			echo "[MASTER] Libraries were last compiled:"
 			ls -lrth  $p | grep lib | awk '{print "\t" $NF ": "$6"_"$7"_"$8}'
 		else
-			active=`ps aux | grep ssh | grep amazon | grep script | wc -l`
+			active=`ps aux | grep ssh | grep make | grep script | grep -v grep | wc -l`
 			while [ $active -gt 0 ] 
 			do 
 				echo "[MASTER] Still $active compilation running remotely"
-				active=`ps aux | grep ssh | grep amazon | grep script | wc -l`
+				active=`ps aux | grep ssh | grep make | grep script | grep -v grep | wc -l`
 				sleep 10
 			done
 			count=0
-			for i in `cat "./proxyList_amazon"`
+			for line in `cat $machineFile`
 			do
-				if [ $count -gt 0 ] 
-				then 
-					addr=`echo $i | cut -f 1 -d ":"`
-					command="cd $remoteFolder; cd evaluation/client_server; ./checkLibrary.sh"
-		            ssh -o StrictHostKeyChecking=no -i $key $user@$addr "$command"
-				fi
-				let "count++"
+				command="cd $remoteFolder; cd evaluation/client_server; ./checkLibrary.sh"
+				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
+				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
+				user=`echo $line | cut -f 1 -d "@"`
+				echo "[MASTER] Checking machine <<$addr:$port>> (with user <<$user>>)"
+				if [ $addr == "tid.system-ns.net" ]
+				then
+		            ssh -o StrictHostKeyChecking=no -p $port $user@$addr "$command" 
+                else
+		            ssh -o StrictHostKeyChecking=no -p $port -i $key $user@$addr "$command"
+				fi 
 			done
 		fi
 		
 		# all good, just exit 
-		echo "[MASTER] Compilation of last version completed"
+		echo "[MASTER] Compilation of last version COMPLETED"
 		exit 0
 		;;
 	1) 
@@ -252,6 +261,10 @@ then
 		echo "[MASTER] Analysis of number of connections per second"
 		R=5
 		S_max=16
+		#------
+		echo "[MASTER] !!!!!!PLN skipped since not yet supported on s_time"
+		let "proto_count--"
+		#------
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
