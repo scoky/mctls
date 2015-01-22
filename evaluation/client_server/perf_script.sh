@@ -134,6 +134,8 @@ organizeMBOXES(){
 			fi
 		fi
 	done
+
+	sleep 1
 }
 
 
@@ -710,6 +712,14 @@ case $expType in
 		scenarios[3,"numSlices"]=4
 		scenarios[3,"numMboxes"]=1
 		scenarios[3,"fileSize"]=1024
+		
+		scenarios[4,"numSlices"]=8
+		scenarios[4,"numMboxes"]=1
+		scenarios[4,"fileSize"]=1024
+
+		scenarios[5,"numSlices"]=4
+		scenarios[5,"numMboxes"]=1
+		scenarios[5,"fileSize"]=10240
 
 		let "numScenarios=${#scenarios[@]}/3"
 		echo "[PERF] Testing $numScenarios scenarios"
@@ -773,7 +783,7 @@ case $expType in
 				echo "#Byte Overhead Analysis" > $resFile
 				echo "#NumSlices NumMboxes FileSize TotalBytes AppTotal PaddingTotal HeaderTotal HandshakeTotal" >> $resFile 
 			fi
-			cat $log | grep "ByteStatsSummary" | cut -f 3,4,5,6,7,8,9,10 -d " " | awk -f filter_scenarios.awk > $resFile
+			cat $log | grep "ByteStatsSummary" | cut -f 3,4,5,6,7,8,9,10,11,12 -d " " | awk -f filter_scenarios.awk > $resFile
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi

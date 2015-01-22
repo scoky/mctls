@@ -709,15 +709,19 @@ void print_stats(SSL *s) {
     printf("[RESULTS] Block padding bytes read: %d\n", s->read_stats.pad_bytes);
     printf("[RESULTS] Header bytes read: %d\n", s->read_stats.header_bytes);
     printf("[RESULTS] Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
+    printf("[RESULTS] MAC bytes read: %d\n", s->read_stats.mac_bytes);
+    printf("[RESULTS] Alert bytes read: %d\n", s->read_stats.alert_bytes);
     printf("[RESULTS] Bytes write: %d\n", s->write_stats.bytes);
     printf("[RESULTS] Application bytes write: %d\n", s->write_stats.app_bytes);
     printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
     printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
     printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
+    printf("[RESULTS] MAC bytes write: %d\n", s->write_stats.mac_bytes);
+    printf("[RESULTS] Alert bytes write: %d\n", s->write_stats.alert_bytes);
 
 	// In one line (so it's easy for plotting script).
-	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total
-	printf("[RESULTS] ByteStatsSummary %d %d %d %d %d %d %d %d\n",
+	// num_slices num_mboxes file_size total app_total padding_total header_total handshake_total MAC_total alert_bytes
+	printf("[RESULTS] ByteStatsSummary %d %d %d %d %d %d %d %d %d %d\n",
 		experiment_info->num_slices,
 		experiment_info->num_proxies,
 		experiment_info->file_size,
@@ -725,7 +729,9 @@ void print_stats(SSL *s) {
 		s->read_stats.app_bytes + s->write_stats.app_bytes,
 		s->read_stats.pad_bytes + s->write_stats.pad_bytes,
 		s->read_stats.header_bytes + s->write_stats.header_bytes,
-		s->read_stats.handshake_bytes + s->write_stats.handshake_bytes);
+		s->read_stats.handshake_bytes + s->write_stats.handshake_bytes,
+		s->read_stats.mac_bytes + s->write_stats.mac_bytes,
+		s->read_stats.alert_bytes + s->write_stats.alert_bytes);
 }
 
 
@@ -777,6 +783,10 @@ int main(int argc, char **argv){
 	struct timeval tvBegin, tvEnd; 
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
 	experiment_info = (ExperimentInfo*)malloc(sizeof(ExperimentInfo));
+
+#ifdef DEBUG
+	printf("\n\n******************** CLIENT STARTING ********************\n");
+#endif
 
 	
 	// Handle user input parameters

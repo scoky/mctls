@@ -1196,6 +1196,7 @@ struct spp_stats_st
         int header_bytes;
         int handshake_bytes;
         int alert_bytes;
+        int mac_bytes;
         };
 
 struct ssl_st

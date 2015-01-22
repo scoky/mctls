@@ -475,7 +475,7 @@ printf("\n");
 			rr->length -= mac_size;
 			mac = &rr->data[rr->length];
 			}
-
+                s->read_stats.mac_bytes += mac_size;
 		i=s->method->ssl3_enc->mac(s,md,0 /* not send */);
 		if (i < 0 || mac == NULL || CRYPTO_memcmp(md, mac, (size_t)mac_size) != 0)
 			enc_err = -1;
@@ -860,6 +860,7 @@ static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
 
 	if (mac_size != 0)
 		{
+                s->write_stats.mac_bytes += mac_size;
 		if (s->method->ssl3_enc->mac(s,&(p[wr->length + eivlen]),1) < 0)
 			goto err;
 		wr->length+=mac_size;
