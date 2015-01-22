@@ -150,6 +150,8 @@ organizeMBOXES(){
 			fi
 		fi
 	done
+
+	sleep 1
 }
 
 
@@ -686,6 +688,7 @@ case $expType in
 	8) 
 		echo "[PERF] Byte overhead -- X axis is a few discrete scenarios"
 		opt=3
+		strategy="cs"
 
 		# Define scenarios to test (num slices, num middleboxes, file size)
 		declare -A scenarios
@@ -720,13 +723,8 @@ case $expType in
 			rm -v $resFile
 		fi
 
-		# Start the server	 # MATTEO: check method <<start_server>>
-		set -x  # print commands we run
-		./wserver -c $proto -o $opt -s cs > log_server 2>&1 &
-		{ set +x; } 2>/dev/null  # stop printing commands
-
-		# Give server small time to setup 
-		sleep 1
+		# Start the server
+		start_server
 		
 		# Run each scenario
 		for((s=1; s<=$numScenarios; s++))
@@ -752,9 +750,6 @@ case $expType in
 					-c $proto -o $opt -b 1 >> $log 2>&1
 				{ set +x; } 2>/dev/null  # stop printing commands
 			done
-			
-			# Reset mboxes # MATTEO: this is done inside organizeMBOXES already
-			# killMbox
 		done
 		
 		# Restore original proxy file (used for other experiments)
