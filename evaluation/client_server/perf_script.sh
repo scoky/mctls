@@ -627,7 +627,7 @@ case $expType in
 		opt=1
 		strategy="uni"
 		testDur=10       
-		pathApps=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
+		pathApps="/usr/local/ssl/bin/openssl"
 		s=4
 		cipher="DH"     # check this???
 		#pathAppsLocal=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
