@@ -582,6 +582,13 @@ void SSL_free(SSL *s)
 	ssl_clear_cipher_ctx(s);
 	ssl_clear_hash_ctx(&s->read_hash);
 	ssl_clear_hash_ctx(&s->write_hash);
+        if (s->proxy_key_mat_shared_secret != NULL) {
+            // Release the shared secret 
+            OPENSSL_cleanse(s->proxy_key_mat_shared_secret,s->proxy_key_mat_shared_secret_len);
+            OPENSSL_free(s->proxy_key_mat_shared_secret);
+            s->proxy_key_mat_shared_secret = NULL;
+            s->proxy_key_mat_shared_secret_len = 0;
+        }
 
 	if (s->cert != NULL) ssl_cert_free(s->cert);
 	/* Free up if allocated */
@@ -1050,7 +1057,7 @@ SPP_PROXY* SPP_get_proxy_by_id(SSL *s, int id) {
     return NULL;
 }
 int SPP_assign_proxy_write_slices(SSL *s, SPP_PROXY* proxy, SPP_SLICE *slices[], int slices_len) {
-    int i,j,found;
+    int i;
     if (slices_len > MAX_SPP_SLICES)
         return -1;
     

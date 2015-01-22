@@ -551,6 +551,10 @@ long ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 		s->init_num += i;
 		n -= i;
 		}
+        
+#ifdef DEBUG
+        printf("Received full handshake message.\n");
+#endif
 
 #ifndef OPENSSL_NO_NEXTPROTONEG
 	/* If receiving Finished, record MAC of prior handshake messages for

@@ -565,7 +565,7 @@ int spp_accept(SSL *s) 	{
                     s->state = SPP_ST_CW_PRXY_MAT_A;
                     s->init_num=0;
                 }
-                ret=spp_send_end_key_material(s);
+                ret=spp_send_end_key_material_server(s);
                 
 #ifndef OPENSSL_NO_TLSEXT
                 if (s->tlsext_ticket_expected)
@@ -589,7 +589,7 @@ int spp_accept(SSL *s) 	{
                     s->state = SPP_ST_CR_PRXY_MAT_A;
                     s->init_num=0;
                 }
-                ret=spp_get_end_key_material(s);
+                ret=spp_get_end_key_material_server(s);
                 if (ret <= 0) goto end;
 #if defined(OPENSSL_NO_TLSEXT) || defined(OPENSSL_NO_NEXTPROTONEG)
                 s->state=SSL3_ST_SR_FINISHED_A;
