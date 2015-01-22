@@ -6,7 +6,7 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
-#define DEBUG
+//#define DEBUG
 
 static const SSL_METHOD *spp_get_server_method(int ver);
 static const SSL_METHOD *spp_get_server_method(int ver)
