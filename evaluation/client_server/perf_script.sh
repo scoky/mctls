@@ -627,7 +627,7 @@ case $expType in
 		opt=1
 		strategy="uni"
 		testDur=10       
-		pathApps="/usr/local/ssl/bin/openssl"
+		pathOpenSSL="/usr/local/ssl/bin/openssl"
 		s=4
 		cipher="DH"     # check this???
 		#pathAppsLocal=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
@@ -658,7 +658,7 @@ case $expType in
 			do
 				echo $s >> .tmp 
 				#echo "$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 >> $log 2>&1"
-				$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 -cipher $cipher >> $log 2>&1
+				$pathOpenSSL s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 -cipher $cipher >> $log 2>&1
 			done
 		done
 
