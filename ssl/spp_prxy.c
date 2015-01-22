@@ -67,11 +67,6 @@ int spp_proxy_connect(SSL *s) {
             case SSL_ST_CONNECT:
             case SSL_ST_BEFORE|SSL_ST_CONNECT:
             case SSL_ST_OK|SSL_ST_CONNECT:
-				// Initialize timers
-				gettimeofday(&currTime, NULL);
-				gettimeofday(&prevTime, NULL);
-				gettimeofday(&originTime, NULL);
-
 				#ifdef DEBUG
 				log_time("Connecting next session\n", &currTime, &prevTime, &originTime); 
 				#endif
@@ -498,29 +493,126 @@ err:
     return(-1);
 }
 
+
+/* Function checks to make sure that this message is for this proxy before 
+ * calling get_proxy_material_ext which puts a shitload more memory on the stack. */
 int get_proxy_material(SSL *s, int server) {
-    int slice_id, proxy_id, len;
-    unsigned char * param, *p;
-    SPP_SLICE *slice, *slice2;
+    unsigned char *key_mat_envelope = NULL;
+    int id;
+
+    key_mat_envelope = (unsigned char *)s->init_msg;
     
-    param=p=(unsigned char *)s->init_msg;
-    
-    /* Server or client identifier */
-    //printf("PROXY MAT MSG header %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
-    n1s(p, proxy_id);
-    
-    // Message is not for this proxy, ignore it
-    if (proxy_id != s->proxy_id) {
+    /* Get the ID */
+    n1s(key_mat_envelope, id);
+    if (id != s->proxy_id) {
+        /* Material not intended for this proxy */
         return 1;
+    } else {
+        return get_proxy_material_ext(s, server);
+    }
+}
+int get_proxy_material_ext(SSL *s, int server) {
+    unsigned char key_mat[SSL3_RT_MAX_PLAIN_LENGTH];
+    int *key_mat_len = 0;
+    EVP_PKEY *private_key = NULL;
+    unsigned char *key_mat_envelope = NULL, *d;
+    int encrypted_envelope_key_len = 0;
+    unsigned char *envelope_iv;
+    //unsigned char encrypted_envelope_key[128] = {0};
+    unsigned char *encrypted_envelope_key;
+    int encrypted_key_mat_len = 0;
+    unsigned char *encrypted_key_mat; /* HACK size... */
+    int n, shared_secret_len;
+    unsigned char *shared_secret=NULL;
+    
+    key_mat_envelope = d = (unsigned char *)s->init_msg;
+    n = s->init_num;
+    key_mat_envelope++; // Skip id
+    
+    private_key = (server ? s->other_ssl->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey : s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey); 
+
+    /* get length of encrypted envelope key */
+    n2l3(key_mat_envelope, encrypted_envelope_key_len);
+    if (encrypted_envelope_key_len > 128)
+        goto err;
+    /* now pull out the encrypted envelope key */
+    /* Memcpy unnecessary. */
+    //memcpy(encrypted_envelope_key, key_mat_envelope, encrypted_envelope_key_len); // );
+    encrypted_envelope_key = key_mat_envelope;
+    // printf("encrypted envelope key:\n");
+    // spp_print_buffer(encrypted_envelope_key, encrypted_envelope_key_len);
+
+    /* advance pointer! */
+    key_mat_envelope += encrypted_envelope_key_len;
+
+    /* read iv */
+    // printf("reading iv\n");
+    //memcpy(envelope_iv, key_mat_envelope, EVP_MAX_IV_LENGTH);
+    envelope_iv = key_mat_envelope;
+    // printf("envelope_iv:\n");
+    // // printf("%s\n", envelope_iv);
+    // spp_print_buffer(envelope_iv, EVP_MAX_IV_LENGTH);
+    /* advance pointer! */
+    key_mat_envelope += EVP_MAX_IV_LENGTH;
+
+    /* get legnth of encrypted key material */
+    n2l3(key_mat_envelope, encrypted_key_mat_len);
+
+    /* pull the encrypted key material out! */
+    //memcpy(encrypted_key_mat, key_mat_envelope, encrypted_key_mat_len);
+    encrypted_key_mat = key_mat_envelope;
+    // printf("Encrypted key material:\n");
+    // spp_print_buffer(encrypted_key_mat, encrypted_key_mat_len);
+    key_mat_envelope += encrypted_key_mat_len;
+    
+    /* Confirm the message is the correct size. */
+    if (n != (key_mat_envelope - d)) {
+        printf("Message size wrong, header:%d, actual:%d\n", n, (key_mat_envelope - d));
+        goto err;
+    }
+
+    printf("opening envelope!\n");
+
+    key_mat_len = envelope_open(
+        private_key,
+        encrypted_key_mat,
+        encrypted_key_mat_len,
+        encrypted_envelope_key,
+        encrypted_envelope_key_len,
+        envelope_iv,
+        key_mat,
+        &shared_secret,
+        &shared_secret_len
+        );
+    
+    /* Proxy actually has no reason to save the secret, cleanse and free */
+    if (shared_secret != NULL) { 
+        OPENSSL_cleanse(shared_secret,shared_secret_len);
+        OPENSSL_free(shared_secret);
     }
     
+
+    printf("key mat len: %d\n", key_mat_len);
+    spp_print_buffer(key_mat, key_mat_len);
+    
+    return spp_proxy_unpack_mat(s, key_mat, key_mat_len, server);
+err:
+    printf("Error in get_proxy_material_ext\n");
+    return -1;
+}
+
+int spp_proxy_unpack_mat(SSL *s, unsigned char *p, long n, int server) {
+    int slice_id, len;
+    SPP_SLICE *slice, *slice2;
+    unsigned char *param=p;
+    
     /* More to read */
-    while (p-param < s->init_num) {
+    while (p-param < n) {
         n1s(p, slice_id);
         //printf("Slice %d received\n", slice_id);
         slice = SPP_get_slice_by_id(s, slice_id);
         slice2 = SPP_get_slice_by_id(s->other_ssl, slice_id);
-        if (slice == NULL)            
+        if (slice == NULL)        
             goto err;
         
         n2s(p, len);
@@ -557,11 +649,12 @@ int get_proxy_material(SSL *s, int server) {
         
     }
     /* Should now have read the full message. */
-    if (p-param != s->init_num) {
-        printf("Did not read the whole message, %d != %d\n", p-param, s->init_num);
+    if (p-param != n) {
+        printf("Did not read the whole message, %d != %d\n", p-param, n);
         goto err;
     }
     
+    //printf("Done\n");
     return 1;
 err:
     printf("Error reading proxy key material\n");
@@ -627,6 +720,10 @@ int spp_proxy_accept(SSL *s) {
             case SSL_ST_ACCEPT:
             case SSL_ST_BEFORE|SSL_ST_ACCEPT:
             case SSL_ST_OK|SSL_ST_ACCEPT:
+                                // Initialize timers
+				gettimeofday(&currTime, NULL);
+				gettimeofday(&prevTime, NULL);
+				gettimeofday(&originTime, NULL);
                                 #ifdef DEBUG
 				log_time("Before handshake\n", &currTime, &prevTime, &originTime); 
 				#endif
@@ -1074,9 +1171,11 @@ int spp_proxy_accept(SSL *s) {
                 // Receive proxy key material for each proxy and the server
                 // Pass all messages on
                 for (i = 0; i <= s->proxies_len; i++) {
+                    //printf("Waiting for proxy material message\n");
                     s->state = next_st->state = SPP_ST_SR_PRXY_MAT_A;
                     ret=get_proxy_msg(next_st, SPP_ST_SR_PRXY_MAT_A, SPP_ST_SR_PRXY_MAT_B, SPP_MT_PROXY_KEY_MATERIAL, 1);
                     if (ret <= 0) goto end;
+                    //printf("Got material message\n");
                     ret=get_proxy_material(next_st, 1); // From server
                     if (ret <= 0) goto end;
                     s->init_num=next_st->init_num=0;
