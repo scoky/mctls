@@ -51,7 +51,7 @@ plotCommand="none"        # Usere selection for plotting
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
-#protoList[4]="pln""     
+protoList[4]="pln"     
 key="amazon.pem"           # amazon key 
 user="ubuntu"              # amazon user 
 
@@ -168,10 +168,11 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto (Running <<$R>> tests per configuration)"
 			if [ $remote -eq 0 ]
 			then
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+				#./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote >> $log
 				#echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
+				./perf_script.sh $S_max $R $proto $opt $remote >> $log
 			fi
 		done
 			;;
