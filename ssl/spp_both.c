@@ -1560,13 +1560,17 @@ int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_
 
 
     /* Create and initialise the context */
+	#ifdef DEBUG
     printf("Create and initialise the context\n");
+	#endif
     if(!(ctx = EVP_CIPHER_CTX_new())) {
-        // handleErrors();
-        printf("envelope_open error 1\n");
+        // handleErrors();		
+        printf("envelope_open error 1\n");	
     }
 
+	#ifdef DEBUG
     printf("Initialise the decryption operation.\n");
+	#endif
     /* Initialise the decryption operation. The asymmetric private key is
      * provided and priv_key, whilst the encrypted session key is held in
      * encrypted_key */

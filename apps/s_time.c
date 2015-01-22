@@ -4,7 +4,7 @@
  */
 
 #define NO_SHUTDOWN
-#define DEBUG 
+//#define DEBUG 
 
 /*-----------------------------------------
    s_time - SSL client connection timer program
