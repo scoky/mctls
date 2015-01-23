@@ -16,6 +16,7 @@ usage(){
 	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
 	echo -e "run    = {(1) run experiment, (0) no run just plot"
     echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
+    echo -e "[debug - instead of running it just prints the command it uses]"
 	exit 0
 }
 	
@@ -48,6 +49,7 @@ opt=$1                    # user choice for experiment
 remote=$2                 # user choice, local or Amazon exp
 parallel=0                # parallel experiment (not used here but needed for plotting)
 RUN_EXP=$3                # run experiment or not 
+debug=0                   # no debugging by default
 plotCommand="none"        # Usere selection for plotting 
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
@@ -55,7 +57,6 @@ protoList[3]="spp"
 protoList[4]="pln"     
 key="amazon.pem"          # amazon key 
 user="ubuntu"             # amazon user 
-debug=0                   # instead of running just print commands
 
 # folder for compilations
 remoteFolder="./secure_proxy_protocol" 
@@ -68,6 +69,11 @@ proto_count=${#protoList[@]}
 if [[ $# -eq 4 ]]
 then 
 	plotCommand=$4
+fi
+# instead of running just print commands
+if [ $# -eq 5 ]
+then 
+	debug=$5                  
 fi
 
 #cleanup 
@@ -85,6 +91,14 @@ then
 		exit 0 
 	fi
 fi
+# Definition for logging purpose 
+if [ $remote -eq 1 ] 
+then 
+	adj="Remote (Amazon)"
+else
+	adj="Local"
+fi
+
 #echo "TCP INIT CWND"
 #cat /usr/src/linux-headers-3.13.0-39-generic/include/net/tcp.h | grep -A 2 initcwnd
 #echo "TCP INIT RWND"
@@ -119,7 +133,7 @@ then
 			fi
 			for line in `cat $machineFile`
 			do
-				comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make; sudo make install; cd evaluation/client_server; make clean; make"
+				comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make clean; ./config; make; sudo make install_sw; cd evaluation/client_server; make clean; make"
 				#comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
 				command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
 				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
@@ -185,7 +199,7 @@ then
 		exit 0
 		;;
 	2)
-		echo "[MASTER] Analysis of first time to byte as a function of number of slices (check <<$log>> for experiment progress)"
+		echo "[MASTER] $adj analysis of first time to byte as a function of number of slices (check <<$log>> for experiment progress)"
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
@@ -210,7 +224,7 @@ then
 			;;
 
 	3) 
-		echo "[MASTER] Analysis of first time to byte as a function of latency"
+		echo "[MASTER] $adj analysis of first time to byte as a function of latency"
 		S_max=4
 		for ((i=1; i<=proto_count; i++))
 		do
@@ -228,7 +242,7 @@ then
 		;;
 
 	4) 
-		echo "[MASTER] Analysis of first time to byte as a function of the number of proxies"
+		echo "[MASTER] $adj analysis of first time to byte as a function of the number of proxies"
 		S_max=4
 		for ((i=1; i<=proto_count; i++))
 		do
@@ -246,7 +260,7 @@ then
 		;;
 	
 	5) 
-		echo "[MASTER] Analysis of download time as a function of the file size"
+		echo "[MASTER] $adj analysis of download time as a function of the file size"
 		echo "!!![MASTER] Increasing transfer rate to 20Mbps and lowering repetitions to just 10 (for testing)!!!"
 		#----------------
 		rate=10
@@ -273,7 +287,7 @@ then
 		;;
 	
 	6) 
-		echo "[MASTER] Analysis of download time in browser-like mode"
+		echo "[MASTER] $adj analysis of download time in browser-like mode"
 		echo "!!![MASTER] Using only 10 repetitions (for testing)!!!"
 		#----------------
 		R=10
@@ -283,9 +297,6 @@ then
 		do
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
-			
-			# deal with SPP_MOD
-			tcpTrick
 			
 			# run analysis
 			if [ $debug -eq 1 ] 
@@ -298,7 +309,7 @@ then
 		;;
 	
 	7) 
-		echo "[MASTER] Analysis of number of connections per second"
+		echo "[MASTER] $adj analysis of number of connections per second"
 		R=5
 		S_max=16
 		#------
@@ -320,7 +331,7 @@ then
 		
 
 	8) 
-		echo "[MASTER] Byte overhead -- X axis is a few discrete scenarios"
+		echo "[MASTER] $adj analysis of byte overhead -- X axis is a few discrete scenarios"
 		echo "[MASTER] NOTE: This test ignores network parameters"
 		R=1  # byte overhead shouldn't vary
 		for ((i=1; i<=proto_count; i++))

@@ -9,7 +9,7 @@ figFolder = './fig/matlab';
 kind_line = ['m';'b';'g';'m';'b';'g';'m';'b';'g';'m';'o';':';'d';'+';'<';'s';'.';'-';'g';'p'];
 line_style = ['-';';';':'];
 N_slices=1;
-
+rate=20; % temporary rate used for file download
 % Close figures 
 close all 
 
@@ -35,17 +35,17 @@ machines  = [
 	]; 
 
 machinesLabel  = [
-	'Amazon_1    '	
-	'Amazon_2    '	
-	'TID         '
-	'Laptop      '
+	'Amazon-1'	
+	'Amazon-2'	
+	'TID     '
+	'Laptop  '
 	]; 
 
 machinesHardware = [
 	'E5(1-core -2.50GHz) 2GB   '
 	'E5(1-core - 2.50GHz) 2GB  '
 	'i7(7-cores - 3.40GHz) 16GB'
-	'i5(5-cores - 2.50GHz) 4GB '
+	'i5(4-cores - 2.50GHz) 4GB '
 	]; 
 
 nProt = size(protocol, 1); 
@@ -110,11 +110,7 @@ for jj = 1 : nMachines
 		data = dlmread(file); 
 		
 		if (opt < 5) 
-			if (remote == 1)  
-				h = errorbar(data(:, 3).*1000, data(:, 4).*1000); 
-			else 
-				h = errorbar(data(:, 4).*1000, data(:, 5).*1000); 
-			end
+			h = errorbar(data(:, 4).*1000, data(:, 5).*1000); 
 		elseif (opt == 5) 
 				h = errorbar(data(:, 4), data(:, 5)); 
 		elseif (opt == 6) 
@@ -135,6 +131,12 @@ for jj = 1 : nMachines
 				leg = [leg, {sprintf('%s', currProtLabel)}];
 			end
 		end
+		% plot only one though all are available
+		if (remote == 1 & ii == 1)  
+			h_ping = errorbar(data(:, 6), data(:, 7)); 
+			set (h_ping, 'color', 'r', 'LineWidth', 3);
+			leg = [leg, {sprintf('Measured RTT')}];
+		end 
 		counter = counter + 1; 
 		if (opt == 2 || opt == 7) 
 			rtt = data(1, 2); 
@@ -230,7 +232,7 @@ for jj = 1 : nMachines
 	end
 	if (opt == 5) 
 		if (remote == 0)  
-			t = sprintf('S=%d ; Latency=%dms; Rate=5Mbps ; LOCAL', N_slices, rtt); 
+			t = sprintf('S=%d ; Latency=%dms; Rate=%dMbps ; LOCAL', N_slices, rtt, rate); 
 		end
 	end
 	if (opt == 6) 
@@ -274,7 +276,7 @@ for jj = 1 : nMachines
 	end
 	if (opt == 5) 
 		if (remote == 0)  
-			outFile = sprintf ('%s/download_time_fSize.eps', figFolder); 
+			outFile = sprintf ('%s/download_time_fSize_%d.eps', figFolder, rate); 
 		else
 			outFile = sprintf ('%s/download_time_fSize_remote.eps', figFolder); 
 		end	
@@ -295,18 +297,21 @@ for jj = 1 : nMachines
 	end
 
 	% Saving file 
-	saveas (h, outFile, 'psc2');
+	%saveas (h, outFile, 'psc2');
+	outFile
+	saveas (fig_handler(jj), outFile, 'psc2');
 end
 
 % Addition for comparison file 
-figure(comparison); 
-xlabel('No. slices (#)');
-ylabel('Connection per second (cps)');
-legend(leg_comparison, 'Location', 'NorthWest');
-grid on 
-set(0,'defaultaxesfontsize',18);
-t = sprintf('Latency=%dms ; N_{prxy}=%d', rtt, N); 
-title(t);
-outFile = sprintf ('%s/connection_per_second_comparison.eps', figFolder); 
-saveas (comparison, outFile, 'psc2');
-
+if (parallel == 1)  
+	figure(comparison); 
+	xlabel('No. slices (#)');
+	ylabel('Connection per second (cps)');
+	legend(leg_comparison, 'Location', 'NorthWest');
+	grid on 
+	set(0,'defaultaxesfontsize',18);
+	t = sprintf('SPP comparison ; Latency=%dms ; N_{prxy}=%d', rtt, N); 
+	title(t);
+	outFile = sprintf ('%s/connection_per_second_comparison.eps', figFolder) 
+	saveas (comparison, outFile, 'psc2');
+end

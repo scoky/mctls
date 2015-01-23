@@ -19,28 +19,29 @@ source function.sh
 [[ $# -lt 5 ]] && usage
 
 # Parameters
-S_MAX=$1                  # max number of slices
-R=$2                      # number of repetitions per experiment
-proto=$3                  # protocol to be used
-expType=$4                # experiment type
-log="log_perf"            # performance log file
-MAX=16                    # hard coded max number of slices as per Kyle
-fSizeMAX=5		          # max file size is 5MB
-proxyFile="./proxyList"   # contains proxy information 
-resFolder="../results"    # result folder        
-resFile=$resFolder"/res"  # result file 
-debug=0                   # more logging 
-protoList[1]="ssl"        # array for protocol types currently supported
+S_MAX=$1                   # max number of slices
+R=$2                       # number of repetitions per experiment
+proto=$3                   # protocol to be used
+expType=$4                 # experiment type
+log="log_perf"             # performance log file
+MAX=16                     # hard coded max number of slices as per Kyle
+fSizeMAX=5		           # max file size is 5MB
+proxyFile="./proxyList"    # contains proxy information 
+resFolder="../results"     # result folder        
+resFile=$resFolder"/res"   # result file 
+debug=0                    # more logging 
+delay=-1                   # default delay (-1 means no delay) 
+protoList[1]="ssl"         # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
-#-------------------------------REMOTE ADDITION
-REMOTE=$5                   # 1=remote ; 0=local 
+#--------------------------# ADDITION FOR REMOTE VERSION
+REMOTE=$5                  # 1=remote ; 0=local 
 key="amazon.pem"           # amazon key 
 user="ubuntu"              # amazon user 
 remoteFolder="/home/$user/secure_proxy_protocol/evaluation/client_server" # remote folder
 timeSleep=5                # time for server to setup
-#-------------------------------REMOTE ADDITION
+#--------------------------# ADDITION FOR REMOTE VERSION
 
 # Max file size in MB
 let "fSizeMAX = fSizeMAX*1024*1024"
@@ -167,6 +168,13 @@ case $expType in
 		# Start middleboxes 
 		organizeMBOXES
 
+		# Estimate RTT
+		if [ $REMOTE -eq 1 ]
+		then 
+			echo "[MASTER] Start RTT estimation script"
+			(./ping_script.sh &)
+		fi
+
 		# Run S_MAX repetitions
 		for((s=1; s<=S_MAX; s=2*s))
 		do
@@ -174,8 +182,8 @@ case $expType in
 			echo "[PERF] Testing $R handshakes with $s slices (protocol <<$proto>>)"
 			for((i=1; i<=R; i++))
 			do
-				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1"
-				./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1
+				#echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1"
+				./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1
 			done
 		done
 
@@ -187,9 +195,29 @@ case $expType in
 				echo "#Handshake Analysis" > $resFile
 				echo "#Slices AvgDur StdDur" >> $resFile 
 			fi
-			#cat $log | grep Handshake_Dur | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
-			let "fix2=nProxy-1"
+			let "fix2=nProxy"
 			cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v fix1=$delay -v fix2=$fix2 -v S=1 -f stdev.awk > $resFile
+			
+			# paste RTT results if needed
+			if [ $REMOTE -eq 1 ]
+			then 
+				if [ -f .tempPing ] 
+				then 
+					rm .tempPing
+				fi
+				if [ -f pingSummary ]
+				then
+					for((s=1; s<=S_MAX; s=2*s))
+					do
+						cat pingSummary >> .tempPing
+					done
+					paste $resFile .tempPing > .pasteRes
+					mv .pasteRes $resFile
+					rm .tempPing
+				else
+					echo "[PERF] Error no file <<pingSummary>> was created, check for ERRORS in script <<ping_script.sh>>!"
+				fi
+			fi
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
@@ -231,8 +259,8 @@ case $expType in
 			for((i=1; i<=R; i++))
 			do
 				echo $delay >> .tmp 
-				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
-				./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1
+				#echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt"
+				./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1
 			done
 		done
 
@@ -248,7 +276,7 @@ case $expType in
 				echo "#Slices AvgDur StdDur" >> $resFile 
 			fi
 			paste .tmp .tmpMore > .res
-			let "fix2=nProxy-1"
+			let "fix2=nProxy"
 			cat .res  |  awk -v fix1=$s -v fix2=$fix2 -v S=5 -f stdev.awk > $resFile
 			rm .tmp .tmpMore 
 			#cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
@@ -264,7 +292,7 @@ case $expType in
 		N_MAX=16
 		s=4
 		strategy="cs"
-		N_low=16
+		N_low=1
 
 		# Update res file 
 		resFile=$resFile"_timeFirstByte_proxy"
@@ -296,8 +324,8 @@ case $expType in
 				echo $N >> .tmp 
 
 				# Starting client 
-				echo "[PERF] ./wclient -s $s -r 1 -w 1 -c $proto -o $opt"
-				./wclient -s $s -r 1 -w 1 -c $proto -o $opt >> $log 2>&1
+				#echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1"
+				./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1
 			done
 		done
 
@@ -309,7 +337,7 @@ case $expType in
 				echo "#Handshake Analysis" > $resFile
 				echo "#Slices AvgDur StdDur" >> $resFile 
 			fi
-			let "fix2=nProxy-1"
+			let "fix2=nProxy"
 			
 			# fixing log file 
 			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
@@ -361,9 +389,8 @@ case $expType in
 			for((i=1; i<=R; i++))
 			do
 				echo $fSizeShort >> .tmp
-				echo "[PER] ./wclient -s $s -c $proto -o $opt -f $fSize"
-				#echo "./wclient -s $s -c $proto -o $opt -f $fSize >> $log 2>/dev/null"
-				./wclient -s $s -c $proto -o $opt -f $fSize -r 1 -w 1 >> $log 2>/dev/null
+				#echo "[PERF] ./wclient -s $s -c $proto -o $opt -f $fSize -r $nProxy -w $nProxy >> $log 2>/dev/null"
+				./wclient -s $s -c $proto -o $opt -f $fSize -r $nProxy -w $nProxy >> $log 2>/dev/null
 			done
 				let "fSize = 2*fSize"
 				let "fSizeShort = 2*fSizeShort"
@@ -377,7 +404,7 @@ case $expType in
 				echo "#Download Time Analysis" > $resFile
 				echo "#FileSize Slices Delay AvgDur StdDur" >> $resFile 
 			fi
-			let "fix2=nProxy-1"
+			let "fix2=nProxy"
 			
 			# fixing log file 
 			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
@@ -429,8 +456,8 @@ case $expType in
 			for((i=1; i<=R; i++))
 			do
 				echo $loop >> .tmp
-				#echo "[PERF] ./wclient -s $s -c $proto -o $opt -a $actionFile"
-				echo "./wclient -s $s -c $proto -o $opt -a $actionFile >> $log 2>/dev/null"
+				echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy-c $proto -o $opt -a $actionFile >> $log 2>/dev/null"
+				./wclient -s $s -r $nProxy -w $nProxy-c $proto -o $opt -a $actionFile >> $log 2>/dev/null
 			done
 			let "loop++"
 		done
@@ -443,7 +470,7 @@ case $expType in
 				echo "#Download Time Analysis" > $resFile
 				echo "#Loop Slices Delay AvgDur StdDur" >> $resFile 
 			fi
-			let "fix2=nProxy-1"
+			let "fix2=nProxy"
 			
 			# fixing log file 
 			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
@@ -493,7 +520,7 @@ case $expType in
 			do
 				echo $s >> .tmp 
 				#echo "$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 >> $log 2>&1"
-				$pathOpenSSL s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 -cipher $cipher >> $log 2>&1
+				$pathOpenSSL s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read $nProxy -write $nProxy -cipher $cipher >> $log 2>&1
 			done
 		done
 
@@ -506,7 +533,7 @@ case $expType in
 				#echo "#Slices AvgDur StdDur" >> $resFile 
 			fi
 			#cat $log | grep Handshake_Dur | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
-			let "fix2=nProxy-1"
+			let "fix2=nProxy"
 			
 			# fixing log file 
 			cat $log | grep connections | grep -v real | cut -f 5 -d " " >  .tmpMore

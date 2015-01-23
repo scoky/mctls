@@ -25,7 +25,7 @@ localFolder="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/ev
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
-protoList[4]="pln"
+#protoList[4]="pln"
 parallel=1                # flag for matlab plotting 
 
 # read type of plot to do 
@@ -128,6 +128,7 @@ do
 			file=$rf"res_"$proto"_connections_slice"
 		fi
 		targetFile=$resFolder"/res_"$proto"_connections_slice_"$addr
+		echo "[REMOTE] Collecting results from machine <<$addr>>"
 		if [ $addr == "tid.system-ns.net" -o $addr == "localhost" ]
 		then 
 			scp -P $port  $user@$addr:$file $targetFile
@@ -143,7 +144,7 @@ if [ $plotCommand == "matlab" ]
 then 
 	echo "[MASTER] Plotting results (option $opt)"
 	echo "[MATLAB] Running MATLAB...(it can take some time first time)"
-	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote, $parallel); quit"
+	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm(7, 0, 1); quit"
 
 	# Generating summary report 
 	cd ../results 
