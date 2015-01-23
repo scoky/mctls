@@ -360,7 +360,7 @@ elif [ $plotCommand == "myplot" ]
 then
 	echo "[MASTER] Plotting results (option $opt)"
 	cd ../results
-	./plot_byte_overhead.py
+	./plot.py $opt
 	cd -
 else 
 	echo "[MASTER] No plotting requested or plotting type <<$plotCommand>> not supported"

@@ -11,6 +11,7 @@ import numpy
 
 sys.path.append('./myplot')
 import myplot
+import plot_byte_overhead
 
 # configuration
 FIG_DIR = './fig'
@@ -29,6 +30,7 @@ EXPERIMENT_NAMES = {
     5: 'downloadTime',
     6: 'downloadTime_browser',
     7: 'connections_slice',
+    8: 'byteOverhead_scenarios',
 }
 #SUFFIXES = {
 #    2: {0: 'timeFirstByte_slice', 1: 'remote_timeFirstByte_slice'},
@@ -214,6 +216,9 @@ def main():
 
         for machine, result_files in local_files.iteritems():
             plot_series(machine, False, result_files)
+
+    elif args.opt in (8,):
+        plot_byte_overhead.plot_byte_scenarios()
         
 
     # TODO: CDF for opt 6
