@@ -5,7 +5,7 @@ function [] = plotHandshake(opt, remote, parallel)
 
 % Common variables 
 folder = '/home/varvello/WorkTelefonica/HTTP-2/results'; 
-figFolder = './fig';
+figFolder = './fig/matlab';
 kind_line = ['m';'b';'g';'m';'b';'g';'m';'b';'g';'m';'o';':';'d';'+';'<';'s';'.';'-';'g';'p'];
 line_style = ['-';';';':'];
 N_slices=1;
@@ -31,11 +31,25 @@ machines  = [
 	'54.76.148.166    '	
 	'54.67.37.251     '
 	'tid.system-ns.net'
+	'localhost        '
+	]; 
+
+machinesLabel  = [
+	'Amazon_1    '	
+	'Amazon_2    '	
+	'TID         '
+	'Laptop      '
+	]; 
+
+machinesHardware = [
+	'E5(1-core -2.50GHz) 2GB   '
+	'E5(1-core - 2.50GHz) 2GB  '
+	'i7(7-cores - 3.40GHz) 16GB'
+	'i5(5-cores - 2.50GHz) 4GB '
 	]; 
 
 nProt = size(protocol, 1); 
 nMachines = size(machines, 1); 
-
 
 if (parallel == 0) 
 	nMachines = 1 
@@ -63,19 +77,26 @@ if (opt == 6)
 end
 if (opt == 7) 
 	suffix = 'connections_slice'; 
+	if (parallel == 1) 
+		comparison = figure(); 
+	end
 end
 
 
 % Main loop 
+counter2 = 1
 for jj = 1 : nMachines
 	% figure handler 
 	fig_handler(jj) = figure(); 
 	hold on 
 	if (parallel == 1) 
 		currMachine = strtrim(machines(jj, :)); 
+		currMachineLabel = strtrim(machinesLabel(jj, :)); 
+		currMachineHardware = strtrim(machinesHardware(jj, :)); 
 	end
 	counter = 1;
 	for ii = 1 : nProt
+		figure(fig_handler(jj)); 
 		currProt = strtrim(protocol(ii, :)); 
 		currProtLabel = strtrim(protoLabel(ii, :)); 
 		if (parallel == 0) 
@@ -127,7 +148,31 @@ for jj = 1 : nMachines
 			N_slices = data(1, 2);
 			rtt = data(1, 3); 
 		end
+		% HERE
+		if (currProt == 'spp' & parallel == 1)
+			figure(comparison)
+			h_comp = errorbar(data(:, 4), data(:, 5)); 
+			hold on
+			if (jj > 3) 
+				set (h_comp, 'color', kind_line(counter2), 'LineWidth', 3, 'LineStyle', '--');
+			else 
+				set (h_comp, 'color', kind_line(counter2), 'LineWidth', 3);
+			end
+			counter2 = counter2 + 1; 
+			if (jj == 1)
+				leg_comparison = {sprintf('%s', currMachineLabel)};
+				% TOFIX set xtick label correctly 
+				xlim([1 size(data, 1)]); 
+				X = 1:size(data, 1); 
+				set(gca, 'XTick', X, 'XTickLabel', data(:, 1)'); 
+			else
+				leg_comparison = [leg_comparison, {sprintf('%s', currMachineLabel)}];
+			end
+		end
 	end
+
+	% make sure we work on right figure
+	figure(fig_handler(jj)); 
 
 	% X axis labels
 	if (opt == 2 || opt == 7) 
@@ -199,7 +244,7 @@ for jj = 1 : nMachines
 		if (parallel == 0)  
 			t = sprintf('Latency=%dms ; N_{prxy}=%d ; LOCAL', rtt, N); 
 		else
-			t = sprintf('Latency=%dms ; N_{prxy}=%d ; Machine=%s', rtt, N, currMachine); 
+			t = sprintf('Latency=%dms ; N_{prxy}=%d ; %s', rtt, N, currMachineHardware); 
 		end
 	end
 
@@ -245,10 +290,23 @@ for jj = 1 : nMachines
 		if (parallel == 0)  
 			outFile = sprintf ('%s/connection_per_second.eps', figFolder); 
 		else
-			outFile = sprintf ('%s/connection_per_second_%s.eps', figFolder, currMachine); 
+			outFile = sprintf ('%s/connection_per_second_%s.eps', figFolder, currMachineLabel); 
 		end
 	end
 
 	% Saving file 
 	saveas (h, outFile, 'psc2');
 end
+
+% Addition for comparison file 
+figure(comparison); 
+xlabel('No. slices (#)');
+ylabel('Connection per second (cps)');
+legend(leg_comparison, 'Location', 'NorthWest');
+grid on 
+set(0,'defaultaxesfontsize',18);
+t = sprintf('Latency=%dms ; N_{prxy}=%d', rtt, N); 
+title(t);
+outFile = sprintf ('%s/connection_per_second_comparison.eps', figFolder); 
+saveas (comparison, outFile, 'psc2');
+
