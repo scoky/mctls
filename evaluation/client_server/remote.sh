@@ -20,6 +20,7 @@ plotCommand="none"        # Usere selection for plotting
 key="amazon.pem"           # amazon key 
 machineFile="machines"
 remoteFolder="./secure_proxy_protocol/evaluation/client_server"
+localFolder="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/client_server"
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
@@ -48,18 +49,24 @@ then
 		fi
 		for line in `cat $machineFile`
 		do
-			comm="cd $remoteFolder; ./master.sh 7 0 1"
 			addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
 			port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
 			user=`echo $line | cut -f 1 -d "@"`
 			log="log_master_"$addr
+			if [ $addr == "localhost" ] 
+			then 
+				comm="cd $localFolder; ./master.sh 7 0 1"
+			else
+				comm="cd $remoteFolder; ./master.sh 7 0 1"
+			fi
+
 			echo "$addr 1" >> .active
 			if [ -f $log ] 
 			then 
 				rm $log 
 			fi
 			echo "[REMOTE] Started script at machine $addr (user=$user ; port=$port)"
-			if [ $addr == "tid.system-ns.net" ]
+			if [ $addr == "tid.system-ns.net" -o $addr == "localhost" ]
 			then  
 				ssh -o StrictHostKeyChecking=no -p $port $user@$addr $comm >> $log 2>&1 &
 			else 
@@ -102,6 +109,7 @@ fi
 
 # Fetch results 
 rf="./secure_proxy_protocol/evaluation/results/"
+lf="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results/"
 resFolder="../results"
 for line in `cat $machineFile`
 do
@@ -111,9 +119,14 @@ do
 	for ((i=1; i<=proto_count; i++))
 	do
 		proto=${protoList[$i]}
-		file=$rf"res_"$proto"_connections_slice"
+		if [ $addr == "localhost" ] 
+		then 
+			file=$lf"res_"$proto"_connections_slice"
+		else
+			file=$rf"res_"$proto"_connections_slice"
+		fi
 		targetFile=$resFolder"/res_"$proto"_connections_slice_"$addr
-		if [ $addr == "research@tid.system-ns.net" ]
+		if [ $addr == "tid.system-ns.net" -o $addr == "localhost" ]
 		then 
 			scp -P $port  $user@$addr:$file $targetFile
 		else 
