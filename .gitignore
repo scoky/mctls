@@ -43,3 +43,4 @@ libcrypto.pc
 libssl.pc
 openssl.pc
 tools/c_rehash
+*.bak
