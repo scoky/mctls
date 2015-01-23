@@ -571,7 +571,7 @@ int get_proxy_material_ext(SSL *s, int server) {
         goto err;
     }
 
-    printf("opening envelope!\n");
+    //printf("opening envelope!\n");
 
     key_mat_len = envelope_open(
         private_key,
@@ -592,8 +592,8 @@ int get_proxy_material_ext(SSL *s, int server) {
     }
     
 
-    printf("key mat len: %d\n", key_mat_len);
-    spp_print_buffer(key_mat, key_mat_len);
+    /*printf("key mat len: %d\n", key_mat_len);
+    spp_print_buffer(key_mat, key_mat_len);*/
     
     return spp_proxy_unpack_mat(s, key_mat, key_mat_len, server);
 err:
