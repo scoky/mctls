@@ -261,9 +261,10 @@ case $expType in
 	4)  # Test time to first byte [f(N_proxy])
 		echo "[PERF] Test time to first byte (function of number of proxies [1:8])"
 		opt=2
-		N_MAX=8
+		N_MAX=16
 		s=4
 		strategy="cs"
+		N_low=16
 
 		# Update res file 
 		resFile=$resFile"_timeFirstByte_proxy"
@@ -276,7 +277,7 @@ case $expType in
 		start_server
 		
 		# Run S_MAX repetitions
-		for((N=1; N<=N_MAX; N=2*N))
+		for((N=$N_low; N<=N_MAX; N=2*N))
 		do
 			# Update proxy file 
 			proxyFileUpdate 
@@ -315,7 +316,7 @@ case $expType in
 			paste .tmp .tmpMore > .res
 			
 			# Analyzing (corrected) log 
-			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=1 -f stdev.awk > $resFile
+			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=$N_low -f stdev.awk > $resFile
 			rm .tmp .tmpMore 
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"

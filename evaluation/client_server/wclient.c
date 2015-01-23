@@ -92,7 +92,8 @@ int read_proxy_count(char *file_name){
 	fgets ( line, sizeof line, fp ); 
 	
 	// Convert char into integer 
-	N = line[0] - '0';
+	N = atoi(line); 
+	
 	#ifdef DEBUG
 	printf("[DEBUG] Expected number of proxies is: %d\r\n", N);
 	#endif

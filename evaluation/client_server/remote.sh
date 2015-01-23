@@ -2,10 +2,11 @@
 
 # Function to print script usage
 usage(){
-    echo -e "Usage: $0 opt run plot"
-    echo -e "opt -- (0) test number of connections per second on multiple machines"
-    echo -e "run -- (0) no run just plot (1) run"
-    echo -e "plot -- plot type"
+    echo -e "Usage: $0 opt run [plotCommand]"
+    echo -e "opt  = test to be run "
+	echo -e "\t(0) Test number of connections per second concurrently on machines from file <<machines>>"
+    echo -e "run  = {(1) run test and collect results ; (0) colect results only}"
+	echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
 	exit 0 
 }
 	
@@ -17,7 +18,7 @@ resFolder="../results"    # result folder
 opt=$1                    # user choice for experiment
 RUN_EXP=$2                # run experiment or not 
 plotCommand="none"        # Usere selection for plotting 
-key="amazon.pem"           # amazon key 
+key="amazon.pem"          # amazon key 
 machineFile="machines"
 remoteFolder="./secure_proxy_protocol/evaluation/client_server"
 localFolder="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/client_server"
@@ -25,6 +26,7 @@ protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
+parallel=1                # flag for matlab plotting 
 
 # read type of plot to do 
 if [ $# -eq 3 ]
@@ -141,7 +143,7 @@ if [ $plotCommand == "matlab" ]
 then 
 	echo "[MASTER] Plotting results (option $opt)"
 	echo "[MATLAB] Running MATLAB...(it can take some time first time)"
-	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote); quit"
+	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote, $parallel); quit"
 
 	# Generating summary report 
 	cd ../results 
