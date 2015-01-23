@@ -46,6 +46,7 @@ log="log_script"          # log file
 logCompile="log_compile"  # log file 
 opt=$1                    # user choice for experiment
 remote=$2                 # user choice, local or Amazon exp
+parallel=0                # parallel experiment (not used here but needed for plotting)
 RUN_EXP=$3                # run experiment or not 
 plotCommand="none"        # Usere selection for plotting 
 protoList[1]="ssl"        # array for protocol types currently supported
@@ -303,7 +304,7 @@ if [ $plotCommand == "matlab" ]
 then 
 	echo "[MASTER] Plotting results (option $opt)"
 	echo "[MATLAB] Running MATLAB...(it can take some time first time)"
-	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote); quit"
+	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote, $parallel); quit"
 
 	# Generating summary report 
 	cd ../results 

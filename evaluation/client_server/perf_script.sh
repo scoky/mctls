@@ -629,7 +629,7 @@ case $expType in
 		testDur=10       
 		pathOpenSSL="/usr/local/ssl/bin/openssl"
 		s=4
-		cipher="DH"     # check this???
+		cipher="DHE-RSA-AES128-SHA256"
 		#pathAppsLocal=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
         #pathAppsRemote="/home/$user/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
 
