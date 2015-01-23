@@ -101,6 +101,8 @@ static int N_proxies = 0;                  // number of proxies indicated
 static char *filename = "proxyList";       // filename for proxy
 static char **proxies_address;             // array of address for proxies
 static bool reuse = false;                 // SSL session caching 
+static int socket = 0;
+
 
 static void s_time_init(void)
 	{
@@ -154,7 +156,7 @@ static void s_time_usage(void){
 	printf("-www page     - Retrieve 'page' from the server\n");
 	printf("-time         - Test duration\n");
 	printf("--------------------------------\n");
-    printf("-proto        - Protocol requested [sll ; spp]\n");
+    printf("-proto        - Protocol requested [sll ; spp; pln]\n");
 	printf("-slice        - Number of slices requested\n"); 
 	printf("-proxies      - Number of proxies\n"); 
     printf("-read         - Number of proxies with read access (per slice)\n"); 
@@ -272,7 +274,10 @@ static int parseArgs(int argc, char **argv){
 		    s_time_meth = SSLv3_client_method();
 		} else if ((strcmp(proto, "spp")) == 0){
 		    s_time_meth = SPP_method(); 
-		} else {
+		} else if ((strcmp(proto, "pln")) == 0){
+		    s_time_meth = SSLv3_client_method(); 
+		}
+		 else {
 	    	BIO_printf(bio_err, "Protocol %s not supported\n", proto); 
 			goto bad; 
 		}
@@ -535,6 +540,16 @@ int send_GET_request(SSL *scon){
 				return -1; 
 			}
 		}
+				// Send HTTP GET request (SSL) 
+		if (strcmp(proto, "pln") == 0){
+			#ifdef DEBUG
+			printf("[DEBUG] Sending GET request (plain) %s\n", buf); 
+			#endif 
+			int r = write(SSL_get_fd(scon), buf, request_len);
+			if (r < 0){
+				return -1; 
+			}
+		}
 
 		// All good
 		return 0; 
@@ -567,6 +582,17 @@ int wait_GET_response(SSL* scon){
 	if (strcmp(proto, "ssl") == 0){
 		// check error for SSP_read_record
 		while ((i = SSL_read(scon, buf, sizeof(buf))) > 0){
+			bytes_read += i;
+			#ifdef DEBUG
+			//printf("%s", buf); 
+			printf("[DEBUG] GET response received (size=%lu)\n", bytes_read); 
+			#endif 
+		}
+	}
+		// Wait for HTTP response (pln)
+	if (strcmp(proto, "pln") == 0){
+		// check error for SSP_read_record
+		while ((i = read(SSL_get_fd(scon), buf, sizeof(buf))) > 0){
 			bytes_read += i;
 			#ifdef DEBUG
 			//printf("%s", buf); 
