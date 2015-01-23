@@ -33,3 +33,13 @@
 #vim
 *.swp
 *.swo
+
+# openssl auto-gen stuff
+Makefile
+apps/openssl
+crypto/buildinf.h
+crypto/opensslconf.h
+libcrypto.pc
+libssl.pc
+openssl.pc
+tools/c_rehash
