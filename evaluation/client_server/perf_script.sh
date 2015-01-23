@@ -776,7 +776,7 @@ case $expType in
 esac 
 
 # Cleanup
-if [ $# -eq 8 ]
+if [ $# -eq 9 ]
 then
 	echo "[PERF] Resetting network parameters (after experiment)"
 	./network.sh 2
