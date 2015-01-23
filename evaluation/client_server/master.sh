@@ -125,6 +125,10 @@ then
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
 				user=`echo $line | cut -f 1 -d "@"`
 				echo "[MASTER] Working on machine <<$addr:$port>> (with user <<$user>>)"
+				if [ $addr == "localhost" ]
+				then
+					continue
+				fi
 				if [ $addr == "tid.system-ns.net" ]
 				then
 		            ssh -o StrictHostKeyChecking=no -p $port $user@$addr "$command" >> $logCompile 2>&1 &
@@ -158,6 +162,10 @@ then
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
 				user=`echo $line | cut -f 1 -d "@"`
 				echo "[MASTER] Checking machine <<$addr:$port>> (with user <<$user>>)"
+				if [ $addr == "localhost" ]
+				then
+					continue
+				fi
 				if [ $addr == "tid.system-ns.net" ]
 				then
 		            ssh -o StrictHostKeyChecking=no -p $port $user@$addr "$command" 
