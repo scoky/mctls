@@ -4,7 +4,7 @@
  */
 
 #define NO_SHUTDOWN
-//#define DEBUG 
+#define DEBUG 
 
 /*-----------------------------------------
    s_time - SSL client connection timer program
@@ -67,6 +67,8 @@ static int read_proxy_list(char *, char ** );
 static int check_SSL_write_error( SSL *, int, int );
 static void slices_management( SSL *, SPP_SLICE **, SPP_PROXY ** ); 
 static int send_GET_request( SSL * ); 
+int tcp_connect(char *host, int port);
+
 
 /***********************************************************************
  * Static data declarations
@@ -101,8 +103,7 @@ static int N_proxies = 0;                  // number of proxies indicated
 static char *filename = "proxyList";       // filename for proxy
 static char **proxies_address;             // array of address for proxies
 static bool reuse = false;                 // SSL session caching 
-static int socket = 0;
-
+static int mySoc = NULL;
 
 static void s_time_init(void)
 	{
@@ -275,7 +276,7 @@ static int parseArgs(int argc, char **argv){
 		} else if ((strcmp(proto, "spp")) == 0){
 		    s_time_meth = SPP_method(); 
 		} else if ((strcmp(proto, "pln")) == 0){
-		    s_time_meth = SSLv3_client_method(); 
+		    s_time_meth = TLSv1_2_method(); 
 		}
 		 else {
 	    	BIO_printf(bio_err, "Protocol %s not supported\n", proto); 
@@ -545,7 +546,7 @@ int send_GET_request(SSL *scon){
 			#ifdef DEBUG
 			printf("[DEBUG] Sending GET request (plain) %s\n", buf); 
 			#endif 
-			int r = write(SSL_get_fd(scon), buf, request_len);
+			int r = write(scon, buf, request_len);
 			if (r < 0){
 				return -1; 
 			}
@@ -592,7 +593,7 @@ int wait_GET_response(SSL* scon){
 		// Wait for HTTP response (pln)
 	if (strcmp(proto, "pln") == 0){
 		// check error for SSP_read_record
-		while ((i = read(SSL_get_fd(scon), buf, sizeof(buf))) > 0){
+		while ((i = read(scon, buf, sizeof(buf))) > 0){
 			bytes_read += i;
 			#ifdef DEBUG
 			//printf("%s", buf); 
@@ -684,7 +685,8 @@ int MAIN(int argc, char **argv){
 		SSL_CTX_set_options(tm_ctx,SSL_OP_ALL);
 	}
 
-	// Set cipher as per input 
+
+
 	SSL_CTX_set_cipher_list(tm_ctx, tm_cipher);
 
 	// Set certificate 
@@ -735,16 +737,17 @@ int MAIN(int argc, char **argv){
 			#endif 
 			break;
 		}
+		/*
 		// WIN32 specific stuff
 #ifdef WIN32_STUFF
 		if( flushWinMsgs(0) == -1 ){
 			goto end;
 		}
 
-		if( waitingToDie || exitNow ){		/* we're dead */
+		if( waitingToDie || exitNow ){		
 			goto end;
 		}
-#endif
+#endif */
 		// new connection (no re-use) 
 
 		#ifdef DEBUG
@@ -761,7 +764,11 @@ int MAIN(int argc, char **argv){
 			printf("(reuse)\n"); 
 			#endif 
 		}
+
+
+
 		if( (scon = doConnection( scon, proto )) == NULL ){
+			printf("Error: Could not establish connection\n");
 			goto end;
 		}
 
@@ -781,6 +788,16 @@ int MAIN(int argc, char **argv){
 			}
 		}
 
+		nConn += 1;
+
+		if (strcmp(proto, "pln") == 0){	
+			printf("closing %d\n", scon);
+			close((int)scon);
+			printf("Done %d\n", scon);
+			scon = NULL;
+			continue; //avoid all the tls closing...
+		}
+
 #ifdef NO_SHUTDOWN
 		#ifdef DEBUG
 		printf("[DEBUG] NO SSL shutdown\n"); 
@@ -798,7 +815,7 @@ int MAIN(int argc, char **argv){
 		#endif 
 		SHUTDOWN2(SSL_get_fd(scon));
 
-		nConn += 1;
+
 		if (SSL_session_reused(scon)){
 			ver = 'r';
 		} else{
@@ -928,6 +945,80 @@ end:
 	OPENSSL_EXIT(ret);
 }
 
+/* A simple error and exit routine*/
+int err_exit(string)
+  char *string;
+  {
+  	#ifdef DEBUG
+    printf("[ERROR] %s\n",string);
+	#endif
+
+    fprintf(stderr,"%s\n",string);
+    exit(0);
+  }
+
+/* Print SSL errors and exit*/
+int berr_exit(string)
+  char *string;
+  {
+    #ifdef DEBUG
+	BIO_printf(bio_err,"%s\n",string);
+    ERR_print_errors(bio_err);
+	#endif
+    exit(0);
+  }
+
+
+
+// TCP connect function 
+int tcp_connect(char *host, int port){
+
+	struct hostent *hp;
+	struct sockaddr_in addr;
+	int sock;
+
+
+
+	// Resolve host 
+	if(!(hp = gethostbyname(host))){
+		berr_exit("Couldn't resolve host");
+	}
+	#ifdef DEBUG
+	printf("[DEBUG] Host %s resolved\n", host); 
+	#endif
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_addr = *(struct in_addr*)
+	hp->h_addr_list[0];
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+
+
+
+
+	if((sock=socket(AF_INET,SOCK_STREAM, IPPROTO_TCP))<0){
+		err_exit("Couldn't create socket");
+	}
+
+	
+	#ifdef DEBUG
+	printf("[DEBUG] Socket correctly created\n"); 
+	#endif
+
+	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0){
+		err_exit("Couldn't connect socket");
+	}
+	#ifdef DEBUG
+	printf("[DEBUG] Socket connected\n"); 
+	#endif
+	return sock;
+}
+
+
+
+
+
+
 /***********************************************************************
  * doConnection - make a connection
  * Args:
@@ -943,12 +1034,26 @@ static SSL *doConnection(SSL *scon, char *proto){
 	SPP_PROXY *proxies[N_proxies];
 	SPP_SLICE *slice_set[slices_len];
 
+
+	/* WARNING ONLY FOR TESTING, THIS OVERRIDES RETURN TYPE FOR PLN PROTOCOL */
+
+	if ((strcmp(proto, "pln")) == 0){
+		char * host_ip = strtok(strdup(host), ":");
+		int host_port = atoi(strtok(NULL, ":")); 
+		return tcp_connect(host_ip, host_port); // WARNING, THIS OVERRIDES RETURN TYPE. ONLY FOR TESTING
+	}
+
+
 	// what is this?
 	if ((conn = BIO_new(BIO_s_connect())) == NULL){
 		return(NULL);
 	}
 
 	BIO_set_conn_hostname(conn, host);
+	#ifdef DEBUG
+	printf("[DEBUG] Connecting to: %s  \n", host);
+	#endif 
+
 
 	// Create a new SSL* 
 	if (scon == NULL){
