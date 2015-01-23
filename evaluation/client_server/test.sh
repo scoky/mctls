@@ -208,9 +208,12 @@ strategy="uni"             # splitting strategy at the server
 echo "[PERF] Sumary of user input -- Slices=$s ; Protocol=$proto ; Test type=$opt"
 
 
-# Cleaning network parameters, just in case 
-echo "[PERF] Cleaning network parameters (just in case)"
-./network.sh 2 
+# Cleaning network parameters, just in case
+if [ $# -eq 8 ]
+then  
+	echo "[PERF] Cleaning network parameters (just in case)"
+	./network.sh 2 
+fi
 
 # More cleaning
 for i in `ls | grep log_mbox`
