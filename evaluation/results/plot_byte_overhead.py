@@ -7,6 +7,8 @@ from collections import defaultdict
 sys.path.append('./myplot')
 import myplot
 
+from plot import LEGEND_STRINGS
+
 
 
 # configuration
@@ -56,8 +58,7 @@ def load_data(data, res_file, protocol):
 
     return scenarios
 
-
-def main():
+def plot_byte_scenarios():
     ## LOAD DATA
     # scenario -> protocol -> data type -> value
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -87,7 +88,7 @@ def main():
         for scenario in scenarios:
             vals.append(data[scenario][protocol]['total'])
         ys.append(vals)
-        labels.append(protocol)
+        labels.append(LEGEND_STRINGS[protocol])
 
     myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
         xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (kB)',\
@@ -110,16 +111,18 @@ def main():
                 vals.append(data[scenario][protocol][byte_type])
             val_arrays.append(vals)
         ys.append(val_arrays)
-        labels.append(protocol)
+        labels.append(LEGEND_STRINGS[protocol])
 
     myplot.stackbar(xs, ys, labels=labels, xtick_label_rotation=0,\
         xtick_label_horizontal_alignment='center', ylabel='Data Transmitted (kB)',\
         stackbar_pattern_labels=byte_types,\
+        stackbar_colors_denote='segments',\
         width_scale=1.1, grid='y',\
         filename='./fig/bytes_breakdown.pdf')
 
 
-            
+def main():
+    plot_byte_scenarios()
 
     
 

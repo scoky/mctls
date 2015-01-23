@@ -12,176 +12,8 @@ usage(){
     exit 0
 }
 
-# Kill eventual pending server processes 
-killServer(){
-	echo "[PERF] Killing server"
-	#killall -q wserver #>> /dev/null 2>&1
-	if [ $REMOTE -eq 0 ]
-	then  
-		for i in `ps aux | grep wserver | grep -v vi | grep -v grep | awk '{print $2}'`
-		do 
-			echo "Killing wserver $i"
-			kill -9 $i >> /dev/null 2>&1
-		done
-	else
-		command="cd $remoteFolder; ./kill.sh"
-		ssh -i $key $user@$serverAdr $command 
-	fi
-}
-
-# Kill eventual pending mbox processes
-killMbox(){
-	echo "[PERF] Killing mbox"
-	if [ $REMOTE -eq 0 ]
-	then  
-		#killall -q mbox #>> /dev/null 2>&1
-		for i in `ps aux | grep mbox | grep -v vi | grep -v grep | awk '{print $2}'`
-		do 
-			echo "[PERF] Killing mbox $i"
-			kill -9 $i >> /dev/null  2>&1
-		done
-	else
-		# Kill proxy according to protocol requestes 
-		for ((i=1; i<nProxy; i++))
-		do
-			proxy=${proxyList[$i]}
-			addr=`echo $proxy | cut -f 1 -d ":"`
-			command="cd $remoteFolder; ./kill.sh"
-			ssh -i $key $user@$addr $command 
-		done
-	fi
-}
-
-# Start a server instance (either remote or local)
-start_server(){
-	echo "[PERF] Starting server: ./wserver -c $proto -o $opt -s $strategy"
-	if [ $REMOTE -eq 0 ] 
-	then 
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
-	else 
-		command="cd $remoteFolder; ./wserver -c $proto -o $opt -s $strategy" 
-		ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &
-	fi 
-	
-	# Give server some time to setup 
-	echo "[PERF] Sleeping $timeSleep to allow server setup"
-	sleep $timeSleep
-}
-
-# Read mboxes and server addresses and ports 
-readMboxes(){
-	firstLine=1    # flag for first line 
-	count=1        # int for proxy ID
-	nProxy=1       # number of proxies
-	
-	
-	# load proxy list in memory 
-	while read proxy
-	do 
-		if [ $firstLine -eq 1 ] 
-		then
-			if [ $proxy == "1" ] 
-			then 
-				break 
-			else
-				nProxy=$proxy
-				firstLine=0
-			fi
-		else	
-			if [ $count -eq $nProxy ]
-			then
-				serverAdr=`echo $proxy | cut -f 1 -d ":"`
-				serverPort=`echo $proxy | cut -f 2 -d ":"`
-			fi
-			proxyList[$count]=$proxy
-			let "count++"
-		fi
-	done < $proxyFile
-}
-
-# Start and organzie mboxes (routing) 
-organizeMBOXES(){
-	
-	# Kill mbox pending
-	killMbox
-	
-	# Start proxy according to protocol requested 
-	for ((i=1; i<nProxy; i++))
-	do
-		# Get data for this proxy 
-		proxy=${proxyList[$i]}
-		port=`echo $proxy | cut -f 2 -d ":"`
-		addr=`echo $proxy | cut -f 1 -d ":"`
-		
-		# Get data for next proxy 
-		let "j=i+1"
-		nextProxy=${proxyList[$j]}
-		
-		# Start proxy with SPP 
-		if [ $proto == "spp" -o $proto == "spp_mod" ]
-		then
-			# Logging 
-			echo "[PERF] Starting proxy $proxy (port extracted: $port)"
-			
-			# Start!		
-			if [ $REMOTE -eq 0 ] 
-			then 
-				./mbox -c $proto -p $port -m $proxy > log_mbox_$port 2>&1 &
-			else 
-				command="killall mbox"
-				ssh -i $key $user@$addr $command 
-				command="cd $remoteFolder; ./mbox -c $proto -p $port -m $proxy"  
-				ssh -i $key $user@$addr $command  > log_mbox_$addr 2>&1 &
-			fi
-		fi
-		
-		# Start proxy with SSL
-		if [ $proto == "ssl" -o $proto == "fwd" -o $proto == "pln" ]
-		then 
-			# Logging 
-			echo "[PERF] Starting proxy $proxy (port extracted: $port - Next proxy: $nextProxy)"
-			
-			# Start!		
-			if [ $REMOTE -eq 0 ] 
-			then 
-				./mbox -c $proto -p $port -m $proxy -a $nextProxy > log_mbox_$port 2>&1 &
-			else
-				command="killall mbox"
-				ssh -i $key $user@$addr $command 
-				command="cd $remoteFolder; ./mbox -c $proto -p $port -m $proxy -a $nextProxy"
-				echo "[DEBUG] ssh -i $key $user@$addr $command > log_mbox_$addr 2>&1 &"
-				ssh -i $key $user@$addr $command > log_mbox_$addr 2>&1 &
-			fi
-		fi
-	done
-
-	# Sleep 1 second (for Kyle)  
-	sleep 1
-}
-
-
-# Here updating proxy list 
-proxyFileUpdate(){
-
-	# parameters
-	server_add="127.0.0.1"    # default server address 
-	server_port="4433"        # default server port 
-	address="127.0.0.1"       # default proxy address (TO DO -- extend to array if multiple machines used)
-	nextPort=8423             # proxy starting port 
-
-	# derive and print total number of network elements (N proxies + 1 server)
-	let "tot=N+1"             
-	echo $tot > $proxyFile
-
-	# Generating lines for proxy
-	for((i=1; i<=N; i++))
-		do
-			echo "$address:$nextPort" >> $proxyFile
-			let "nextPort++"
-		done
-
-	echo "$server_add:$server_port" >> $proxyFile
-}
+# Get common functions with script <<perf_script.sh>>
+source function.sh
 
 # Check input for minimum number of parameteres requestes
 [[ $# -lt 5 ]] && usage
@@ -299,8 +131,12 @@ then
 fi
 
 
-# Read mboxes (and server) address from config file
-readMboxes
+# Read mboxes (and server) address from config file 
+# NOTE: no option 4 since it needs to update file first 
+if [ $expType -ne 4 ] 
+then
+	readMboxes
+fi 
 
 # Make sure server is not running
 killServer
@@ -425,7 +261,10 @@ case $expType in
 	4)  # Test time to first byte [f(N_proxy])
 		echo "[PERF] Test time to first byte (function of number of proxies [1:8])"
 		opt=2
-		N_MAX=8
+		N_MAX=16
+		s=4
+		strategy="cs"
+		N_low=16
 
 		# Update res file 
 		resFile=$resFile"_timeFirstByte_proxy"
@@ -437,18 +276,14 @@ case $expType in
 		# Start the server 
 		start_server
 		
-		# 4 slices (1 req header, 1 req body) (1 resp header, 1 resp body)
-		s=4
-		strategy="cs"
-
-		# Make copy of current file 
-		cp $proxyFile $proxyFile"_original"
-
 		# Run S_MAX repetitions
-		for((N=1; N<=N_MAX; N=2*N))
+		for((N=$N_low; N<=N_MAX; N=2*N))
 		do
 			# Update proxy file 
 			proxyFileUpdate 
+
+			# Read proxy from (updated) file
+			readMboxes
 
 			# Start middleboxes 
 			organizeMBOXES
@@ -481,7 +316,7 @@ case $expType in
 			paste .tmp .tmpMore > .res
 			
 			# Analyzing (corrected) log 
-			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=1 -f stdev.awk > $resFile
+			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=$N_low -f stdev.awk > $resFile
 			rm .tmp .tmpMore 
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"

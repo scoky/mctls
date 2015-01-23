@@ -53,8 +53,9 @@ protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"     
-key="amazon.pem"           # amazon key 
-user="ubuntu"              # amazon user 
+key="amazon.pem"          # amazon key 
+user="ubuntu"             # amazon user 
+debug=0                   # instead of running just print commands
 
 # folder for compilations
 remoteFolder="./secure_proxy_protocol" 
@@ -125,6 +126,10 @@ then
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
 				user=`echo $line | cut -f 1 -d "@"`
 				echo "[MASTER] Working on machine <<$addr:$port>> (with user <<$user>>)"
+				if [ $addr == "localhost" ]
+				then
+					continue
+				fi
 				if [ $addr == "tid.system-ns.net" ]
 				then
 		            ssh -o StrictHostKeyChecking=no -p $port $user@$addr "$command" >> $logCompile 2>&1 &
@@ -158,6 +163,10 @@ then
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
 				user=`echo $line | cut -f 1 -d "@"`
 				echo "[MASTER] Checking machine <<$addr:$port>> (with user <<$user>>)"
+				if [ $addr == "localhost" ]
+				then
+					continue
+				fi
 				if [ $addr == "tid.system-ns.net" ]
 				then
 		            ssh -o StrictHostKeyChecking=no -p $port $user@$addr "$command" 
@@ -183,11 +192,19 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto (Running <<$R>> tests per configuration)"
 			if [ $remote -eq 0 ]
 			then
-				#echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+				if [ $debug -eq 1 ] 
+				then
+					echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+				else
+					./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				fi
 			else
-				#echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
-				./perf_script.sh $S_max $R $proto $opt $remote >> $log
+				if [ $debug -eq 1 ] 
+				then
+					echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
+				else
+					./perf_script.sh $S_max $R $proto $opt $remote >> $log 2>/dev/null
+				fi
 			fi
 		done
 			;;
@@ -199,7 +216,14 @@ then
 		do
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
-			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+
+			# run analysis
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null"
+			else
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+			fi
 		done
 		;;
 
@@ -212,7 +236,12 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# run analysis
-			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null"
+			else
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+			fi
 		done
 		;;
 	
@@ -234,8 +263,12 @@ then
 			tcpTrick
 			
 			# run analysis
-			#echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
-			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+			else
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+			fi
 		done
 		;;
 	
@@ -255,8 +288,12 @@ then
 			tcpTrick
 			
 			# run analysis
-			#echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
-			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+			else
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+			fi
 		done
 		;;
 	
@@ -272,8 +309,12 @@ then
 		do
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto (10 second per parameter value and repetition)"
-			#echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
-			./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+			else
+				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+			fi
 		done
 		;;
 		
@@ -292,7 +333,12 @@ then
 			
 			# run analysis
 			# TODO: use local/Amazon flag here once supported (instead of 0)
-			./perf_script.sh $S_max $R $proto $opt 0 >> $log
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh $S_max $R $proto $opt 0 >> $log 2>/dev/null"
+			else
+				./perf_script.sh $S_max $R $proto $opt 0 >> $log 2>/dev/null
+			fi
 		done
 		;;
 
@@ -314,7 +360,7 @@ elif [ $plotCommand == "myplot" ]
 then
 	echo "[MASTER] Plotting results (option $opt)"
 	cd ../results
-	./plot_byte_overhead.py
+	./plot.py $opt
 	cd -
 else 
 	echo "[MASTER] No plotting requested or plotting type <<$plotCommand>> not supported"

@@ -21,3 +21,9 @@ Simple example to work
 1) compile our own version  -- TO DO 
 2) compile new version with ALPN support and integrate with crawler -- TO DO (if above is succesfull, it is then trivial)
 3) alternative is focus on subset with empire or other more recent machine? (time is a problem, even a week is not enough ~1000hrs...)  -- TO DO 
+
+
+To plot using matplotlib:
+git submodule init
+git submodule update
+install packages: python-matplotlib, python-numpy, python-scipy
