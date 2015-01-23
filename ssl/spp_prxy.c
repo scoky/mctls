@@ -5,7 +5,7 @@
 #include <openssl/objects.h>
 #include <openssl/evp.h>
 
-#define DEBUG
+//#define DEBUG
 // They need to be global here to work 
 /* Matteo -- START */	
 struct timeval currTime;      // keep current time  

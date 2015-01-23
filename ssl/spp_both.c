@@ -8,6 +8,7 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
+//#define DEBUG
 /* Proxy key material encryption functions. */
 
 int envelope_seal(EVP_PKEY **pub_key, unsigned char *plaintext, int plaintext_len,
@@ -978,8 +979,10 @@ int spp_send_proxy_key_material(SSL *s, SPP_PROXY* proxy) {
         s->init_num=n+4;
         s->init_off=0;
 
-        printf("Sending proxy key material, n=%d\n", n);
+		#ifdef DEBUG
+        printf("Sending proxy key material, n=%d\n", n);	
         spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
+		#endif
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
@@ -1125,8 +1128,10 @@ int spp_send_end_key_material_client(SSL *s) {
         s->init_num=n+4;
         s->init_off=0;
 
-        printf("Sending end key material, n=%d\n", n);
+		#ifdef DEBUG
+        printf("Sending end key material, n=%d\n", n);		
         spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
+		#endif 
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
@@ -1154,9 +1159,10 @@ int spp_send_end_key_material_server(SSL *s) {
         if (s->proxy_key_mat_shared_secret == NULL) {
             goto err;
         }
-        
+        #ifdef DEBUG
         printf("Proxy key material shared secret (server):\n");
         spp_print_buffer(s->proxy_key_mat_shared_secret, s->proxy_key_mat_shared_secret_len);
+		#endif
 
         encrypted_key_mat_len = spp_encrypt_key_mat_server(
             s->proxy_key_mat_shared_secret,
@@ -1173,10 +1179,12 @@ int spp_send_end_key_material_server(SSL *s) {
         s->proxy_key_mat_shared_secret = NULL;
         s->proxy_key_mat_shared_secret_len = 0;
 
+		#ifdef DEBUG
         printf("server->client key material:\n");
         spp_print_buffer(temp_buff, n);
         printf("server->client encrypted_key_mat:\n");
         spp_print_buffer(encrypted_key_mat, encrypted_key_mat_len);
+		#endif 
 
         d = (unsigned char *)s->init_buf->data;
         p = &(d[4]);
@@ -1212,8 +1220,10 @@ int spp_send_end_key_material_server(SSL *s) {
         s->init_num=n+4;
         s->init_off=0;
 
+		#ifdef DEBUG
         printf("Sending end key material, n=%d\n", n);
         spp_print_buffer((unsigned char *)s->init_buf->data, s->init_num);
+		#endif
     }
 
     /* SPP_ST_CW_PRXY_MAT_B */
@@ -1328,8 +1338,10 @@ int spp_get_end_key_material_client(SSL *s) {
         goto err;
     }
 
+	#ifdef DEBUG
     printf("Proxy key material shared secret (client):\n");
     spp_print_buffer(s->proxy_key_mat_shared_secret, s->proxy_key_mat_shared_secret_len);
+	#endif
 
     /* decrypt the key material */
     key_mat_len = spp_decrypt_key_mat_client(
@@ -1345,10 +1357,12 @@ int spp_get_end_key_material_client(SSL *s) {
     OPENSSL_free(s->proxy_key_mat_shared_secret);
     s->proxy_key_mat_shared_secret = NULL;
     s->proxy_key_mat_shared_secret_len = 0;
-    
+
+	#ifdef DEBUG
     printf("key mat len: %d\n", key_mat_len);
     printf("client get key material, key mat:\n");
     spp_print_buffer(key_mat, key_mat_len);
+	#endif
     
     return spp_unpack_proxy_key_mat(s, key_mat, key_mat_len);
 err:
@@ -1432,7 +1446,9 @@ int spp_get_end_key_material_server(SSL *s) {
         goto err;
     }
 
+	#ifdef DEBUG
     printf("opening envelope!\n");
+	#endif 
 
     key_mat_len = envelope_open(
         private_key,
@@ -1544,13 +1560,17 @@ int envelope_open(EVP_PKEY *priv_key, unsigned char *ciphertext, int ciphertext_
 
 
     /* Create and initialise the context */
+	#ifdef DEBUG
     printf("Create and initialise the context\n");
+	#endif
     if(!(ctx = EVP_CIPHER_CTX_new())) {
-        // handleErrors();
-        printf("envelope_open error 1\n");
+        // handleErrors();		
+        printf("envelope_open error 1\n");	
     }
 
+	#ifdef DEBUG
     printf("Initialise the decryption operation.\n");
+	#endif
     /* Initialise the decryption operation. The asymmetric private key is
      * provided and priv_key, whilst the encrypted session key is held in
      * encrypted_key */
@@ -1847,7 +1867,9 @@ int spp_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek
     if ((npubk <= 0) || !pubk)
         return 1;
     *key_len = EVP_CIPHER_CTX_key_length(ctx);
+	#ifdef DEBUG
     printf("Key length = %d\n", *key_len);
+	#endif 
     *key = (unsigned char*)OPENSSL_malloc(*key_len);
     if (EVP_CIPHER_CTX_rand_key(ctx, *key) <= 0)
         return 0;

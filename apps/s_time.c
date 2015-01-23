@@ -4,7 +4,7 @@
  */
 
 #define NO_SHUTDOWN
-#define DEBUG 
+//#define DEBUG 
 
 /*-----------------------------------------
    s_time - SSL client connection timer program
@@ -271,7 +271,7 @@ static int parseArgs(int argc, char **argv){
 		proto = *(++argv);
 
 		if ((strcmp(proto, "ssl")) == 0){	
-		    s_time_meth = SSLv3_client_method();
+		    s_time_meth = TLSv1_2_method();
 		} else if ((strcmp(proto, "spp")) == 0){
 		    s_time_meth = SPP_method(); 
 		} else if ((strcmp(proto, "pln")) == 0){

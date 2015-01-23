@@ -115,7 +115,7 @@ def main():
     myplot.stackbar(xs, ys, labels=labels, xtick_label_rotation=0,\
         xtick_label_horizontal_alignment='center', ylabel='Data Transmitted (kB)',\
         stackbar_pattern_labels=byte_types,\
-        width_scale=1.1,\
+        width_scale=1.1, grid='y',\
         filename='./fig/bytes_breakdown.pdf')
 
 
