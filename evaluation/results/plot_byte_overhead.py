@@ -3,40 +3,34 @@
 import sys
 import pprint
 from collections import defaultdict
+import numpy
 
 sys.path.append('./myplot')
 import myplot
 
-from plot import LEGEND_STRINGS
+from plot import LEGEND_STRINGS, Y_AXIS, EXPERIMENT_NAMES, PROTOCOLS,\
+    MANUAL_ARGS, DATA_TRANSFORMS, outfile
 
-
-
-# configuration
-SPP_FILE = './res_spp_byteOverhead_scenarios'
-SSL_FILE = './res_ssl_byteOverhead_scenarios'
-FWD_FILE = './res_fwd_byteOverhead_scenarios'
-
-
-def data_size(string):
-    return float(string)/1024.0
+OPT=8
 
 
 def records(filepath):
+    transform = numpy.vectorize(DATA_TRANSFORMS[OPT])
     with open(filepath, 'r') as f:
         for line in f:
             if line[0] != '#':
                 fields = line.strip().split()
 
                 scenario = 'Slice: %s\nMbox: %s\nFile: %0.0f kB' %\
-                    (fields[0], fields[1], data_size(fields[2]))
+                    (fields[0], fields[1], transform(fields[2]))
 
-                total_bytes = data_size(fields[3])
-                app_total = data_size(fields[4])
-                padding_total = data_size(fields[5])
-                header_total = data_size(fields[6])
-                handshake_total = data_size(fields[7])
-                mac_total = data_size(fields[8])
-                alert_total = data_size(fields[9])
+                total_bytes = transform(fields[3])
+                app_total = transform(fields[4])
+                padding_total = transform(fields[5])
+                header_total = transform(fields[6])
+                handshake_total = transform(fields[7])
+                mac_total = transform(fields[8])
+                alert_total = transform(fields[9])
 
                 yield scenario, total_bytes, app_total, padding_total,\
                     header_total, handshake_total, mac_total, alert_total
@@ -58,14 +52,20 @@ def load_data(data, res_file, protocol):
 
     return scenarios
 
-def plot_byte_scenarios():
+def plot_byte_scenarios(machine, remote, result_files):
+    out_filename, out_filepath = outfile(OPT, remote, machine)
+
     ## LOAD DATA
     # scenario -> protocol -> data type -> value
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    scenarios = None
+    
+    for protocol in PROTOCOLS:
+        if protocol not in result_files: continue
+        filepath = result_files[protocol]
+        print '[IN]', protocol, filepath
 
-    scenarios = load_data(data, SPP_FILE, 'spp')
-    load_data(data, SSL_FILE, 'ssl')
-    load_data(data, FWD_FILE, 'fwd')
+        scenarios = load_data(data, filepath, protocol)
 
     #scenarios = data.keys()
     protocols = data[scenarios[0]].keys()
@@ -75,24 +75,24 @@ def plot_byte_scenarios():
 
     ## PLOT
 
-    ##
-    ## PLOT 1: total bytes
-    ##
-    xs = []
-    ys = []
-    labels = []
+    ###
+    ### PLOT 1: total bytes
+    ###
+    #xs = []
+    #ys = []
+    #labels = []
 
-    for protocol in protocols:
-        xs.append(scenarios)
-        vals = []
-        for scenario in scenarios:
-            vals.append(data[scenario][protocol]['total'])
-        ys.append(vals)
-        labels.append(LEGEND_STRINGS[protocol])
+    #for protocol in protocols:
+    #    xs.append(scenarios)
+    #    vals = []
+    #    for scenario in scenarios:
+    #        vals.append(data[scenario][protocol]['total'])
+    #    ys.append(vals)
+    #    labels.append(LEGEND_STRINGS[protocol])
 
-    myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
-        xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (kB)',\
-        filename='./fig/bytes_total.pdf')
+    #myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
+    #    xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (kB)',\
+    #    filename='./fig/bytes_total.pdf')
     
     
     ##
@@ -113,18 +113,10 @@ def plot_byte_scenarios():
         ys.append(val_arrays)
         labels.append(LEGEND_STRINGS[protocol])
 
+    print '[OUT]', out_filepath
     myplot.stackbar(xs, ys, labels=labels, xtick_label_rotation=0,\
-        xtick_label_horizontal_alignment='center', ylabel='Data Transmitted (kB)',\
+        xtick_label_horizontal_alignment='center', ylabel=Y_AXIS[OPT],\
         stackbar_pattern_labels=byte_types,\
         stackbar_colors_denote='segments',\
         width_scale=1.1, grid='y',\
-        filename='./fig/bytes_breakdown.pdf')
-
-
-def main():
-    plot_byte_scenarios()
-
-    
-
-if __name__ == '__main__':
-    main()
+        filename=out_filepath, **MANUAL_ARGS[out_filename])
