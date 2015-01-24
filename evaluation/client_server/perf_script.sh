@@ -27,7 +27,7 @@ log="log_perf"             # performance log file
 MAX=16                     # hard coded max number of slices as per Kyle
 fSizeMAX=5		           # max file size is 5MB
 proxyFile="./proxyList"    # contains proxy information 
-resFolder="../results"     # result folder        
+resFolder="../results/tmp" # result folder        
 resFile=$resFolder"/res"   # result file 
 debug=0                    # more logging 
 delay=-1                   # default delay (-1 means no delay) 
@@ -488,7 +488,7 @@ case $expType in
 		echo "[PERF] Number of connections (f[#slices])"
 		opt=1
 		strategy="uni"
-		testDur=10       
+		testDur=30       
 		pathOpenSSL="/usr/local/ssl/bin/openssl"
 		s=4
 		cipher="DHE-RSA-AES128-SHA256"
@@ -512,8 +512,20 @@ case $expType in
 		nextHop=`cat $proxyFile | awk '{if(count==1)print $0; count+=1}'`
 
 		# Run S_MAX repetitions
-		for((s=1; s<=S_MAX; s=2*s))
+		minS=1
+		#minS=8
+		#echo "[PERF] !!!!Temporarly checking linear range from 8 to 16!!!!"
+		for((s=$minS; s<=S_MAX; s=2*s))
+		#for((s=$minS; s<=16; s++))
 		do
+			# Prepare for copy of full log 
+			fullLog="./full_results/results_$proto"
+			echo "[PERF] Making copy of full experiment log. Check file <<$fullLog>>"
+			if [ -f $fullLog ]
+			then 
+				rm -v $fullLog
+			fi
+
 			# Run R handshake repetitions	
 			echo "[PERF] Testing $R handshakes with $s slices (worst case, all mboxes get READ/WRITE access)"
 			for((i=1; i<=R; i++))
@@ -530,9 +542,7 @@ case $expType in
 			if [ $debug -eq 1 ]
 			then 
 				echo "#Connection Analysis" > $resFile
-				#echo "#Slices AvgDur StdDur" >> $resFile 
 			fi
-			#cat $log | grep Handshake_Dur | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
 			let "fix2=nProxy"
 			
 			# fixing log file 
@@ -540,8 +550,13 @@ case $expType in
 			paste .tmp .tmpMore > .res
 			
 			# Analyzing (corrected) log 
-			cat .res  |  awk -v fix1=$delay -v fix2=$fix2 -v S=1 -f stdev.awk > $resFile
-			rm .tmp .tmpMore 
+			cat .res  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFile
+
+			# Make a local copy of full results 
+			cp .res $fullLog
+			
+			# Cleanup support files
+			rm .tmp .tmpMore .res
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi

@@ -18,6 +18,7 @@
 
 #include "common.h"
 #include <stdbool.h>            
+#include <time.h>
 #define KEYFILE "server.pem"
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
@@ -778,6 +779,7 @@ void usage(void){
 	printf("-c:   protocol requested: ssl, spp, pln.\n");
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-s:   content slicing strategy {uni; cs}\n");
+	printf("-l:   duration of load estimation time (10 sec default)\n");
 	printf("{uni[DEFAUL]=split response equally among slices ; cs=split uniformly among half slices, assuming other half is used by the client}\n");
 	exit(-1);
 }
@@ -795,35 +797,39 @@ int main(int argc, char **argv){
 	extern char *optarg;                // user input parameters
 	int c;                              // user iput from getopt
 	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
-	int status;
+	int status;                         // ...
+	clock_t start, end;                 // timers for cpu time estimation 
+	double cpu_time_used;               // cpu time used 
+	int loadTime = 10;                  // time used for load estimation (10 second default, user can change with option -l)
+
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "c:o:s:")) != -1){
+	while((c = getopt(argc, argv, "c:o:s:l:")) != -1){
 		switch(c){
 			// Protocol 
-			case 'c':
-				if(! (proto = strdup(optarg) )){
-					err_exit("Out of memory");
-				}
-				if (strcmp(proto, "fwd") == 0){
-					proto = "ssl"; 
-				}
-				if (strcmp(proto, "spp_mod") == 0){
-					proto = "spp"; 
-				}
-				break; 
+			case 'c':	if(! (proto = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						if (strcmp(proto, "fwd") == 0){
+							proto = "ssl"; 
+						}
+						if (strcmp(proto, "spp_mod") == 0){
+							proto = "spp"; 
+						}
+						break; 
 
 			// Client/Server behavior 
-			case 'o':
-				action = atoi(optarg); 
-				break; 
+			case 'o':	action = atoi(optarg); 
+						break; 
 
 			// Control slicing strategy
-			case 's':
-				if(! (strategy = strdup(optarg) )){
-					err_exit("Out of memory");
-				}
-				break;
-			}
+			case 's':	if(! (strategy = strdup(optarg) )){
+							err_exit("Out of memory");
+						}
+						break;
+			// Control load estimation period 
+			case 'l':	loadTime = atoi(optarg); 
+						break;
+		}
 	}
 
 	// Check that input parameters are correct 
@@ -857,7 +863,11 @@ int main(int argc, char **argv){
 	sock = tcp_listen();
 
 	// Wait for client request 
+	long finishLoadEst = (long) time (NULL) + loadTime;
+	int nConn = 0; 
+	bool report = true; 
 	while(1){
+			
 		#ifdef DEBUG
 		printf("[DEBUG] Waiting on TCP accept...\n"); 
 		#endif
@@ -868,6 +878,8 @@ int main(int argc, char **argv){
 			printf("[DEBUG] Accepted new connection %d\n", sock); 
 			#endif
 		}
+		// keep track of number of connections
+		nConn++;
 
 		// Fork a new process
 		signal(SIGCHLD, SIG_IGN); 
@@ -878,6 +890,7 @@ int main(int argc, char **argv){
 				berr_exit("FORK error"); 
 				return 1;
            	}
+			start = clock();
 			#ifdef DEBUG
 			printf("[DEBUG] child process close old socket (why?) and operate on new one\n");
 			#endif
@@ -902,7 +915,11 @@ int main(int argc, char **argv){
 					#endif
 				}
 			}
-
+			end = clock();
+			cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+			if (loadTime > 0){
+				printf( "CPU time=%f sec\n", cpu_time_used); 
+			}
   			
 			// Switch across possible client-server behavior 
 			// NOTE: here we can add more complex strategies

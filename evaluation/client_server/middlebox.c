@@ -17,6 +17,8 @@
 
 
 #include "common.h"
+#include <time.h>
+#include <stdbool.h>
 #define KEYFILE "server.pem"
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
@@ -499,6 +501,7 @@ void usage(void){
 	printf("-a:   {for ssl splitting only: address to forward in ip:port format}\n");
 	printf("-p:   {port number that the box will listen at (default 8423)}\n");
 	printf("-m:   {id of this proxy in ip:port format.}\n");
+	printf("-l:   duration of load estimation time (10 sec default)\n");
 	exit(-1);  
 }
 
@@ -520,9 +523,12 @@ int main(int argc, char **argv){
 	proto = "spp";
 	char *prxy_address = "127.0.0.1:8423";
 	SSL* ssl_next = NULL;
-
+    clock_t start, end;
+    double cpu_time_used; 
+	int loadTime = 0;                  // time used for load estimation (not used but for future. 0 means no printing)
+	
 	// Handle user input parameters
-	while((c = getopt(argc, argv, "h:c:a:p:m:")) != -1){
+	while((c = getopt(argc, argv, "h:c:a:p:m:l:")) != -1){
 			
 			switch(c){
 
@@ -559,7 +565,10 @@ int main(int argc, char **argv){
 							err_exit("Out of memory");
 						}
 						break;
-	
+			// Control load estimation period 
+			case 'l':   loadTime = atoi(optarg);
+						break; 
+
 			// Default case 
 			default:	usage(); 
 						break; 
@@ -596,7 +605,12 @@ int main(int argc, char **argv){
 	// Socket in listen state
 	sock = tcp_listen(port);
 
+	// Wait for client request 
+	int nConn = 0;
 	while(1){
+		// keep track of number of connections
+		nConn++; 
+
 		if((s = accept(sock, 0, 0)) < 0){
 			err_exit("Problem socket accept\n");
 		}
@@ -605,8 +619,10 @@ int main(int argc, char **argv){
 		if((pid = fork())){
 			close(s);
 		} else {
-			if (strcmp(proto, "fwd") == 0)
-			{
+			// start timer for CPU time on first connection 
+			start = clock();
+
+			if (strcmp(proto, "fwd") == 0){
 				#ifdef DEBUG            
 		        printf("[middlebox] TCP forwarder\n"); 
 		        #endif
@@ -615,9 +631,7 @@ int main(int argc, char **argv){
     			int fwd_port = atoi(strtok(NULL, ":"));	// port 
 				int next_hop =  tcp_connect(fwd_host, fwd_port);
 				tcp_forwarder(s, next_hop);
-			}
-			else
-			{
+			} else {
 				sbio = BIO_new_socket(s, BIO_NOCLOSE);
 				ssl = SSL_new(ctx);
 				SSL_set_bio(ssl, sbio, sbio);
@@ -650,9 +664,17 @@ int main(int argc, char **argv){
 				*/
 				handle_data(ssl, ssl_next, proto);
 			}
-			// Close socket and exit child thread
+			// Close socket
     		close(s);
-    		exit(0);
+    	
+			// Compute CPU time user for this connection and log it 
+			end = clock();
+			cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+			if (loadTime > 0){
+				printf("CPU time=%f sec\n", cpu_time_used); 
+			}		
+			// Exit child thread
+			exit(0);
 		}
 	}
 	
