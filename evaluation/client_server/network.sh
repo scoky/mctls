@@ -16,10 +16,9 @@ usage(){
 # Set of checks for correctness
 [[ $# -lt $N_input ]] && usage
 
-# User choice
-opt=$1
-
+opt=$1           # User choice
 #More check 
+
 if [ $opt -eq 1 ] 
 then 
 	if [ $# -lt 5 ] 

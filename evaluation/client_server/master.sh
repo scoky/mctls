@@ -15,7 +15,8 @@ usage(){
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
 	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
 	echo -e "run    = {(1) run experiment, (0) no run just plot"
-    echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
+	echo -e "----------------------------------OPTIONAL-----------------------------------------------"
+    echo -e "[plotCommand = {matlab, myplot, none, ...} add your own to the script (default is no plotting)]"
     echo -e "[debug - instead of running it just prints the command it uses]"
 	exit 0
 }
@@ -134,7 +135,6 @@ then
 			for line in `cat $machineFile`
 			do
 				comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make clean; ./config; make; sudo make install_sw; cd evaluation/client_server; make clean; make"
-				#comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
 				command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
 				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
@@ -312,10 +312,6 @@ then
 		echo "[MASTER] $adj analysis of number of connections per second"
 		R=5
 		S_max=16
-		#------
-		echo "[MASTER] !!!!!!PLN skipped since not yet supported on s_time"
-		let "proto_count--"
-		#------
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
@@ -360,7 +356,7 @@ fi
 if [ $plotCommand == "matlab" ] 
 then 
 	echo "[MASTER] Plotting results (option $opt)"
-	echo "[MATLAB] Running MATLAB...(it can take some time first time)"
+	echo "[MATLAB] Running MATLAB...(it takes some time at first launch)"
 	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote, $parallel); quit"
 
 	# Generating summary report 

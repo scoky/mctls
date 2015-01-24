@@ -18,13 +18,13 @@ protocol = [
 	'fwd'
 	'ssl'
 	'spp'
-	'pln'
+	%'pln'
 	]; 
 protoLabel = [
 	'TLS (forwarding)'
 	'TLS (splitting) '
 	'SPP             '
-	'PLN             '
+	%'PLN             '
 	]; 
 
 machines  = [
@@ -42,10 +42,10 @@ machinesLabel  = [
 	]; 
 
 machinesHardware = [
-	'E5(1-core -2.50GHz) 2GB   '
-	'E5(1-core - 2.50GHz) 2GB  '
-	'i7(7-cores - 3.40GHz) 16GB'
-	'i5(4-cores - 2.50GHz) 4GB '
+	'Amazon1 E5(1-core -2.50GHz) 2GB   '
+	'Amazon2 E5(1-core - 2.50GHz) 2GB  '
+	'TID i7(7-cores - 3.40GHz) 16GB    '
+	'Laptop i5(4-cores - 2.50GHz) 4GB  '
 	]; 
 
 nProt = size(protocol, 1); 
@@ -217,7 +217,7 @@ for jj = 1 : nMachines
 		if (remote == 0)  
 			t = sprintf('Latency=%dms ; N_{prxy}=%d ; LOCAL', rtt, N); 
 		else
-			t = sprintf('N_{prxy}=%d ; AMAZON',  N); 
+			t = sprintf('N_{prxy}=%d ; C(LAPTOP)->MBOX(AMAZON)->S(AMAZON)',  N); 
 		end
 	end
 	if (opt == 3) 

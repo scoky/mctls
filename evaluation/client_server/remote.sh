@@ -3,9 +3,11 @@
 # Function to print script usage
 usage(){
     echo -e "Usage: $0 opt run [plotCommand]"
-    echo -e "opt  = test to be run "
+    echo -e "opt    = test to be run "
 	echo -e "\t(0) Test number of connections per second concurrently on machines from file <<machines>>"
-    echo -e "run  = {(1) run test and collect results ; (0) colect results only}"
+    echo -e "run    = {(1) run test and collect results ; (0) colect results only}"
+    echo -e "debug  = {(1) debug only (print command no run); (0) run normally}"
+    echo -e "-------------------------------OPTIONAL---------------------------------------------------"
 	echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
 	exit 0 
 }
@@ -17,6 +19,7 @@ usage(){
 resFolder="../results"    # result folder 
 opt=$1                    # user choice for experiment
 RUN_EXP=$2                # run experiment or not 
+debug=$3                # run experiment or not 
 plotCommand="none"        # Usere selection for plotting 
 key="amazon.pem"          # amazon key 
 machineFile="machines"
@@ -25,13 +28,13 @@ localFolder="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/ev
 protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
-#protoList[4]="pln"
+protoList[4]="pln"
 parallel=1                # flag for matlab plotting 
 
 # read type of plot to do 
-if [ $# -eq 3 ]
+if [ $# -eq 4 ]
 then 
-	plotCommand=$3
+	plotCommand=$4
 fi
 
 # derive proto size 
@@ -70,15 +73,31 @@ then
 			echo "[REMOTE] Started script at machine $addr (user=$user ; port=$port)"
 			if [ $addr == "tid.system-ns.net" -o $addr == "localhost" ]
 			then  
-				ssh -o StrictHostKeyChecking=no -p $port $user@$addr $comm >> $log 2>&1 &
+				if [ $debug -eq 1 ] 
+				then
+					echo "ssh -o StrictHostKeyChecking=no -p $port $user@$addr $comm >> $log 2>&1 &"
+				else
+					ssh -o StrictHostKeyChecking=no -p $port $user@$addr $comm >> $log 2>&1 &
+				fi
 			else 
-				ssh -o StrictHostKeyChecking=no -p $port -i $key $user@$addr $comm >> $log 2>&1 &
+				if [ $debug -eq 1 ] 
+				then
+					echo "ssh -o StrictHostKeyChecking=no -p $port -i $key $user@$addr $comm >> $log 2>&1 &"
+				else
+					ssh -o StrictHostKeyChecking=no -p $port -i $key $user@$addr $comm >> $log 2>&1 &
+				fi
 			fi
 			let "machines++"
 		done
 
+		# if debugging just stop here
+		if [ $debug -eq 1 ] 
+		then 
+			exit 0 
+		fi
+
 		# check that experiment is completed everywhere 
-		echo "[REMOTE] Active machines: "
+		echo "[REMOTE] Machines where experiment was started:"
 		cat .active
 		found=0
 		while [ $found -lt $machines ] 
