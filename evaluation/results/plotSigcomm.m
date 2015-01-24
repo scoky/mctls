@@ -1,10 +1,13 @@
+% function to plot several statistics for the Sigcomm paper 
 % opt - graph type 
-% remote - local or remote experiment
+% remote   - local or remote experiment
+% parallel - if = 1 it refers to experiment ran on multiple machines at the same time
+% role     - required by option 7 to indicate whether we wannt plot for "client", "server" or "mbox"
 
-function [] = plotHandshake(opt, remote, parallel) 
+function [] = plotHandshake(opt, remote, parallel, role) 
 
 % Common variables 
-folder = '/home/varvello/WorkTelefonica/HTTP-2/results'; 
+folder = '/home/varvello/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results/tmp'; 
 figFolder = './fig/matlab';
 kind_line = ['m';'b';'g';'m';'b';'g';'m';'b';'g';'m';'o';':';'d';'+';'<';'s';'.';'-';'g';'p'];
 line_style = ['-';';';':'];
@@ -13,7 +16,7 @@ rate=20; % temporary rate used for file download
 % Close figures 
 close all 
 
-% Protoocl labels 
+% Protocol  and protocol labels 
 protocol = [
 	'fwd'
 	'ssl'
@@ -27,24 +30,25 @@ protoLabel = [
 	%'PLN             '
 	]; 
 
+% machines and label and hardware 
 machines  = [
-	'54.76.148.166    '	
-	'54.67.37.251     '
-	'tid.system-ns.net'
+	%'54.76.148.166    '	
+	%'54.67.37.251     '
+	%'tid.system-ns.net'
 	'localhost        '
 	]; 
 
 machinesLabel  = [
-	'Amazon-1'	
-	'Amazon-2'	
-	'TID     '
+	%'Amazon-1'	
+	%'Amazon-2'	
+	%'TID     '
 	'Laptop  '
 	]; 
 
 machinesHardware = [
-	'Amazon1 E5(1-core -2.50GHz) 2GB   '
-	'Amazon2 E5(1-core - 2.50GHz) 2GB  '
-	'TID i7(7-cores - 3.40GHz) 16GB    '
+	%'Amazon1 E5(1-core -2.50GHz) 2GB   '
+	%'Amazon2 E5(1-core - 2.50GHz) 2GB  '
+	%'TID i7(7-cores - 3.40GHz) 16GB    '
 	'Laptop i5(4-cores - 2.50GHz) 4GB  '
 	]; 
 
@@ -100,9 +104,9 @@ for jj = 1 : nMachines
 		currProt = strtrim(protocol(ii, :)); 
 		currProtLabel = strtrim(protoLabel(ii, :)); 
 		if (parallel == 0) 
-			file = sprintf('res_%s_%s', currProt, suffix) 
+			file = sprintf('%s/res_%s_%s', folder, currProt, suffix) 
 		else 
-			file = sprintf('res_%s_%s_%s', currProt, suffix, currMachine) 
+			file = sprintf('%s/res_%s_%s_%s_%s', folder, currProt, suffix, role, currMachine) 
 		end
 		if exist(file, 'file') ~= 2
 			continue
@@ -207,7 +211,9 @@ for jj = 1 : nMachines
 	if (parallel == 0) 
 		legend(leg, 'Location', 'NorthWest');
 	else 
-		legend(leg, 'Location', 'SouthEast');
+		%legend(leg, 'Location', 'SouthEast');
+		legend(leg, 'Location', 'NorthWest');
+		%legend(leg, 'Location', 'North'); 
 	end
 	grid on 
 	set(0,'defaultaxesfontsize',18);
@@ -246,7 +252,7 @@ for jj = 1 : nMachines
 		if (parallel == 0)  
 			t = sprintf('Latency=%dms ; N_{prxy}=%d ; LOCAL', rtt, N); 
 		else
-			t = sprintf('Latency=%dms ; N_{prxy}=%d ; %s', rtt, N, currMachineHardware); 
+			t = sprintf('Latency=%dms ; N_{prxy}=%d ; %s ; %s', rtt, N, currMachineHardware, role); 
 		end
 	end
 
@@ -257,8 +263,9 @@ for jj = 1 : nMachines
 	xlim([1 size(data, 1)]); 
 	X = 1:size(data, 1); 
 	set(gca, 'XTick', X, 'XTickLabel', data(:, 1)'); 
-	%set(gca, 'XTickLabel', [5; 10; 20]); 
-	%if (opt == 3) 
+
+	% set log scale 
+	%if (opt == 7 & parallel == 1) 
 	%	set(gca, 'YScale','log'); 
 	%end
 	if (opt == 2)
@@ -292,7 +299,7 @@ for jj = 1 : nMachines
 		if (parallel == 0)  
 			outFile = sprintf ('%s/connection_per_second.eps', figFolder); 
 		else
-			outFile = sprintf ('%s/connection_per_second_%s.eps', figFolder, currMachineLabel); 
+			outFile = sprintf ('%s/connection_per_second_%s_%s.eps', figFolder, currMachineLabel, role); 
 		end
 	end
 
