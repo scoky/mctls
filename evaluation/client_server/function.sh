@@ -41,10 +41,15 @@ killMbox(){
 
 # Start a server instance (either remote or local)
 start_server(){
-	echo "[FUNCTION] Starting server: ./wserver -c $proto -o $opt -s $strategy"
+	echo "[FUNCTION] Starting server"
+	echo -e "\t./wserver -c $proto -o $opt -s $strategy -l $loadTime"
+	if [ -f log_server ]
+	then 
+		rm log_server
+	fi 
 	if [ $REMOTE -eq 0 ] 
 	then 
-		./wserver -c $proto -o $opt -s $strategy > log_server 2>&1 &
+		./wserver -c $proto -o $opt -s $strategy -l $loadTime >> log_server 2>&1 &
 	else 
 		command="cd $remoteFolder; ./wserver -c $proto -o $opt -s $strategy" 
 		ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &
@@ -104,6 +109,12 @@ organizeMBOXES(){
 		# Get data for next proxy 
 		let "j=i+1"
 		nextProxy=${proxyList[$j]}
+	
+		# cleanup 
+		if [ -f log_mbox_$port ] 
+		then 
+			rm log_mbox_$port
+		fi
 		
 		# Start proxy with SPP 
 		if [ $proto == "spp" -o $proto == "spp_mod" ]
@@ -114,7 +125,7 @@ organizeMBOXES(){
 			# Start!		
 			if [ $REMOTE -eq 0 ] 
 			then 
-				./mbox -c $proto -p $port -m $proxy > log_mbox_$port 2>&1 &
+				./mbox -c $proto -p $port -m $proxy -l $loadTime >> log_mbox_$port 2>&1 &
 			else 
 				command="killall mbox"
 				ssh -i $key $user@$addr $command 
@@ -132,7 +143,7 @@ organizeMBOXES(){
 			# Start!		
 			if [ $REMOTE -eq 0 ] 
 			then 
-				./mbox -c $proto -p $port -m $proxy -a $nextProxy > log_mbox_$port 2>&1 &
+				./mbox -c $proto -p $port -m $proxy -a $nextProxy -l $loadTime >> log_mbox_$port 2>&1 &
 			else
 				command="killall mbox"
 				ssh -i $key $user@$addr $command 

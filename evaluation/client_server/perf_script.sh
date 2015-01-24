@@ -31,6 +31,7 @@ resFolder="../results/tmp" # result folder
 resFile=$resFolder"/res"   # result file 
 debug=0                    # more logging 
 delay=-1                   # default delay (-1 means no delay) 
+loadTime=0                 # this disable by default logiing of CPU time 
 protoList[1]="ssl"         # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
@@ -485,22 +486,47 @@ case $expType in
 		;;
 
 	7)  
-		echo "[PERF] Number of connections (f[#slices])"
+		echo "[PERF] Number of connections (f[#slices]) -- FIXME: only work with 1 mbox at port 8423"
 		opt=1
 		strategy="uni"
-		testDur=30       
+		testDur=30      
 		pathOpenSSL="/usr/local/ssl/bin/openssl"
 		s=4
 		cipher="DHE-RSA-AES128-SHA256"
-		#pathAppsLocal=$HOME"/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
-        #pathAppsRemote="/home/$user/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/apps"
+		loadTime=10   # this enables logging of CPU time (in the future measure for that time?)
+		
+		prev_server=0;  # number of lines in server log from previous exp
+		prev_mbox=0;    # number of lines in mbox log from previous exp
 
-		# Update res file 
-		resFile=$resFile"_connections_slice"
-		if [ -f $resFile ] 
+		# cleanup 
+		if [ -f .resServer ] 
 		then 
-			rm -v $resFile
+			rm .resServer
 		fi
+		if [ -f .resMbox ] 
+		then 
+			rm .resMbox
+		fi
+		
+		# Update res file 
+		resFileC=$resFile"_connections_slice_client"
+		resFileM=$resFile"_connections_slice_mbox"
+		resFileS=$resFile"_connections_slice_server"
+		if [ -f $resFileC ] 
+		then 
+			rm -v $resFileC
+		fi
+		if [ -f $resFileM ] 
+		then 
+			rm -v $resFileM
+		fi
+		if [ -f $resFileS ] 
+		then 
+			rm -v $resFileS
+		fi
+
+		# create folder if needed 
+		mkdir -p full_results
 
 		# Start the server 
 		start_server
@@ -519,20 +545,31 @@ case $expType in
 		#for((s=$minS; s<=16; s++))
 		do
 			# Prepare for copy of full log 
-			fullLog="./full_results/results_$proto"
-			echo "[PERF] Making copy of full experiment log. Check file <<$fullLog>>"
-			if [ -f $fullLog ]
-			then 
-				rm -v $fullLog
-			fi
-
+			fullLogC="./full_results/results_client_$proto"
+			fullLogM="./full_results/results_mbox_$proto"
+			fullLogS="./full_results/results_server_$proto"
+			
 			# Run R handshake repetitions	
-			echo "[PERF] Testing $R handshakes with $s slices (worst case, all mboxes get READ/WRITE access)"
+			echo "[PERF] Run $R s_time based tests ($s slices, all mboxes get READ/WRITE access)"
 			for((i=1; i<=R; i++))
 			do
+				echo "[PERF] Test $i"
 				echo $s >> .tmp 
 				#echo "$pathApps"/openssl" s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read 1 -write 1 >> $log 2>&1"
 				$pathOpenSSL s_time -connect $nextHop -new -time $testDur -proto $proto -slice $s -read $nProxy -write $nProxy -cipher $cipher >> $log 2>&1
+				# Analyzing and cleaning logs
+				#cat log_server | awk '{split($2, a, "="); sum=sum+a[2]; c=c+1;}END{print c " connections. CPU time="sum"s;" c/sum " connections/user sec"}'
+				curr_server=`wc -l log_server | cut -f 1 -d " "`
+				curr_mbox=`wc -l log_mbox_8423 |  cut -f 1 -d " "`
+				let "lines_s = curr_server - prev_server"
+				let "lines_m = curr_mbox - prev_mbox"
+				prev_server=$curr_server	
+				prev_mbox=$curr_mbox
+				
+				#echo "tail -n $lines_s log_server"
+				tail -n $lines_s log_server    | awk -v s=$s '{split($2, a, "="); sum=sum+a[2]; c=c+1;}END{print s " " c/sum}' >> .resServer
+				#echo "tail -n $lines_m log_mbox"
+				tail -n $lines_m log_mbox_8423 | awk -v s=$s '{split($2, a, "="); sum=sum+a[2]; c=c+1;}END{print s " " c/sum}' >> .resMbox
 			done
 		done
 
@@ -541,7 +578,9 @@ case $expType in
 		then  
 			if [ $debug -eq 1 ]
 			then 
-				echo "#Connection Analysis" > $resFile
+				echo "#Connection Analysis" > $resFileC
+				echo "#Connection Analysis" > $resFileM
+				echo "#Connection Analysis" > $resFileS
 			fi
 			let "fix2=nProxy"
 			
@@ -550,13 +589,17 @@ case $expType in
 			paste .tmp .tmpMore > .res
 			
 			# Analyzing (corrected) log 
-			cat .res  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFile
+			cat .res  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileC
+			cat .resServer  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileM
+			cat .resMbox  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileS
 
 			# Make a local copy of full results 
-			cp .res $fullLog
+			mv .res $fullLogC
+			mv .resServer $fullLogS
+			mv .resMbox $fullLogM
 			
 			# Cleanup support files
-			rm .tmp .tmpMore .res
+			rm .tmp .tmpMore 
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi

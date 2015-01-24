@@ -37,7 +37,7 @@ tcpTrick(){
 [[ $# -lt 3 ]] && usage
 
 # Static parameters
-resFolder="../results"    # result folder 
+resFolder="../results/temp"  # result folder 
 R=50                      # number of repetitions
 S_max=16                  # max number of slices 
 rate=1                    # common rate
@@ -312,10 +312,13 @@ then
 		echo "[MASTER] $adj analysis of number of connections per second"
 		R=5
 		S_max=16
+		str="l($S_max)/l(2)"
+		X=`echo $str | bc -l  | cut -f 1 -d "."`
+		let "estTime = (R * X * 30) / 60)"
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
-			echo -e "\t[MASTER] Working on protocol $proto (10 second per parameter value and repetition)"
+			echo -e "\t[MASTER] Working on protocol $proto (30 second per parameter value and repetition. Est time $estTime minutes)"
 			if [ $debug -eq 1 ] 
 			then
 				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"

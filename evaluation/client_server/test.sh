@@ -187,12 +187,14 @@ case $opt in
 		;;	
 
 	5)  # Test number of connection per second  
-		echo "[TEST] Test number of connection per second (last 10 seconds)"
 		opt=1
-		testDur=10       
+		loadTime=10   # this enables logging of CPU time (in the future measure for that time?)
+		testDur=30       
 		pathOpenSSL="/usr/local/ssl/bin/openssl"
 		cipher="DHE-RSA-AES128-SHA256"
 
+		echo "[TEST] Test number of connection per second (last $testDur seconds -- watch out from shorted duration, due to a precision problem)"
+		
 		# Start the server 
 		start_server
 		

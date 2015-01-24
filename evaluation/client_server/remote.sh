@@ -15,21 +15,21 @@ usage(){
 # Set of checks for correctness
 [[ $# -lt 2 ]] && usage
 
-# Static parameters
-resFolder="../results"    # result folder 
-opt=$1                    # user choice for experiment
-RUN_EXP=$2                # run experiment or not 
-debug=$3                # run experiment or not 
-plotCommand="none"        # Usere selection for plotting 
-key="amazon.pem"          # amazon key 
+# Parameters
+resFolder="../results/tmp"  # result folder 
+opt=$1                      # user choice for experiment
+RUN_EXP=$2                  # run experiment or not 
+debug=$3                    # run experiment or not 
+plotCommand="none"          # user selection for plotting 
+key="amazon.pem"            # amazon key 
 machineFile="machines"
 remoteFolder="./secure_proxy_protocol/evaluation/client_server"
 localFolder="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/client_server"
-protoList[1]="ssl"        # array for protocol types currently supported
+protoList[1]="ssl"          # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
-parallel=1                # flag for matlab plotting 
+parallel=1                  # flag used for plotting
 
 # read type of plot to do 
 if [ $# -eq 4 ]
@@ -120,7 +120,7 @@ then
 						echo "$addr 1" >> .active_new
 					fi	
 				fi 
-				sleep 2
+				sleep 10
 			done
 			mv .active_new .active 
 		done
@@ -129,9 +129,9 @@ then
 fi
 
 # Fetch results 
-rf="./secure_proxy_protocol/evaluation/results/"
-lf="./WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results/"
-resFolder="../results"
+f=`echo $resFolder | awk 'BEGIN{FS="/"}{print $2"/"$3}'`
+rf="./secure_proxy_protocol/evaluation/$f/"
+lf="$HOME/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/$f/"
 for line in `cat $machineFile`
 do
 	addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
@@ -140,19 +140,36 @@ do
 	for ((i=1; i<=proto_count; i++))
 	do
 		proto=${protoList[$i]}
+		suff=$proto"_connections_slice"
 		if [ $addr == "localhost" ] 
 		then 
-			file=$lf"res_"$proto"_connections_slice"
+			file1=$lf"res_"$suff"_client"
+			file2=$lf"res_"$suff"_mbox"
+			file3=$lf"res_"$suff"_server"
 		else
-			file=$rf"res_"$proto"_connections_slice"
+			file1=$rf"res_"$suff"_client"
+			file2=$rf"res_"$suff"_mbox"
+			file3=$rf"res_"$suff"_server"
 		fi
-		targetFile=$resFolder"/res_"$proto"_connections_slice_"$addr
+		targetFile1=$resFolder"/res_"$proto"_connections_slice_client_"$addr
+		targetFile2=$resFolder"/res_"$proto"_connections_slice_mbox_"$addr
+		targetFile3=$resFolder"/res_"$proto"_connections_slice_server_"$addr
 		echo "[REMOTE] Collecting results from machine <<$addr>>"
 		if [ $addr == "tid.system-ns.net" -o $addr == "localhost" ]
 		then 
-			scp -P $port  $user@$addr:$file $targetFile
+			scp -P $port  $user@$addr:$file1 $targetFile1
+			scp -P $port  $user@$addr:$file2 $targetFile2
+			scp -P $port  $user@$addr:$file2 $targetFile3
+			if [ $addr == "localhost" ] 
+			then 		
+				rm $file1
+				rm $file2
+				rm $file3
+			fi
 		else 
-			scp -P $port  -i $key $user@$addr:$file $targetFile
+			scp -P $port  -i $key $user@$addr:$file1 $targetFile1
+			scp -P $port  -i $key $user@$addr:$file2 $targetFile2
+			scp -P $port  -i $key $user@$addr:$file3 $targetFile3
 		fi
 	done
 done
