@@ -4,7 +4,7 @@
  */
 
 #define NO_SHUTDOWN
-#define DEBUG 
+//#define DEBUG 
 
 /*-----------------------------------------
    s_time - SSL client connection timer program
@@ -157,7 +157,7 @@ static void s_time_usage(void){
 	printf("-www page     - Retrieve 'page' from the server\n");
 	printf("-time         - Test duration\n");
 	printf("--------------------------------\n");
-    printf("-proto        - Protocol requested [sll ; spp; pln]\n");
+    printf("-proto        - Protocol requested [sll ; spp; fwd ; pln]\n");
 	printf("-slice        - Number of slices requested\n"); 
 	printf("-proxies      - Number of proxies\n"); 
     printf("-read         - Number of proxies with read access (per slice)\n"); 
@@ -271,6 +271,10 @@ static int parseArgs(int argc, char **argv){
 	    if (--argc < 1) goto bad;
 		proto = *(++argv);
 
+		// Added support for fwd (client side is regular SSL)
+		if ((strcmp(proto, "fwd")) == 0){	
+			proto = "ssl";
+		}
 		if ((strcmp(proto, "ssl")) == 0){	
 		    s_time_meth = TLSv1_2_method();
 		} else if ((strcmp(proto, "spp")) == 0){
