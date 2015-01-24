@@ -6,7 +6,7 @@ usage(){
     echo -e "opt    = test to be run "
 	echo -e "\t(0) Test number of connections per second concurrently on machines from file <<machines>>"
     echo -e "run    = {(1) run test and collect results ; (0) colect results only}"
-    echo -e "debug  = {(1) debug only (print command no run); (0) run normallu}"
+    echo -e "debug  = {(1) debug only (print command no run); (0) run normally}"
     echo -e "-------------------------------OPTIONAL---------------------------------------------------"
 	echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
 	exit 0 
@@ -97,7 +97,7 @@ then
 		fi
 
 		# check that experiment is completed everywhere 
-		echo "[REMOTE] Active machines: "
+		echo "[REMOTE] Machines where experiment was started:"
 		cat .active
 		found=0
 		while [ $found -lt $machines ] 

@@ -135,7 +135,6 @@ then
 			for line in `cat $machineFile`
 			do
 				comm="cd $remoteFolder; git fetch --all; git reset --hard origin/master; make clean; ./config; make; sudo make install_sw; cd evaluation/client_server; make clean; make"
-				#comm="cd $remoteFolder; git pull; make; sudo make install; cd evaluation/client_server; make clean; make"
 				command="script -q -c '"$comm"'"         # Make typescript version of the command (solve SUDO problem via SSH)
 				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
 				port=`echo $line | cut -f 2 -d "@" | cut -f 2 -d ":"`
