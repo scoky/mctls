@@ -36,6 +36,8 @@ typedef struct experiment_info {
 	int num_slices;
 	int num_proxies;
 	int file_size;
+	int app_bytes_read;
+	int app_bytes_written;
 } ExperimentInfo;
 
 #ifndef ALLOW_OLD_VERSIONS

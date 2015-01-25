@@ -337,6 +337,7 @@ void sendRequest(char *filename){
 		printf("[DEBUG] Plain socket write\n");
 		#endif 
 	    int r = write(plain_socket, request, request_len);
+		experiment_info->app_bytes_written += r;
 	    if ( r <= 0 )
 	    {
 	    	printf("Something went wrong with writing to the socket!\n");
@@ -496,6 +497,7 @@ static int http_complex(char *proto, char *fn){
 		}		
 		else if (strcmp(proto, "pln") == 0){
 			r = read(plain_socket, buf, BUFSIZZ);
+			experiment_info->app_bytes_read += r;
 			#ifdef DEBUG 
 			printf("[DEBUG] Read %d bytes\n", r);
 			#endif
@@ -649,6 +651,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 			printf("[DEBUG] Waiting to read bytes in plain mode\n");
 			#endif
 			r = read(plain_socket, buf, BUFSIZZ);
+			experiment_info->app_bytes_read += r;
 			bytes_read += r;
 			#ifdef DEBUG 
 			printf("[DEBUG] Read %d bytes\n", r);
@@ -704,16 +707,27 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 
 // report "BYTE STATISITICS"
 void print_stats(SSL *s) {
+	int total_read, total_write, app_read, app_write;
+	if (strcmp(proto, "pln") == 0) {
+		total_read = app_read = experiment_info->app_bytes_read;
+		total_write = app_write = experiment_info->app_bytes_written;
+	} else {
+		total_read = s->read_stats.bytes;
+		total_write = s->write_stats.bytes;
+		app_read = s->read_stats.app_bytes;
+		app_write = s->write_stats.app_bytes;
+	}
+
     printf("[RESULTS] BYTE STATISITICS:\n");
-    printf("[RESULTS] Bytes read: %d\n", s->read_stats.bytes);
-    printf("[RESULTS] Application bytes read: %d [Expected %d]\n", s->read_stats.app_bytes, sizeCheck); 
+    printf("[RESULTS] Bytes read: %d\n", total_read);
+    printf("[RESULTS] Application bytes read: %d [Expected %d]\n", app_read, sizeCheck); 
     printf("[RESULTS] Block padding bytes read: %d\n", s->read_stats.pad_bytes);
     printf("[RESULTS] Header bytes read: %d\n", s->read_stats.header_bytes);
     printf("[RESULTS] Handshake bytes read: %d\n", s->read_stats.handshake_bytes);
     printf("[RESULTS] MAC bytes read: %d\n", s->read_stats.mac_bytes);
     printf("[RESULTS] Alert bytes read: %d\n", s->read_stats.alert_bytes);
-    printf("[RESULTS] Bytes write: %d\n", s->write_stats.bytes);
-    printf("[RESULTS] Application bytes write: %d\n", s->write_stats.app_bytes);
+    printf("[RESULTS] Bytes write: %d\n", total_write);
+    printf("[RESULTS] Application bytes write: %d\n", app_write);
     printf("[RESULTS] Block padding bytes write: %d\n", s->write_stats.pad_bytes);
     printf("[RESULTS] Header bytes write: %d\n", s->write_stats.header_bytes);
     printf("[RESULTS] Handshake bytes write: %d\n", s->write_stats.handshake_bytes);
@@ -726,8 +740,8 @@ void print_stats(SSL *s) {
 		experiment_info->num_slices,
 		experiment_info->num_proxies,
 		experiment_info->file_size,
-		s->read_stats.bytes + s->write_stats.bytes,
-		s->read_stats.app_bytes + s->write_stats.app_bytes,
+		total_read + total_write,
+		app_read + app_write,
 		s->read_stats.pad_bytes + s->write_stats.pad_bytes,
 		s->read_stats.header_bytes + s->write_stats.header_bytes,
 		s->read_stats.handshake_bytes + s->write_stats.handshake_bytes,
@@ -784,6 +798,8 @@ int main(int argc, char **argv){
 	struct timeval tvBegin, tvEnd; 
 	struct timeval tvConnect, tvDuration;  // time structures for handshake duration 
 	experiment_info = (ExperimentInfo*)malloc(sizeof(ExperimentInfo));
+	experiment_info->app_bytes_read = 0;
+	experiment_info->app_bytes_written = 0;
 
 #ifdef DEBUG
 	printf("\n\n******************** CLIENT STARTING ********************\n");

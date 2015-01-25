@@ -614,25 +614,29 @@ case $expType in
 
 		# Define scenarios to test (num slices, num middleboxes, file size)
 		declare -A scenarios
-		scenarios[1,"numSlices"]=2  # TODO: make 1 after client fix
+		scenarios[1,"numSlices"]=2
 		scenarios[1,"numMboxes"]=0
-		scenarios[1,"fileSize"]=1024
+		scenarios[1,"fileSize"]=$((10*1024))
 		
 		scenarios[2,"numSlices"]=4
 		scenarios[2,"numMboxes"]=0
-		scenarios[2,"fileSize"]=1024
-
-		scenarios[3,"numSlices"]=4
-		scenarios[3,"numMboxes"]=1
-		scenarios[3,"fileSize"]=1024
+		scenarios[2,"fileSize"]=$((10*1024))
 		
-		scenarios[4,"numSlices"]=8
-		scenarios[4,"numMboxes"]=1
-		scenarios[4,"fileSize"]=1024
+		scenarios[3,"numSlices"]=8
+		scenarios[3,"numMboxes"]=0
+		scenarios[3,"fileSize"]=$((10*1024))
 
+		scenarios[4,"numSlices"]=4
+		scenarios[4,"numMboxes"]=1
+		scenarios[4,"fileSize"]=$((10*1024))
+		
 		scenarios[5,"numSlices"]=4
-		scenarios[5,"numMboxes"]=1
-		scenarios[5,"fileSize"]=10240
+		scenarios[5,"numMboxes"]=2
+		scenarios[5,"fileSize"]=$((10*1024))
+
+		scenarios[6,"numSlices"]=4
+		scenarios[6,"numMboxes"]=1
+		scenarios[6,"fileSize"]=$((20*1024))
 
 		let "numScenarios=${#scenarios[@]}/3"
 		echo "[PERF] Testing $numScenarios scenarios"
@@ -655,6 +659,9 @@ case $expType in
 			# Update proxy file 
 			N=${scenarios[$s,"numMboxes"]}
 			proxyFileUpdate 
+			
+			# Read proxy from (updated) file
+			readMboxes
 
 			# Proxy setup 
 			organizeMBOXES

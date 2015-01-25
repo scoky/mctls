@@ -118,5 +118,5 @@ def plot_byte_scenarios(machine, remote, result_files):
         xtick_label_horizontal_alignment='center', ylabel=Y_AXIS[OPT],\
         stackbar_pattern_labels=byte_types,\
         stackbar_colors_denote='segments',\
-        width_scale=1.1, grid='y',\
+        width_scale=1.4, grid='y',\
         filename=out_filepath, **MANUAL_ARGS[out_filename])

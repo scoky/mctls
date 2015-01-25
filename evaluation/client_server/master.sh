@@ -338,9 +338,6 @@ then
 			proto=${protoList[$i]}
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
-			# deal with SPP_MOD
-			tcpTrick
-			
 			# run analysis
 			# TODO: use local/Amazon flag here once supported (instead of 0)
 			if [ $debug -eq 1 ] 
