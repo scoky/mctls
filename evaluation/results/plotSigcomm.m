@@ -8,6 +8,7 @@ function [] = plotHandshake(opt, remote, parallel, role)
 
 % Common variables 
 folder = '/home/varvello/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results/tmp'; 
+%folder = '/home/varvello/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results'; 
 figFolder = './fig/matlab';
 kind_line = ['m';'b';'g';'m';'b';'g';'m';'b';'g';'m';'o';':';'d';'+';'<';'s';'.';'-';'g';'p'];
 line_style = ['-';';';':'];
@@ -18,15 +19,15 @@ close all
 
 % Protocol  and protocol labels 
 protocol = [
+	'spp'
 	'fwd'
 	'ssl'
-	'spp'
 	%'pln'
 	]; 
 protoLabel = [
+	'SPP             '
 	'TLS (forwarding)'
 	'TLS (splitting) '
-	'SPP             '
 	%'PLN             '
 	]; 
 

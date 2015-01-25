@@ -4,7 +4,7 @@
 # variables
 count=1
 paper="results"
-figFolder="./fig"
+figFolder="./fig/matlab"
 
 # For MAC lovers... (to check) 
 if [ "$(uname)" == "Darwin" ]

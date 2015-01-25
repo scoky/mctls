@@ -159,7 +159,7 @@ do
 		then 
 			scp -P $port  $user@$addr:$file1 $targetFile1
 			scp -P $port  $user@$addr:$file2 $targetFile2
-			scp -P $port  $user@$addr:$file2 $targetFile3
+			scp -P $port  $user@$addr:$file3 $targetFile3
 			if [ $addr == "localhost" ] 
 			then 		
 				rm $file1

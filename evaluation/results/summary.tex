@@ -1,0 +1,248 @@
+%\documentclass[letter]{report}
+\documentclass{article}
+\makeatletter
+\usepackage{epsfig,endnotes}
+\usepackage{epstopdf}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{color}
+\usepackage{subfigure}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{soul}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{ifthen}
+\usepackage{xcolor}
+
+\setcounter{section}{0}
+\begin{document}
+
+%commands from Matteo
+\newcommand{\fig}{{Figure}}
+\newcommand{\eg}{{e.g.,}}
+\newcommand{\ie}{{\it i.e.,}}
+
+
+%%%
+%%% COMMENTS / TODOS
+%%%
+\newcommand{\exclude}[1]{}
+\newcommand{\showComments}{yes}  % change to "no" to hide comments/TODOs
+\newcommand{\note}[2]{
+    \ifthenelse{\equal{\showComments}{yes}}{\textcolor{#1}{#2}}{}
+}
+\newcommand{\TODO}[1]{%
+    \addcontentsline{tdo}{todo}{\protect{#1}}%
+    \note{red}{TODO: #1} 
+}
+\newcommand{\question}[2]{\paragraph{Q: #1}\\\textit{A: #2}}
+\makeatletter \newcommand{\listoftodos}
+{\section*{Todo List} \@starttoc{tdo}}
+\newcommand{\l@todo}
+{\@dottedtocline{1}{0em}{2.3em}} \makeatother
+
+\newcommand{\spp}{TruMP\xspace}
+\newcommand{\tcpmode}{\texttt{NoEncrypt}\xspace}
+\newcommand{\etemode}{\texttt{E2E-TLS}\xspace}
+\newcommand{\splitmode}{\texttt{SplitTLS}\xspace}
+\newcommand{\sppmode}{\texttt{\spp}\xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiments}
+%%%%%%%%%%%%%%%%%%%%%%%%
+We differentiate between two main environments: \emph{synthetic} and
+\emph{realistic}. 
+
+\noindent {\bf Synthetic environment:} It consists of a single machine
+where we run concurrently one or several instances of our applications
+(client, mbox and server). In this environment we control bandwidth,
+delay and losses using Linux TC~\cite{tc}. Also, we can easily run as
+many instances of each application as we want without requiring any
+further machine. If not specified otherwise, each experiment consists
+of 50 runs for which we report average and standard deviation by mean
+of error bars. We also assume that network links have a speed capped
+at 8~Mbps.
+
+\noindent {\bf Realistic environment:} It consists of three different
+machines on which we run respectively our client, mbox and server. The
+client runs on a desktop machine in our lab with both wired and 3G
+access. The mbox and the server run on two different Amazon machine
+we start on different locations. 
+
+\TODO{(1) Any benefit of running VMs? (2) Add control for losses? (3) 3G experiments (4) Amazon locations}
+
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Controlled}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}[t]
+\centering
+\psfig{figure=./fig/matlab/time_1st_byte_slice.eps, width=4.1in}
+\label{fig:eval_1}
+\end{figure}
+
+\fig~\ref{fig:eval_1} shows the time to first byte as a function of
+the number of slices $S$ and mode of operation. In this scenario, we
+run one client, mbox and server, which are connected through an 8~Mbs
+link with 20~ms network delay, \ie~80~ms RTT between client and
+server. We consider a worst case scenario for \sppmode where the mbox
+has read/write access to each slice, independently of the number of
+slices. Note that, unless otherwise specified, in the coming scenarios
+we will always assume each mbox has full read/write access to each
+slice.
+
+In \fig~\ref{fig:eval_1} \tcpmode, or no encryption, shows the
+baseline of our experiments, with a time to first byte of about 120~ms
+or 1.5 RTT. We now add focus on the modes dealing with encrypted
+traffic. Compared to today (\etemode), \sppmode only add a negligible
+delay of 10~ms when $S$ is between 1 and 8 slices. With 16 slices, the
+time to first byte with \sppmode grows by about 50\%. This is due to
+the Nagle algorithm (...). \splitmode, overall, saves about 1~RTT
+compared to both \sppmode and \tcpmode: this is due to the fact that
+the two TLS sessions (client-mbox and mbox-server) carry on in
+parallel. Note that we could also implement \sppmode in a split
+fashion and enjoy a similar performance boost, but this would indeed
+violate our end-to-end principle.
+
+
+\TODO{Q: why again is \tcpmode1.5 RTT? }\\
+\TODO{Run experiment for Nagel algorithm (add support to client) and
+  explain results}\\
+
+
+\newpage
+\begin{figure}[!htbp]
+\centering
+\psfig{figure=./fig/matlab/time_1st_byte_latency.eps, width=4.1in}
+\label{fig:eval_2}
+\end{figure}
+
+We now consider a scenario with fixed number of slices and variable
+network delay. We set $S$ equal to 4, assuming two slices are used for
+user requests (header and body) and two slices are used for server
+responses (header and body). We then vary the network delay between a
+minimum of 5 and up to 80~ms. Since we use a single mbox instance,
+this means an RTT between client and server that varies between 20 and
+320~ms. Overall, results above are confirmed.
+
+
+\TODO{Discuss strategy at server (uni, cs). Check what we ran with.}\\
+\TODO{Add x axis on top with RTT measure}\\
+
+\newpage
+\begin{figure}[!htbp]
+\centering
+\psfig{figure=./fig/matlab/time_1st_byte_proxy.eps, width=4.1in}
+\label{fig:eval_3}
+\end{figure}
+
+We now consider a scenario with variable number of mboxes. We set $S$
+equal to 4, the network delay to 20~ms, and vary the number of mboxes
+$N$ between 1 and 16. 
+
+\TODO{Q: why splitting becomes worst than fwd with 16 mboxes?}
+\TODO{run experiment with 0 middleboxes}
+
+\newpage
+\begin{figure}[t]
+\centering
+\psfig{figure=./fig/matlab/download_time_fSize_20.eps, width=4.1in}
+\label{fig:eval_4}
+\end{figure}
+
+\fig~\ref{fig:eval_4} shows the download time as a function of the
+file transferred for each mode of operation described above. In this
+scenario, we set $S$ equal to 4, the network delay to 20~ms, and $N$
+equal to one.  As expected from the time to first byte analysis,
+\sppmode only minimally increases the download time compared to
+\etemode: for example, for a file transfer of 1280~KB we measure a
+download time of 570 and 540~ms for \sppmode and \etemode, \ie~an
+increase of only 5\%. While difference in download time between
+\sppmode and \splitmode is more prominent, it becomes negligible at
+the size of the transferred file grows (...) \\
+
+\TODO{Transform the figure as percentace of increase time versus the
+  fastest mode (no encryption)}\\
+
+\TODO{Q: Do a plot with scenarios where we play with file size and link speed. Then in final scenario we use a realistic one (Amazon)}\\
+
+\TODO{Q: Weird behavior for small sizes? Maybe due to small number of
+  repetitions? Try increase to 50 when time (now only 10 rep)}\\
+
+
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Realistic Environment}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[t]
+\centering
+\psfig{figure=./fig/matlab/time_1st_byte_slice_remote.eps, width=4.1in}
+\label{fig:eval_5}
+\end{figure}
+
+We start by considering a scenario where the client, located in
+Barcelona (Spain), is connected to the Internet with a fiber
+connection (avg measured speed of 45~mbps). The mbox runs on an Amazon
+EC2 instance located in Ireland and the server runs on an Amazon EC2
+instance located is California.
+
+\fig~\ref{fig:eval_5} shows the time to first byte as a function of
+the number of slices $S$ and mode of operation in a realistic
+scenario. The figure also shows the measured RTT between client and
+server. Accordingly, results from controlled environment are verified.
+
+\TODO{measure speed from TID}
+
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Scalability}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+We now aim to understand the impact of the additional complexity of
+\sppmode on the number of connections per second that a server (and a
+mbox) can sustain. To do so, we extend \texttt{s\_time}, the measuring
+application contained within the OpenSSL package, to support
+\sppmode. Overall, this required about X line changes. 
+
+\texttt{S\_time} infers the number of connections per second a client
+can launch without invoking the server through concurrent
+connections. Instead, it opens sequential connection, measure the CPU
+time consumed in a given time-frame and then derive theoretical number
+of connections per second. For instance, if we made 100 connection in
+0.5 CPU seconds, then we derive that 200 connections per second are
+possible. We leverage the same rationale to measure the number of
+connections per second that a mbox and server can sustain.
+
+\TODO{Derive line changes} 
+
+
+\begin{figure*}[t]
+\centering
+\subfigure[Client.]{\psfig{figure=./fig/matlab/connection_per_second_Laptop_client.eps,width=2.1in} \label{fig:conn_1_1}}
+\subfigure[Mbox.]{\psfig{figure=./fig/matlab/connection_per_second_Laptop_mbox.eps,width=2.1in} \label{fig:conn_1_2}}
+%\subfigure[Server.]{\psfig{figure=./fig/matlab/connection_per_second_Laptop_server.eps,width=2.1in} \label{fig:conn_1_3}}
+\caption{Connection per second.}
+\label{fig:conn_1} 
+\end{figure*}
+
+
+Figure \ref{fig:conn_1} compares the number of connections per second
+measured respectively by client, mbox and server on an Intel i5
+(4-cores - 2.50GHz) with 4~GB of memory.
+
+\TODO{Due to an error in the script, server results are missing. REDO}
+
+\newpage
+Figure \ref{fig:conn_2} compares the performance of \sppmode on different hardware.
+
+\begin{figure}[t]
+\centering
+\psfig{figure=./fig/matlab/connection_per_second_comparison.eps, width=4.1in}
+\label{fig:conn_2}
+\end{figure}
+
+\TODO{REDO with new code}
+
+
+\end{document}

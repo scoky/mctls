@@ -75,7 +75,7 @@ SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
 	}
 	else {
    		#ifdef DEBUG
-   		printf("[DEBUG] Using SPP_method\n");  
+   		//printf("[DEBUG] Using SPP_method\n");  
 		#endif 
 		meth = SPP_method(); 
 	}

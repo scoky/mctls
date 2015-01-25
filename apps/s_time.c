@@ -26,6 +26,7 @@
 #include <openssl/pem.h>
 #include "s_apps.h"
 #include <openssl/err.h>
+#include <time.h>
 #ifdef WIN32_STUFF
 #include "winmain.h"
 #include "wintext.h"
@@ -626,6 +627,8 @@ int MAIN(int argc, char **argv){
 	int ret = 1, i;
 	MS_STATIC char buf[1024*8];
 	int ver;
+	clock_t start, end;
+	double cpu_time_used;
 
 	apps_startup();
 	s_time_init();
@@ -733,6 +736,7 @@ int MAIN(int argc, char **argv){
 	tm_Time_F(START);
 
 	// Successively open and use connections until time expires
+	start = clock();
 	for (;;){
 		// If time is done just break 
 		if (finishtime < (long) time (NULL)){
@@ -795,9 +799,13 @@ int MAIN(int argc, char **argv){
 		nConn += 1;
 
 		if (strcmp(proto, "pln") == 0){	
-			printf("closing %d\n", scon);
+			#ifdef DEBUG
+			printf("[DEBUG] Closing %d\n", scon);
+			#endif 
 			close((int)scon);
-			printf("Done %d\n", scon);
+			#ifdef DEBUG
+			printf("[DEBUG] Done %d\n", scon);
+			#endif 
 			scon = NULL;
 			continue; //avoid all the tls closing...
 		}
@@ -842,12 +850,15 @@ int MAIN(int argc, char **argv){
 		SSL_free(scon);
 		scon = NULL;
 	}
-	
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;	
 	totalTime += tm_Time_F(STOP); /* Add the time for this iteration */
 
 	i = (int)((long)time(NULL) - finishtime + maxTime);
-	printf( "\n\n%d connections. CPU time=%.2fs; %.2f connections/user sec, bytes read %ld\n", nConn, totalTime, ((double)nConn/totalTime),bytes_read);
+	//printf( "\n\n%d connections. CPU time=%.2fs; %.2f connections/user sec, bytes read %ld\n", nConn, totalTime, ((double)nConn/totalTime),bytes_read);
+	printf( "\n\n%d connections. CPU time=%.5fs; %.2f connections/user sec, bytes read %ld\n", nConn, totalTime, ((double)nConn/cpu_time_used),bytes_read);
 	printf( "%d connections in %ld real seconds, %ld bytes read per connection\n",nConn, (long)time(NULL) - finishtime + maxTime, bytes_read/nConn);
+	//printf( "\n CPU time=%.5fs; %.5f connections/user sec [NEW]", cpu_time_used, ((double)nConn/cpu_time_used));
 
 
 /* Now loop and time connections using the same session id over and over

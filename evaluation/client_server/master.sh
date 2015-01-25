@@ -279,7 +279,7 @@ then
 			# run analysis
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface"
 			else
 				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
