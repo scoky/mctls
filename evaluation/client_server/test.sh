@@ -34,6 +34,7 @@ user="ubuntu"              # amazon user
 remoteFolder="/home/$user/secure_proxy_protocol/evaluation/client_server" # remote folder
 timeSleep=5                # time for server to setup
 strategy="uni"             # splitting strategy at the server 
+loadTime=0                 # this disable by default logging of CPU time
 
 #Logging 
 echo "[PERF] Sumary of user input -- Slices=$s ; Protocol=$proto ; Test type=$opt"

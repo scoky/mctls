@@ -37,7 +37,7 @@ tcpTrick(){
 [[ $# -lt 3 ]] && usage
 
 # Static parameters
-resFolder="../results/temp"  # result folder 
+resFolder="../results/tmp"  # result folder 
 R=50                      # number of repetitions
 S_max=16                  # max number of slices 
 rate=1                    # common rate

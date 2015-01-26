@@ -294,6 +294,57 @@ char* parse_http_get(char *buf){
 	return fn; 
 }
 
+
+// Serve some data in browser mode, just for SPP protocol 
+int serveDataSPPBrowser(SSL *ssl, int s,  int data_size, char *proto, int *resp_len_arr){ 
+	
+	int i; 
+	for (i = 0; i < ssl->slices_len; i++){
+		int still_to_send = resp_len_arr[i]; 
+		for (;;){
+
+			// Derive min between how much to send and max buffer size 
+			int toSend = BUFTLS; 
+			if (still_to_send < toSend){
+				toSend = still_to_send; 
+			}
+
+			//Allocate buffer with size to send and fill with "!"
+			#ifdef VERBOSE
+			printf ("[DEBUG] Allocating buffer with %d data\n", toSend); 
+			#endif 
+			char *buf = (char*) malloc(sizeof(char) * toSend);
+			memset(buf, '!', sizeof(char) * toSend);	
+			
+			#ifdef VERBOSE
+			printf ("[DEBUG] Buffer=\n%s\n", buf); 
+			#endif 
+		
+			// send data on slice i 
+			int r = SPP_write_record(ssl, buf, toSend, ssl->slices[i]);
+			#ifdef DEBUG
+			printf("Wrote %d bytes\n", r);
+			#endif
+			check_SSL_write_error(ssl, r, toSend);
+		
+			// Update how much content is still to send 
+			still_to_send -= toSend;
+			if (still_to_send == 0){
+				#ifdef DEBUG
+				printf ("[DEBUG] No more data to send for slice %d\n", i); 
+				#endif 
+				break; 	
+			}
+
+			// Free buffer
+			free(buf); 
+		}
+	}
+
+	// All good
+	return 0; 
+}	
+
 // Serve a given amount of data 
 int serveData(SSL *ssl, int s,  int data_size, char *proto){ 
 	
@@ -402,6 +453,98 @@ int serveFile(SSL *ssl, int s, char *filename, char *proto){
 	// All good
 	return 0; 
 }	
+
+// serve requests in browser-like mode 
+static int http_serve_request_browser(SSL *ssl, int s, char *proto){
+  
+    int r; 
+	char buf[BUFSIZZ];
+	
+	// Clean buffer 
+	memset(buf, 0, sizeof(buf));
+
+	// Read HTTP GET (assuming a single read is enough)
+	while(1){
+		if (strcmp(proto, "spp") == 0){
+			SPP_SLICE *slice;       
+			SPP_CTX *ctx;           
+			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
+			if (SSL_get_error(ssl, r) == SSL_ERROR_ZERO_RETURN){
+				#ifdef DEBUG
+				printf("[DEBUG] Client closed the connection\n");
+				#endif
+				return -1; 
+			}
+			if (SSL_get_error(ssl, r) != SSL_ERROR_NONE){
+				berr_exit("[DEBUG] SSL read problem - closed connection?");
+			}
+			#ifdef DEBUG
+			printf("[DEBUG] Read %d bytes\n", r);
+			#endif
+		}
+		else if (strcmp(proto, "ssl") == 0){
+			r = SSL_read(ssl, buf, BUFSIZZ);
+			if (SSL_get_error(ssl, r) != SSL_ERROR_NONE)
+				berr_exit("[DEBUG] SSL read problem");
+		}
+		else if (strcmp(proto, "pln") == 0){
+			r = read(s, buf, BUFSIZZ);
+		}
+
+		#ifdef DEBUG
+		printf("[DEBUG] Request received:\n"); 
+		printf("%s\n", buf); 
+		#endif
+
+		//Look for the blank line that signals the end of the HTTP header (FIXME: assume 1 read is enough)
+		if(strstr(buf, "\r\n") || strstr(buf, "\n")){
+			break; 
+		}else{
+			return 0;  
+		}
+		
+	}
+
+	// Parsing 
+	char *delim="\r\n"; 
+	char *token = strtok(buf , delim);   
+	delim=" "; 
+	char *fn = strtok(token, delim);   
+	fn = strtok(NULL, delim);   
+	
+	printf("[DEBUG] List of requested slice sizes: %s\n", fn);
+	// data structures to store sizes of responses 
+    int slices_len = ssl->slices_len; 
+    int resp_len_arr[slices_len]; 
+    int response_len; 
+    
+    // extract list of response sizes 
+    resp_len_arr[0] = atoi(strtok(fn, "_")); 
+    response_len = resp_len_arr[0]; 
+    int counter = 1; 
+    while (counter < slices_len){
+        resp_len_arr[counter] = atoi(strtok(NULL, "_")); 
+        response_len += resp_len_arr[counter]; 
+        counter++; 
+    }    
+	int i; 
+	for (i = 0; i < slices_len; i++){
+		printf("[DEBUG] Requested Slice %d with size %d\n", i, resp_len_arr[i]);
+	}
+	printf("[DEBUG] Total size is %d\n", response_len);
+	
+	// serve requested data 
+	if (strcmp(proto, "spp") == 0){
+		serveDataSPPBrowser(ssl, s,  resp_len_arr, proto, resp_len_arr); 
+	} else {	
+		// use classic method to serve data if not SPP
+		serveData(ssl, s, response_len, proto); 
+	}
+	
+	// All good 
+    return 0; 
+}
+
 
 
 
@@ -523,6 +666,7 @@ int serveFile_old(SSL *ssl, int s, char *filename, char *proto){
 }	
 
 
+
 // 1) work with both SSL and SPP
 // 2) no usage of BIO APIs
 static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int action){
@@ -603,7 +747,7 @@ static int http_serve_request(SSL *ssl, int s, char *proto, bool shut, int actio
 		}
 	}
 
-	// Do not shutdown TLS for browser-like behavior unless requested
+	// Do not shutdown TLS for browser-like behavior unless requested -- FIXME (NEVER SHUTDOWN)
 	if (shut){
 		#ifdef DEBUG
 		printf("[DEBUG] Shutdown SSL connection\n");
@@ -892,7 +1036,7 @@ int main(int argc, char **argv){
            	}
 			start = clock();
 			#ifdef DEBUG
-			printf("[DEBUG] child process close old socket (why?) and operate on new one\n");
+			printf("[DEBUG] child process close old socket and operate on new one\n");
 			#endif
 			close(sock);
 
@@ -940,8 +1084,9 @@ int main(int argc, char **argv){
 				// This can only serve one connection at a time. 
 				// Here we would need to fire a new thread 
 				// (or re-think the code) to support multiple SSL connections 
+				// FIXME - detect closed connection 
 				case 4: while(1){
-							if (http_serve_request(ssl, newsock, proto, false, action) < 0){
+							if (http_serve_request_browser(ssl, newsock, proto) < 0){
 								break; 
 							}
 						}
@@ -959,7 +1104,7 @@ int main(int argc, char **argv){
 			// return 0 
 		}else{
 			#ifdef DEBUG
-			printf("[DEBUG] parent process close new socket (why?)\n");
+			printf("[DEBUG] parent process close new socket\n");
 			#endif
 			close(newsock); 
 		}

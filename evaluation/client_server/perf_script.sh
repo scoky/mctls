@@ -422,9 +422,29 @@ case $expType in
 	6)	# Measure download time in browser-like behavior 
 		echo "[PERF] Measure download time in browser-like behavior"
 		opt=4
-		# 4 slices (1 req header, 1 req body) (1 resp header, 1 resp body)
-		s=4
 		strategy="cs"
+	
+		# switch on user input (one ; four ; all)
+		str="one"
+		if [ $str == "one" ] 
+		then 
+			key="one-slice"
+		fi
+		if [ $str == "four" ] 
+		then 
+			key="four-slices"
+		fi
+		if [ $str == "all" ] 
+		then 
+			key="slice-per-header"
+		fi
+
+		# Remote NOT supported yet
+		if [ $REMOTE -eq 1 ] 
+		then 
+			echo "[PERF] Remote NOT supported yet"
+			exit 0 
+		fi	
 	
 		# Update res file 
 		resFile=$resFile"_downloadTime_browser"
@@ -445,24 +465,84 @@ case $expType in
 		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
 		loop=0
 		MAX_LOOP=1
-		for actionFile in `ls $actionFolder`	
-		do 
+		th=10
+		for f in `ls $actionFolder | grep "$key"`    
+		do
+			echo "[PERF] Working on action file $f"
 			if [ $loop -eq $MAX_LOOP ] 
 			then 
 				echo "[PERF] Stopping since tested already <<$loop>> actionFiles"
 				break 
 			fi
-			# Run R handshake repetitions	
-			echo "[PERF] Test $R file retrievals with action file $fSize ($s slices)"
-			for((i=1; i<=R; i++))
+            
+			# cleanup + prepare 1 file per connection 
+            for i in `ls ./actionFiles`
 			do
-				echo $loop >> .tmp
-				echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy-c $proto -o $opt -a $actionFile >> $log 2>/dev/null"
-				./wclient -s $s -r $nProxy -w $nProxy-c $proto -o $opt -a $actionFile >> $log 2>/dev/null
+				rm "./actionFiles/"$i
 			done
+			N_clients=`cat $actionFolder"/"$f | awk '{if (conn[$NF] == 0){conn[$NF] = 1; count = count + 1;}}END{print count}'`
+			
+			# filter last bogus object 
+			let "N_clients--"
+			
+			if [ $N_clients -gt $th ] 
+			then 
+				echo "[PERF] File $f skipped since it requires more than $th connections"
+				continue
+			else
+				echo "[PERF] $N_clients connections were found"
+				if [ $N_clients -eq 1 ]
+				then
+					# Compute number of objects requested in that single connection  
+					N_objects=`wc -l $actionFolder"/"$f | cut -f 1 -d " "`
+					
+					# filter last bogus object 
+					let "N_objects--"
+					
+					if [ $N_objects -eq 1 ]
+					then 
+						echo "[PERF] File $f skipped since it contains only $N_clients connection with $N_objects object"
+						continue 
+					else
+						echo "[PERF] File $f contains $N_clients connection with $N_objects objects"
+					fi
+				fi	
+			fi
+			cat $actionFolder"/"$f | sed s/";"/" "/g | awk '{if ($2 != -1){print $0 >> "./actionFiles/conn_"$NF}}'
+			line=`tail -n 1  $actionFolder"/"$f`
+			N_clients=0
+		
+			# Compute number of slices needed 
+			s=`head -n 1 "./actionFiles/conn_0" | awk '{print (NF - 2)/2}'`	
+			echo "[PERF] $s slices extracted from action file"
+			
+			# Starting all clients needed
+			for i in `ls ./actionFiles`
+			do
+				#echo $loop >> .tmp
+				echo $line >> "./actionFiles/"$i
+				let "N_clients++"
+				echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i"
+				#./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> $log"_"$i 2>/dev/null &
+			done
+			# Logging 
+			echo "[PERF] Started $N_clients in parallel"
+			active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
+			while [ $active -gt 0 ] 
+			do 
+				echo "[PERF] Still $active clients running (sleeping 5 sec)"
+				sleep 5 
+				active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
+			done
+			# Wait to be all done then either analyze or merge or other 
+			# TODO
+			#	
 			let "loop++"
 		done
 		
+		echo "[PERF] !!Temoporary stopping!!!"
+		exit 0 
+	
 		# Results
 		if [ -f $log ] 
 		then  

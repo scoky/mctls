@@ -38,10 +38,37 @@ static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 static ExperimentInfo *experiment_info;       // for printing stats at the end
 
+// Thread syncronization variables 
+static int done = 0;
+static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t c = PTHREAD_COND_INITIALIZER;
+static bool running = true; 
+static int lines = 0;                         // number of lines in action file
+static int fSize = 0; 
 
+pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m);
+pthread_cond_signal(pthread_cond_t *c);
+
+// thread exit 
+void thr_exit() {
+	pthread_mutex_lock(&m);
+	done = 1;
+	pthread_cond_signal(&c);
+	pthread_mutex_unlock(&m);
+}
+
+// Join 
+void thr_join() {
+	pthread_mutex_lock(&m);
+	while (done == 0){
+		pthread_cond_wait(&c, &m);
+	}
+	pthread_mutex_unlock(&m);
+}
+
+
+// function to plot statistics
 void print_stats(SSL *s);
-
-
 
 // Compute the size of a file to be served
 int calculate_file_size(char *filename){ 
@@ -301,11 +328,162 @@ void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_se
 }
 
 // Form and send GET
+void sendRequestBrowser(char *filename){
+		
+	// data structures to store sizes of requests and responses 
+	int slices_len = ssl->slices_len; 
+	int req_len_arr[slices_len]; 
+	int request_len; 
+	
+	// extract list of response sizes 
+	char *str = strtok(filename, ";");
+	str = strtok(NULL, ";"); 
+	char *resp_sizes = strtok(str, " "); 
+ 
+	// extract request sizes 
+	req_len_arr[0] = atoi(strtok(filename, "_")); 
+	request_len = req_len_arr[0]; 
+	int counter = 1; 
+	while (counter < slices_len){
+		req_len_arr[counter] = atoi(strtok(NULL, "_")); 
+		request_len += req_len_arr[counter]; 
+		counter++; 
+	}
+	// extract expected response size
+	char *tool; 
+	tool = (char*) malloc(sizeof(resp_sizes));
+	sprintf(tool, "%s", resp_sizes); 
+	fSize = atoi(strtok(tool, "_")); 
+	counter = 1; 
+	while (counter < slices_len){
+		fSize += atoi(strtok(NULL, "_")); 
+		counter++; 
+	}	
+	free(tool); 
+	#ifdef DEBUG
+	printf ("[DEBUG] Expected response with size %d\n", fSize); 
+	#endif 	
+	
+	// prepare common GET request 	
+	char get_str[100];
+	int get_len;
+	memset(get_str, '0', sizeof(get_str));
+	sprintf(get_str, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\nPadding:", resp_sizes, clientID, host, port); 
+	get_len = strlen(get_str); 
+	#ifdef DEBUG
+	printf ("[DEBUG] GET string (size %d):\n%s\n", get_len, get_str); 
+	#endif 	
+	
+	//prepare final request with appropriate padding
+	char *request;
+	char *padding;
+	if (strcmp(proto, "spp") == 0){
+		padding = (char*) malloc(sizeof(char) * (req_len_arr[0] - get_len - 5));
+		memset(padding, '?', sizeof(char) * (req_len_arr[0] - get_len - 5));	
+		request = (char*) malloc(sizeof(char) * req_len_arr[0]);
+		sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+	} else {
+		padding = (char*) malloc(sizeof(char) * (request_len - get_len - 5));
+		memset(padding, '?', sizeof(char) * (request_len - get_len - 5));	
+		request = (char*) malloc(sizeof(char) * request_len);
+		sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+	}
+
+	/* free memory 
+	free(get_str); 
+	free(padding); 
+	*/
+	
+	#ifdef DEBUG
+	int tmp_len = strlen(request); 
+	printf ("[DEBUG] Prepared GET request (size %d):\n%s\n", tmp_len, request); 
+	#endif 	
+	
+	// SPP write
+	if (strcmp(proto, "spp") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] SPP_write\n");
+		#endif 
+		int i, r; 
+		for (i = 0; i < slices_len; i++){
+			if (i == 0){
+				#ifdef DEBUG
+				printf ("[DEBUG] Send GET request with slice %d\n", i); 
+				#endif 	
+				r = SPP_write_record(ssl, request, req_len_arr[i], ssl->slices[i]);
+				// Check for errors 	
+				check_SSL_write_error(r, req_len_arr[i]); 
+
+				#ifdef DEBUG
+				printf("[DEBUG] Wrote %d bytes (on slice %d)\n", r, i);
+				#endif
+				// free memory 
+				free(request); 
+			}else{
+				// prepare fake request slices if needed  
+				if (req_len_arr[i] > 0){
+					char *fake_request = (char*) malloc(sizeof(char) * req_len_arr[i]);
+					memset(fake_request, '?', sizeof(char) * req_len_arr[i]);	
+					#ifdef VERBOSE
+					printf ("[DEBUG] Prepared padding:\n%s\n", fake_request); 
+					#endif
+					#ifdef DEBUG
+					printf ("[DEBUG] Send padding with slice %d\n", i); 
+					#endif 	
+					r = SPP_write_record(ssl, fake_request, req_len_arr[i], ssl->slices[i]);
+					// Check for errors 	
+					check_SSL_write_error(r, req_len_arr[i]); 
+
+					// logging 			
+					#ifdef DEBUG
+					printf("[DEBUG] Wrote %d bytes (on slice %d)\n", r, i);
+					#endif
+
+					// Free request 
+					free(fake_request); 
+				}
+			
+			}
+		}
+	}
+	// SSL write
+	else if (strcmp(proto, "ssl") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] SSL_write\n");
+		#endif 
+		int r = SSL_write(ssl, request, request_len);
+		check_SSL_write_error(r, request_len); 
+	}
+	// socket write
+	else if (strcmp(proto, "pln") == 0){
+		#ifdef DEBUG
+		printf("[DEBUG] Plain socket write\n");
+		#endif 
+	    int r = write(plain_socket, request, request_len);
+		experiment_info->app_bytes_written += r;
+	    if ( r <= 0 )
+	    {
+	    	printf("Something went wrong with writing to the socket!\n");
+	    }
+	    #ifdef DEBUG
+		printf("[DEBUG] Request sent. %d bytes\n", r);
+		#endif 
+	}
+
+	// free some memory here 
+
+}
+
+
+
+
+
+// Form and send GET
 void sendRequest(char *filename){
 		
 	char request[100];
 	int request_len;
-	
+
 	// Form the request 
 	memset(request, '0', sizeof(request));
 	sprintf(request, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\r\n\r\n", filename, clientID, host, port); 
@@ -355,8 +533,9 @@ void sendRequest(char *filename){
 // Read file line by line with timing information 
 static void *browser_replay(void *ptr){
 	char line[128];
-	int previous_time = 0;      // current/previous time
+	//int previous_time = 0;      // current/previous time
 	FILE *fp;                   // pointer to file
+	int curr_line = 0;       // keep track of line read 
 
 	#ifdef DEBUG
 	printf("[DEBUG] Read file timing\n"); 
@@ -381,6 +560,9 @@ static void *browser_replay(void *ptr){
 		//double duration; 
 		char file_request[128]; 
 	
+		// Current line read in the file
+		curr_line ++; 
+		
 		// Remove trailing newline (NOTE: strtoK is not thread safe)
         strtok(line, "\n");
 
@@ -397,23 +579,39 @@ static void *browser_replay(void *ptr){
 		//printf("[DEBUG] Extracted values are: %f -- %f\n", time, duration);
 		printf("[DEBUG] Extracted values are: %f -- %s\n", time, file_request);
 		#endif
-		
+
+		/* Original code to relay timing information from traces
 		// Compute sleeping time 
 		double time_to_sleep = time - previous_time; 
 		#ifdef DEBUG
 		printf("[DEBUG] Sleeping for %f\n", time_to_sleep); 
 		#endif 
     	sleep(time_to_sleep);
-		
-		// Here send timed HTTP GET 
+	
+		*/ 
+
+		// Send HTTP GET 
 		#ifdef DEBUG
-		//printf("[DEBUG] Sending GET request for file <<%s>>\n", file_request); 
 		printf("[DEBUG] Sending GET request for <<%s>> bytes of data\n", file_request); 
 		#endif 
-		sendRequest(file_request); 
 		
+		if (curr_line == lines){
+			#ifdef DEBUG
+			printf("[DEBUG] File has %d lines and we read %d\n", lines, curr_line); 
+			#endif 
+			running = false; 
+		}
+		sendRequestBrowser(file_request); 
+		
+		// Wait on main thread to have received requested data unless we are done 
+		if (curr_line < lines){
+			thr_join(); 
+		} 
+		
+		/* Not used 
 		// Save current time
 		previous_time = time;  
+		*/
 	}
 
 	#ifdef DEBUG
@@ -422,17 +620,18 @@ static void *browser_replay(void *ptr){
     
 	// Close file
     fclose(fp);
-
-	// All good
+	
+	// All good 
 	return NULL;  
 }
 
 
 // Emulate browser behavior based on some input traces 
-static int http_complex(char *proto, char *fn){
+static int http_complex(char *proto, char *fn, struct timeval *tvEnd){
 
 	int r; 
 	char buf[BUFSIZZ];
+	long bytes_read = 0;
 
 	// Thread for browser-like behavior 
 	pthread_t reading_thread;
@@ -455,24 +654,6 @@ static int http_complex(char *proto, char *fn){
 			SPP_SLICE *slice;		// slice for SPP_read
 			SPP_CTX *ctx;			// context pointer for SPP_read
 			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);	
-			#ifdef DEBUG
-			printf("Read %d bytes\n", r);
-			#endif
-			
-			switch(SSL_get_error(ssl, r)){
-				case SSL_ERROR_NONE:
-					break;
-
-				case SSL_ERROR_ZERO_RETURN:
-					goto shutdown;
-
-				case SSL_ERROR_SYSCALL: 
-					fprintf(stderr, "SSL Error: Premature close\n");
-					goto done;
-
-				default:
-					berr_exit("SSL read problem");
-			}
 		} 
 		// SSL read
 		else if (strcmp(proto, "ssl") == 0){
@@ -480,67 +661,84 @@ static int http_complex(char *proto, char *fn){
 			printf("[DEBUG] Waiting on SSL_read...\n");
 			#endif 
 			r = SSL_read(ssl, buf, BUFSIZZ);
-			switch(SSL_get_error(ssl, r)){
-				case SSL_ERROR_NONE:
-					break;
-
-				case SSL_ERROR_ZERO_RETURN:
-					goto shutdown;
-
-				case SSL_ERROR_SYSCALL: 
-					fprintf(stderr, "SSL Error: Premature close\n");
-					goto done;
-
-				default:
-					berr_exit("SSL read problem");
-			}
-		}		
+		}
+		// TCP read 		
 		else if (strcmp(proto, "pln") == 0){
 			r = read(plain_socket, buf, BUFSIZZ);
 			experiment_info->app_bytes_read += r;
-			#ifdef DEBUG 
-			printf("[DEBUG] Read %d bytes\n", r);
-			#endif
-			if ( r <= 0 ) /* done reading */
-				goto done;
 		}
-		
-		// Write buf to stdout
+		// Check for errors in read 
+		if (strcmp(proto, "spp") == 0 || strcmp(proto, "ssl") == 0){
+			switch(SSL_get_error(ssl, r)){
+				case SSL_ERROR_NONE:			break;
+				case SSL_ERROR_ZERO_RETURN:		berr_exit("SSL error zero return");
+				case SSL_ERROR_SYSCALL: 		berr_exit("SSL Error: Premature close");
+				default:						berr_exit("SSL read problem");
+			}
+		}
+
 		#ifdef DEBUG
+		printf("Read %d bytes\n", r);
+		#endif
+
+		// Write buf to stdout
+		#ifdef VERBOSE
 		printf("[DEBUG] Received:\n%s\n\n", buf); 
 		#endif 
-    }
-    
-	shutdown:
-		r = SSL_shutdown(ssl);
-		#ifdef DEBUG
-		printf("[DEBUG] Shutdown was requested\n"); 
-		#endif 
-
-		switch(r){
-			case 1:
-				break; // Success 
-			case 0:
-	
-			case -1:
-
-			default:
-				#ifdef DEBUG 
-				printf ("Shutdown failed with code %d\n", r);
-				#endif 
-				berr_exit("Shutdown failed"); 
-		}
-    
-	done:
-		//  Print byte statistics
-		if (stats){
-			print_stats(ssl);        
-		}
-		// Free ssl 
-		SSL_free(ssl);
+    	
+		// Update counter of bytes read 
+		bytes_read += r;
 		
-		// All good 
-		return(0);
+		//if ( r <= 0 || bytes_read == fSize){
+		printf("[DEBUG] File transfer stats %d -- %d\n", bytes_read,  fSize); 
+		if (bytes_read == fSize){
+			#ifdef DEBUG
+			printf("[DEBUG] File transfer done - signaling to other thread\n");
+			#endif 
+			bytes_read = 0; 
+			if (running){
+				thr_exit();
+			}else{
+				#ifdef DEBUG
+				printf("[DEBUG] Reading thread is done, so here we are done too\n"); 
+				#endif
+				break;  
+			} 
+		}
+	}
+    
+	// Measure time
+	gettimeofday(tvEnd, NULL);
+	
+	// Shutdown connection 
+	r = SSL_shutdown(ssl);
+	#ifdef DEBUG
+	printf("[DEBUG] Shutdown was requested\n"); 
+	#endif 
+
+	switch(r){
+		case 1:
+			break; // Success 
+		case 0:
+
+		case -1:
+
+		default:
+			#ifdef DEBUG 
+			printf ("Shutdown failed with code %d\n", r);
+			#endif 
+			berr_exit("Shutdown failed"); 
+	}
+
+	//  Print byte statistics
+	if (stats){
+		print_stats(ssl);        
+	}
+	// Free ssl 
+	SSL_free(ssl);
+
+	// All good 
+	return(0);
 }
 
 // Send HTTP get and wait for response (SSL/SPP)
@@ -551,7 +749,7 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 	int len; 
 	long bytes_read = 0;
     // Compute expected data size
-	int fSize = atoi(filename);
+	fSize = atoi(filename);
     if (fSize == 0 && filename[0] != '0'){
 		if (requestingFile){
 			fSize = calculate_file_size(filename);
@@ -904,6 +1102,22 @@ int main(int argc, char **argv){
 		if (file_action == NULL){
 			printf ("Action file (-a path_to_file) is required with -o 4\n"); 
 			usage(); 
+		}else{
+			FILE *fp;                   
+    		fp = fopen(file_action,"r");  
+    		int ch=0;
+			// Check for errors while opening file
+		    if(fp == NULL){
+    		    printf("Error while opening file %s.\r\n", file_action);
+        		exit(-1);
+			}
+			while( ! feof(fp)){
+				ch = fgetc(fp);
+				if(ch == '\n'){
+					lines++;
+				}
+			}
+    		fclose(fp);
 		}
 	}
 
@@ -1042,8 +1256,7 @@ int main(int argc, char **argv){
 
 		// Send several GET request following a browser-like behavior  
 		case 4:  
-			http_complex(proto, file_action);
-			gettimeofday(&tvEnd, NULL);
+			http_complex(proto, file_action, &tvEnd);
 			break; 
  
 		// Unknown option 
