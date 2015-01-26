@@ -21,9 +21,9 @@ def slice_sizes_one_slice(obj, dummy1, dummy2):
 # How much data should go in each slice if there's one slice each for (1) req
 # headers, (2) req body, (3) resp headers, (4) resp body
 def slice_sizes_headers_content(obj, dummy1, dummy2):
-    request_sizes = '%d;%d;0;0' % (obj.request_headers_size,\
+    request_sizes = '%d_%d_0_0' % (obj.request_headers_size,\
         max(obj.request_body_size, 0))
-    response_sizes = '0;0;%d;%d' % (obj.response_headers_size, obj.response_body_size)
+    response_sizes = '0_0_%d_%d' % (obj.response_headers_size, obj.response_body_size)
     return request_sizes, response_sizes
     
 
@@ -36,7 +36,7 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
     for header, value in obj.request_headers.iteritems():
         req_hdr_size = len(header) + len(value) + 4  # : \n\r
         total_req_hdr_size += req_hdr_size
-        request_sizes += ';%d' % req_hdr_size
+        request_sizes += '_%d' % req_hdr_size
     # NOTE: we're losing the 2 byte \n\r following the last header
 
     # add the size of the request line (GET ... )
@@ -44,10 +44,10 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
         request_sizes)
 
     # add content size
-    request_sizes += ';%d' % max(obj.request_body_size, 0)
+    request_sizes += '_%d' % max(obj.request_body_size, 0)
 
     # pad with 0's for extra request slices + response slices
-    request_sizes += ';0' * (total_slices - len(obj.request_headers))
+    request_sizes += '_0' * (total_slices - len(obj.request_headers))
 
 
 
@@ -58,7 +58,7 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
     for header, value in obj.response_headers.iteritems():
         resp_hdr_size = len(header) + len(value) + 4  # : \n\r
         total_resp_hdr_size += resp_hdr_size
-        response_sizes += ';%d' % resp_hdr_size
+        response_sizes += '_%d' % resp_hdr_size
     # NOTE: we're losing the 2 byte \n\r following the last header
 
     # add the size of the response line (GET ... )
@@ -66,16 +66,16 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
         response_sizes)
 
     # add content size
-    response_sizes += ';%d' % max(obj.response_body_size, 0)
+    response_sizes += '_%d' % max(obj.response_body_size, 0)
 
     # pad with 0's for extra response slices + request slices
-    response_sizes = '0;' *\
+    response_sizes = '0_' *\
         (total_slices - len(obj.response_headers))\
         + response_sizes
 
     # make sure we have the right number of slices in each column
-    if len(request_sizes.split(';')) != len(response_sizes.split(';')):
-        print 'WRONG', len(request_sizes.split(';')), len(response_sizes.split(';'))
+    if len(request_sizes.split('_')) != len(response_sizes.split('_')):
+        print 'WRONG', len(request_sizes.split('_')), len(response_sizes.split('_'))
 
     
     return request_sizes, response_sizes
@@ -150,7 +150,7 @@ def save_action_list_for_har(har_path, slice_sizes_func, slice_tag):
 
 
                 # FILE 1  (actions)
-                actionf.write('%f %s %s %d\n' %\
+                actionf.write('%f %s;%s %d\n' %\
                     ((obj.object_start_time - har.page_start_time).total_seconds(),\
                     request_slice_sizes,\
                     response_slice_sizes,\
@@ -174,10 +174,6 @@ def save_action_list_for_har(har_path, slice_sizes_func, slice_tag):
 
                 last_timestamp = obj.object_start_time
                 servers_so_far.add(obj.host)
-
-            actionf.write('%f -1 -1\n' %\
-                (last_timestamp - har.page_start_time + datetime.timedelta(0, 5))\
-                .total_seconds())
 
 
 def main():
