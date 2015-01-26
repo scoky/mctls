@@ -29,6 +29,7 @@ def slice_sizes_headers_content(obj, dummy1, dummy2):
 
 # How much data should go in each slice if each HTTP header gets its own slice?
 def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
+    total_slices = num_req_slices + num_resp_slices + 1  # +1 for GET
     # get request header sizes
     request_sizes = ''
     total_req_hdr_size = 2  # final \n\r
@@ -45,8 +46,8 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
     # add content size
     request_sizes += ';%d' % max(obj.request_body_size, 0)
 
-    # pad with 0's for response slices
-    request_sizes += ';0' * num_resp_slices
+    # pad with 0's for extra request slices + response slices
+    request_sizes += ';0' * (total_slices - len(obj.request_headers))
 
 
 
@@ -67,8 +68,14 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
     # add content size
     response_sizes += ';%d' % max(obj.response_body_size, 0)
 
-    # pad with 0's for response slices
-    response_sizes = '0;' * num_req_slices + response_sizes
+    # pad with 0's for extra response slices + request slices
+    response_sizes = '0;' *\
+        (total_slices - len(obj.response_headers))\
+        + response_sizes
+
+    # make sure we have the right number of slices in each column
+    if len(request_sizes.split(';')) != len(response_sizes.split(';')):
+        print 'WRONG', len(request_sizes.split(';')), len(response_sizes.split(';'))
 
     
     return request_sizes, response_sizes
@@ -83,6 +90,12 @@ def save_action_list_for_har(har_path, slice_sizes_func, slice_tag):
         logging.info(har)
     except HarError:
         logging.exception('Error parsing HAR')
+        return
+
+
+    # make sure the first response is a 200 OK
+    if har.objects[0].response_code != 200:
+        logging.warn('Not 200 OK; skipping. %s' % har)
         return
 
 
