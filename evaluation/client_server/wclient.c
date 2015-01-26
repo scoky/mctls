@@ -37,7 +37,7 @@ static char *proto = "ssl";                   // protocol to use (ssl ; spp)
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 static ExperimentInfo *experiment_info;       // for printing stats at the end
-
+static int disable_nagle = 0;
 
 void print_stats(SSL *s);
 
@@ -196,6 +196,10 @@ int tcp_connect(char *host, int port){
 	#ifdef DEBUG
 	printf("[DEBUG] Socket correctly created\n"); 
 	#endif
+
+    if (disable_nagle == 1)
+    	set_nagle(sock, 1); 
+
 
 	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0){
 		err_exit("Couldn't connect socket");
@@ -760,7 +764,7 @@ void usage(void){
 	printf("-f:   file for http GET (either via <name> (require file to exhist both at server and client[for testing reasons]) or via <size>)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-a:   action file for browser-like behavior\n");
-	printf("-c:   protocol chosen (ssl ; spp; pln)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; pln; spp-mod)\n"); 
 	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
@@ -839,6 +843,7 @@ int main(int argc, char **argv){
 						}
 						if (strcmp(proto, "spp_mod") == 0){
                   			proto = "spp"; 
+                  			set_nagle = 1;
 						}
 						break; 
 			

@@ -27,6 +27,7 @@
 #define MAX_PACKET 16384 
 
 static char *strategy = "uni";
+static int disable_nagle = 0; //default is disabled
 
 // Listen TCP socket
 int tcp_listen(){
@@ -44,6 +45,9 @@ int tcp_listen(){
     sin.sin_family = AF_INET;
     sin.sin_port = htons(PORT);
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &val,sizeof(val));
+
+    if (disable_nagle == 1)
+    	set_nagle(sock, 1); 
 
 	// Bind to socket    
 	if(bind(sock,(struct sockaddr *)&sin, sizeof(sin))<0){
@@ -776,7 +780,7 @@ static int http_serve_SSL(SSL *ssl, int s){
 // Usage function 
 void usage(void){
 	printf("usage: wserver -c -o -s\n");
-	printf("-c:   protocol requested: ssl, spp, pln.\n");
+	printf("-c:   protocol requested: ssl, spp, pln, spp-mod.\n");
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-s:   content slicing strategy {uni; cs}\n");
 	printf("-l:   duration of load estimation time (10 sec default)\n");
@@ -814,6 +818,7 @@ int main(int argc, char **argv){
 						}
 						if (strcmp(proto, "spp_mod") == 0){
 							proto = "spp"; 
+							set_nagle = 1;
 						}
 						break; 
 
