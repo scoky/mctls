@@ -38,6 +38,9 @@ static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 static ExperimentInfo *experiment_info;       // for printing stats at the end
 
+//nagle stuff
+static int disable_nagle = 0;
+
 // Thread syncronization variables 
 static int done = 0;
 static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
@@ -223,6 +226,10 @@ int tcp_connect(char *host, int port){
 	#ifdef DEBUG
 	printf("[DEBUG] Socket correctly created\n"); 
 	#endif
+
+    if (disable_nagle == 1)
+    	set_nagle(sock, 1); 
+
 
 	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0){
 		err_exit("Couldn't connect socket");
@@ -958,7 +965,7 @@ void usage(void){
 	printf("-f:   file for http GET (either via <name> (require file to exhist both at server and client[for testing reasons]) or via <size>)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-a:   action file for browser-like behavior\n");
-	printf("-c:   protocol chosen (ssl ; spp; pln)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; pln; spp-mod)\n"); 
 	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
@@ -1037,6 +1044,7 @@ int main(int argc, char **argv){
 						}
 						if (strcmp(proto, "spp_mod") == 0){
                   			proto = "spp"; 
+                  			disable_nagle = 1;
 						}
 						break; 
 			
@@ -1234,7 +1242,7 @@ int main(int argc, char **argv){
 		doConnect (proto, slices_len, N_proxies, slice_set, proxies);
 
 	gettimeofday(&tvEndConnect, NULL);
-	timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
+	timeval_subtract(&tvConnect, &tvEndConnect, &tvBegin);
 	
 
 	// Switch across possible client-server behavior
@@ -1266,7 +1274,7 @@ int main(int argc, char **argv){
 	}
 	// Compute duration of action
 	if (action > 1){
-		timeval_subtract(&tvDuration, &tvEnd, &tvBeginConnect);
+		timeval_subtract(&tvDuration, &tvEnd, &tvBegin);
 	}
 
 	// Remove SSL context

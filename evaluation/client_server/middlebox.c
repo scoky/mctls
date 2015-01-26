@@ -23,6 +23,7 @@
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
 #include <openssl/e_os2.h>
+static int disable_nagle  = 0 ;
 
 //#define DEBUG				// now this can be turned on/off in the Makefile 
 
@@ -43,6 +44,9 @@ int tcp_listen(int port)
     sin.sin_port=htons(port);
     setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,
       &val,sizeof(val));
+
+    if (disable_nagle == 1)
+    	set_nagle(sock, 1); 
     
     if(bind(sock,(struct sockaddr *)&sin,
       sizeof(sin))<0)
@@ -88,6 +92,9 @@ int tcp_connect(char *host, int port){
 	#ifdef DEBUG
 	printf("Socket created\n"); 
 	#endif
+
+    if (disable_nagle == 1)
+    	set_nagle(sock, 1); 
 
 	if(connect(sock,(struct sockaddr *)&addr, sizeof(addr))<0){
 		err_exit("Couldn't connect socket");
@@ -542,6 +549,7 @@ int main(int argc, char **argv){
 						}
 						if (strcmp(proto, "spp_mod") == 0){ 
 							proto = "spp"; 
+							disable_nagle = 1;
 						}   
 						if (strcmp(proto, "pln") == 0){ 
 							proto = "fwd"; 
