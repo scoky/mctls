@@ -19,10 +19,10 @@ RESULT_DIR = '.'
 PROTOCOLS = ('spp', 'spp_mod', 'ssl', 'fwd', 'pln')
 LEGEND_STRINGS = {
     'pln': 'No Encryption',
-    'fwd': 'Blind Proxy',
-    'ssl': 'MITM Proxy',
-    'spp': 'TMP',
-    'spp_mod': 'TMP (Nagle off)',
+    'fwd': 'TLS (Blind Proxy)',
+    'ssl': 'TLS (MITM Proxy)',
+    'spp': 'TruMP',
+    'spp_mod': 'TruMP (Nagle off)',
 }
 EXPERIMENT_NAMES = {
     2: 'timeFirstByte_slice',
