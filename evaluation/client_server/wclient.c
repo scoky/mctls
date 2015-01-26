@@ -1025,7 +1025,7 @@ int main(int argc, char **argv){
 		doConnect (proto, slices_len, N_proxies, slice_set, proxies);
 
 	gettimeofday(&tvEndConnect, NULL);
-	timeval_subtract(&tvConnect, &tvEndConnect, &tvBeginConnect);
+	timeval_subtract(&tvConnect, &tvEndConnect, &tvBegin);
 	
 
 	// Switch across possible client-server behavior
@@ -1058,7 +1058,7 @@ int main(int argc, char **argv){
 	}
 	// Compute duration of action
 	if (action > 1){
-		timeval_subtract(&tvDuration, &tvEnd, &tvBeginConnect);
+		timeval_subtract(&tvDuration, &tvEnd, &tvBegin);
 	}
 
 	// Remove SSL context
