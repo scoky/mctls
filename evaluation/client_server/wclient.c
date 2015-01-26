@@ -47,7 +47,7 @@ static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t c = PTHREAD_COND_INITIALIZER;
 static bool running = true; 
 static int lines = 0;                         // number of lines in action file
-static int fSize = 0; 
+static long fSize = 0; 
 
 pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m);
 pthread_cond_signal(pthread_cond_t *c);
@@ -173,6 +173,7 @@ void read_proxy_list(char *file_name, SPP_PROXY **proxies){
 	
 	// Close file
 	fclose(fp);
+
 }
 
 // Print proxy list 
@@ -336,12 +337,16 @@ void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_se
 
 // Form and send GET
 void sendRequestBrowser(char *filename){
-		
+	
+	int r; 
 	// data structures to store sizes of requests and responses 
 	int slices_len = ssl->slices_len; 
 	int req_len_arr[slices_len]; 
 	int request_len; 
 	
+	// Remove trailing newline (NOTE: strtoK is not thread safe)
+	strtok(filename, "\n");
+
 	// extract list of response sizes 
 	char *str = strtok(filename, ";");
 	str = strtok(NULL, ";"); 
@@ -360,22 +365,23 @@ void sendRequestBrowser(char *filename){
 	char *tool; 
 	tool = (char*) malloc(sizeof(resp_sizes));
 	sprintf(tool, "%s", resp_sizes); 
-	fSize = atoi(strtok(tool, "_")); 
+	fSize = atol(strtok(tool, "_")); 
 	counter = 1; 
 	while (counter < slices_len){
-		fSize += atoi(strtok(NULL, "_")); 
+		fSize += atol(strtok(NULL, "_")); 
 		counter++; 
 	}	
-	free(tool); 
+	free(tool);
+ 
 	#ifdef DEBUG
 	printf ("[DEBUG] Expected response with size %d\n", fSize); 
 	#endif 	
 	
-	// prepare common GET request 	
-	char get_str[100];
+	// prepare common GET request 	- FIXME: sometimes string generated is slightly longer. WHY?
+	char get_str[200];
 	int get_len;
 	memset(get_str, '0', sizeof(get_str));
-	sprintf(get_str, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\nPadding:", resp_sizes, clientID, host, port); 
+	sprintf(get_str, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\nPadding:\0", resp_sizes, clientID, host, port); 
 	get_len = strlen(get_str); 
 	#ifdef DEBUG
 	printf ("[DEBUG] GET string (size %d):\n%s\n", get_len, get_str); 
@@ -385,21 +391,23 @@ void sendRequestBrowser(char *filename){
 	char *request;
 	char *padding;
 	if (strcmp(proto, "spp") == 0){
-		padding = (char*) malloc(sizeof(char) * (req_len_arr[0] - get_len - 5));
-		memset(padding, '?', sizeof(char) * (req_len_arr[0] - get_len - 5));	
+		printf ("[DEBUG] Allocating %d\n", (req_len_arr[0] - get_len - 1)); 
+		padding = (char*) malloc(sizeof(char) * (req_len_arr[0] - get_len - 1));
+		memset(padding, '?', sizeof(char) * (req_len_arr[0] - get_len - 1));	
 		request = (char*) malloc(sizeof(char) * req_len_arr[0]);
-		sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+		//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+		sprintf(request, "%s %s", get_str, padding); 
 	} else {
-		padding = (char*) malloc(sizeof(char) * (request_len - get_len - 5));
-		memset(padding, '?', sizeof(char) * (request_len - get_len - 5));	
+		printf ("[DEBUG] Allocating %d\n", (request_len - get_len - 1)); 
+		padding = (char*) malloc(sizeof(char) * (request_len - get_len - 1));
+		memset(padding, '?', sizeof(char) * (request_len - get_len - 1));	
 		request = (char*) malloc(sizeof(char) * request_len);
-		sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+		//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+		sprintf(request, "%s %s", get_str, padding); 
 	}
 
-	/* free memory 
-	free(get_str); 
+	// free memory 
 	free(padding); 
-	*/
 	
 	#ifdef DEBUG
 	int tmp_len = strlen(request); 
@@ -411,21 +419,21 @@ void sendRequestBrowser(char *filename){
 		#ifdef DEBUG
 		printf("[DEBUG] SPP_write\n");
 		#endif 
-		int i, r; 
+		int i;  
 		for (i = 0; i < slices_len; i++){
 			if (i == 0){
 				#ifdef DEBUG
 				printf ("[DEBUG] Send GET request with slice %d\n", i); 
 				#endif 	
-				r = SPP_write_record(ssl, request, req_len_arr[i], ssl->slices[i]);
+				//r = SPP_write_record(ssl, request, req_len_arr[i], ssl->slices[i]);
+				r = SPP_write_record(ssl, request, strlen(request), ssl->slices[i]);
 				// Check for errors 	
-				check_SSL_write_error(r, req_len_arr[i]); 
+				//check_SSL_write_error(r, req_len_arr[i]); 
+				check_SSL_write_error(r, strlen(request)); 
 
 				#ifdef DEBUG
 				printf("[DEBUG] Wrote %d bytes (on slice %d)\n", r, i);
 				#endif
-				// free memory 
-				free(request); 
 			}else{
 				// prepare fake request slices if needed  
 				if (req_len_arr[i] > 0){
@@ -437,9 +445,11 @@ void sendRequestBrowser(char *filename){
 					#ifdef DEBUG
 					printf ("[DEBUG] Send padding with slice %d\n", i); 
 					#endif 	
-					r = SPP_write_record(ssl, fake_request, req_len_arr[i], ssl->slices[i]);
+					//r = SPP_write_record(ssl, fake_request, req_len_arr[i], ssl->slices[i]);
+					r = SPP_write_record(ssl, fake_request, strlen(fake_request), ssl->slices[i]);
 					// Check for errors 	
-					check_SSL_write_error(r, req_len_arr[i]); 
+					//check_SSL_write_error(r, req_len_arr[i]); 
+					check_SSL_write_error(r, strlen(fake_request)); 
 
 					// logging 			
 					#ifdef DEBUG
@@ -458,26 +468,29 @@ void sendRequestBrowser(char *filename){
 		#ifdef DEBUG
 		printf("[DEBUG] SSL_write\n");
 		#endif 
-		int r = SSL_write(ssl, request, request_len);
-		check_SSL_write_error(r, request_len); 
+		//r = SSL_write(ssl, request, request_len);
+		r = SSL_write(ssl, request, strlen(request));
+		//check_SSL_write_error(r, request_len); 
+		check_SSL_write_error(r, strlen(request)); 
 	}
 	// socket write
 	else if (strcmp(proto, "pln") == 0){
 		#ifdef DEBUG
 		printf("[DEBUG] Plain socket write\n");
 		#endif 
-	    int r = write(plain_socket, request, request_len);
+	    //r = write(plain_socket, request, strlen(request));
+	    r = write(plain_socket, request, request_len);
 		experiment_info->app_bytes_written += r;
-	    if ( r <= 0 )
-	    {
-	    	printf("Something went wrong with writing to the socket!\n");
+	    if ( r <= 0 ){
+			printf("[ERROR] Something went wrong with writing to the socket!\n");
 	    }
 	    #ifdef DEBUG
 		printf("[DEBUG] Request sent. %d bytes\n", r);
 		#endif 
 	}
 
-	// free some memory here 
+	// free memory 
+	free(request); 
 
 }
 
@@ -488,7 +501,7 @@ void sendRequestBrowser(char *filename){
 // Form and send GET
 void sendRequest(char *filename){
 		
-	char request[100];
+	char request[200];
 	int request_len;
 
 	// Form the request 
@@ -539,7 +552,7 @@ void sendRequest(char *filename){
 
 // Read file line by line with timing information 
 static void *browser_replay(void *ptr){
-	char line[128];
+	char line[300];
 	//int previous_time = 0;      // current/previous time
 	FILE *fp;                   // pointer to file
 	int curr_line = 0;       // keep track of line read 
@@ -604,7 +617,7 @@ static void *browser_replay(void *ptr){
 		
 		if (curr_line == lines){
 			#ifdef DEBUG
-			printf("[DEBUG] File has %d lines and we read %d\n", lines, curr_line); 
+			printf("[DEBUG] File has %d GET and we sent %d. Reading thread is done\n", lines, curr_line); 
 			#endif 
 			running = false; 
 		}
@@ -613,7 +626,8 @@ static void *browser_replay(void *ptr){
 		// Wait on main thread to have received requested data unless we are done 
 		if (curr_line < lines){
 			thr_join(); 
-		} 
+		}
+		done = 0;  
 		
 		/* Not used 
 		// Save current time
@@ -697,7 +711,9 @@ static int http_complex(char *proto, char *fn, struct timeval *tvEnd){
 		bytes_read += r;
 		
 		//if ( r <= 0 || bytes_read == fSize){
-		printf("[DEBUG] File transfer stats %d -- %d\n", bytes_read,  fSize); 
+		#ifdef DEBUG
+		printf("[DEBUG] File transfer stats %d -- %ld\n", bytes_read,  fSize); 
+		#endif 
 		if (bytes_read == fSize){
 			#ifdef DEBUG
 			printf("[DEBUG] File transfer done - signaling to other thread\n");
@@ -1284,12 +1300,17 @@ int main(int argc, char **argv){
     close(sock);
 
 	//Free memory 
+	#ifdef DEBUG
+	printf("[DEBUG] Freeing memory\n"); 
+	#endif 
 	for (i = 0; i < N_proxies ; i++){
 	    free(proxies[i]);
 	}
 	for (i = 0; i < slices_len; i++){
 		free(slice_set[i]); 
 	}
+	free(proxies); 
+	free(slice_set); 
 	free(experiment_info);
 
 	// Report time statistics

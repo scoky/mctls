@@ -300,48 +300,57 @@ char* parse_http_get(char *buf){
 
 
 // Serve some data in browser mode, just for SPP protocol 
-int serveDataSPPBrowser(SSL *ssl, int s,  int data_size, char *proto, int *resp_len_arr){ 
+int serveDataSPPBrowser(SSL *ssl, int s,  int data_size, char *proto, long *resp_len_arr){ 
 	
 	int i; 
 	for (i = 0; i < ssl->slices_len; i++){
-		int still_to_send = resp_len_arr[i]; 
-		for (;;){
-
-			// Derive min between how much to send and max buffer size 
-			int toSend = BUFTLS; 
-			if (still_to_send < toSend){
-				toSend = still_to_send; 
-			}
-
-			//Allocate buffer with size to send and fill with "!"
-			#ifdef VERBOSE
-			printf ("[DEBUG] Allocating buffer with %d data\n", toSend); 
-			#endif 
-			char *buf = (char*) malloc(sizeof(char) * toSend);
-			memset(buf, '!', sizeof(char) * toSend);	
-			
-			#ifdef VERBOSE
-			printf ("[DEBUG] Buffer=\n%s\n", buf); 
-			#endif 
-		
-			// send data on slice i 
-			int r = SPP_write_record(ssl, buf, toSend, ssl->slices[i]);
+		long still_to_send = resp_len_arr[i]; 
+		if (still_to_send > 0){
 			#ifdef DEBUG
-			printf("Wrote %d bytes\n", r);
-			#endif
-			check_SSL_write_error(ssl, r, toSend);
-		
-			// Update how much content is still to send 
-			still_to_send -= toSend;
-			if (still_to_send == 0){
-				#ifdef DEBUG
-				printf ("[DEBUG] No more data to send for slice %d\n", i); 
-				#endif 
-				break; 	
-			}
+			printf ("[DEBUG] %d bytes to be sent with slice %d\n", still_to_send, i); 
+			#endif 
+			for (;;){
 
-			// Free buffer
-			free(buf); 
+				// Derive min between how much to send and max buffer size 
+				long toSend = BUFTLS; 
+				if (still_to_send < toSend){
+					toSend = still_to_send; 
+				}
+
+				//Allocate buffer with size to send and fill with "!"
+				#ifdef DEBUG
+				printf ("[DEBUG] Allocating buffer with %d data\n", toSend); 
+				#endif 
+				char *buf = (char*) malloc(sizeof(char) * toSend);
+				memset(buf, '!', sizeof(char) * toSend);	
+				
+				#ifdef VERBOSE
+				printf ("[DEBUG] Buffer=\n%s\n", buf); 
+				#endif 
+			
+				// send data on slice i 
+				int r = SPP_write_record(ssl, buf, toSend, ssl->slices[i]);
+				#ifdef DEBUG
+				printf("Wrote %d bytes\n", r);
+				#endif
+				check_SSL_write_error(ssl, r, toSend);
+			
+				// Update how much content is still to send 
+				still_to_send -= toSend;
+				if (still_to_send == 0){
+					#ifdef DEBUG
+					printf ("[DEBUG] No more data to send for slice %d\n", i); 
+					#endif 
+					break; 	
+				}
+
+				// Free buffer
+				free(buf); 
+			}
+		}else{
+			#ifdef DEBUG
+			printf ("[DEBUG] Nothing to be sent with slice %d\n", i); 
+			#endif 
 		}
 	}
 
@@ -516,26 +525,31 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 	char *fn = strtok(token, delim);   
 	fn = strtok(NULL, delim);   
 	
+	#ifdef DEBUG	
 	printf("[DEBUG] List of requested slice sizes: %s\n", fn);
+	#endif 
+	
 	// data structures to store sizes of responses 
     int slices_len = ssl->slices_len; 
-    int resp_len_arr[slices_len]; 
-    int response_len; 
+    long resp_len_arr[slices_len]; 
+    long response_len; 
     
     // extract list of response sizes 
-    resp_len_arr[0] = atoi(strtok(fn, "_")); 
+    resp_len_arr[0] = atol(strtok(fn, "_")); 
     response_len = resp_len_arr[0]; 
     int counter = 1; 
     while (counter < slices_len){
-        resp_len_arr[counter] = atoi(strtok(NULL, "_")); 
+        resp_len_arr[counter] = atol(strtok(NULL, "_")); 
         response_len += resp_len_arr[counter]; 
         counter++; 
     }    
+	#ifdef DEBUG
 	int i; 
 	for (i = 0; i < slices_len; i++){
-		printf("[DEBUG] Requested Slice %d with size %d\n", i, resp_len_arr[i]);
+		printf("[DEBUG] Requested Slice %d with size %ld\n", i, resp_len_arr[i]);
 	}
-	printf("[DEBUG] Total size is %d\n", response_len);
+	printf("[DEBUG] Total size is %ld\n", response_len);
+	#endif 
 	
 	// serve requested data 
 	if (strcmp(proto, "spp") == 0){
