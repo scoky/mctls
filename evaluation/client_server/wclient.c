@@ -843,7 +843,7 @@ int main(int argc, char **argv){
 						}
 						if (strcmp(proto, "spp_mod") == 0){
                   			proto = "spp"; 
-                  			set_nagle = 1;
+                  			disable_nagle = 1;
 						}
 						break; 
 			
