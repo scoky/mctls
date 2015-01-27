@@ -16,11 +16,13 @@ import plot_byte_overhead
 # configuration
 FIG_DIR = './fig/myplot'
 RESULT_DIR = '.'
-PROTOCOLS = ('spp', 'spp_mod', 'ssl', 'fwd', 'pln')
+PROTOCOLS = ('spp', 'ssl', 'fwd', 'pln', 'spp_mod')#, 'spp_one-slice',\
+    #'ssl_one-slice', 'fwd_one-slice', 'spp_four-slices', 'ssl_four-slices',\
+    #'fwd_four-slices')
 LEGEND_STRINGS = {
-    'pln': 'No Encryption',
-    'fwd': 'TLS (Blind Proxy)',
-    'ssl': 'TLS (MITM Proxy)',
+    'pln': 'NoEncrypt',
+    'fwd': 'E2E-TLS',
+    'ssl': 'SplitTLS',
     'spp': 'TruMP',
     'spp_mod': 'TruMP (Nagle off)',
 }
@@ -29,7 +31,7 @@ EXPERIMENT_NAMES = {
     3: 'timeFirstByte_latency',
     4: 'timeFirstByte_proxy',
     5: 'downloadTime',
-    6: 'downloadTime_browser',
+    6: 'page_load_time',
     7: 'connections_slice',
     8: 'byteOverhead_scenarios',
 }
@@ -76,9 +78,9 @@ DATA_TRANSFORMS = {
     8: lambda x: float(x)/1024.,
 }
 SHOW_RTTS = {
-    2: 3,
-    3: 3,
-    4: 3,
+    2: 4,
+    3: 4,
+    4: 4,
     5: 3,
     6: 0,
     7: 0,
@@ -91,6 +93,9 @@ SHOW_RTTS = {
 MANUAL_ARGS=defaultdict(dict)
 MANUAL_ARGS['connections_slice_local_tid.system-ns.net.pdf'] = {
     'ylim':(0, 500),
+}
+MANUAL_ARGS['timeFirstByte_slice_local_local.pdf'] = {
+    'legend': 'upper left',
 }
 
 
@@ -172,8 +177,8 @@ def title(opt, remote, data):
         title += 'NumSlice=%d   LinkLatency=%d ms   Rate=5Mbps' % (num_slice, rtt)
 
     elif opt == 6:
-        num_slice = data[1, 2]
-        rtt = data[1, 3]
+        num_slice = data[1, 1]
+        rtt = data[1, 0]
         if not remote:
             title += 'NumSlice=%d   LinkLatency=%d ms' % (num_slice, rtt)
         else:
@@ -187,10 +192,10 @@ def title(opt, remote, data):
     return title
 
 
-def outfile(opt, remote, machine):
+def outfile(opt, remote, machine, extra_tag=''):
     remote_str = 'remote' if remote else 'local'
     machine_str = machine if machine else 'local'
-    filename = '%s_%s_%s.pdf' % (EXPERIMENT_NAMES[opt], remote_str, machine_str)
+    filename = '%s_%s_%s%s.pdf' % (EXPERIMENT_NAMES[opt], remote_str, machine_str, extra_tag)
     filepath = os.path.join(FIG_DIR, filename)
     return filename, filepath
 
@@ -206,14 +211,14 @@ def make_rtt_lines(endpoints, num=3):
             'line_args':{
                 'linewidth':1,
                 'color':'gray',
-                'alpha':0.5,
+                'alpha':0.7,
             },
 
             'label':'%d RTT' % i,
             'label_args':{
                 'color':'gray',
-                'alpha':0.5,
-                'size':'x-small',
+                'alpha':0.7,
+                'size':'small',
             },
         }
         lines.append(line)
@@ -288,6 +293,97 @@ def plot_series(machine, remote, result_files):
         ylabel=Y_AXIS[args.opt], guide_lines=rtt_lines,\
         #title=plot_title,\
         filename=out_filepath, **MANUAL_ARGS[out_filename])
+            
+
+# result_files is a dict: protocol -> result file path
+def plot_browser(machine, remote, result_files):
+
+    ##
+    ## plot 1: compare 4-slice version of all protocols
+    ##
+    out_filename, out_filepath = outfile(args.opt, remote, machine,\
+        extra_tag='_proto-comparison')
+
+    # need to make alternate dict of result paths
+    temp_result_files = {}
+    if 'spp_four-slices' in result_files:
+        temp_result_files['spp'] = result_files['spp_four-slices']
+    if 'spp_mod_four-slices' in result_files:
+        temp_result_files['spp_mod'] = result_files['spp_mod_four-slices']
+    if 'ssl_four-slices' in result_files:
+        temp_result_files['ssl'] = result_files['ssl_four-slices']
+    if 'fwd_four-slices' in result_files:
+        temp_result_files['fwd'] = result_files['fwd_four-slices']
+    if 'pln_four-slices' in result_files:
+        temp_result_files['pln'] = result_files['pln_four-slices']
+        
+    ys = []  # holds arrays of y values, 1 per series
+    labels = []
+    plot_title = ''
+
+    for protocol in PROTOCOLS:
+        if protocol not in temp_result_files: continue
+        filepath = temp_result_files[protocol]
+        print '[IN]', protocol, filepath
+        data = numpy.loadtxt(filepath)
+        if len(data) == 0 or\
+           len(data.shape) != 2 or\
+           data.shape[1] != 3:
+            print 'WARNING: malformed data: %s' % filepath
+            continue
+        
+        transform = numpy.vectorize(DATA_TRANSFORMS[args.opt])
+
+        ys.append(transform(data[:,2]))
+        labels.append(LEGEND_STRINGS[protocol])
+        plot_title = title(args.opt, remote, data)
+
+    print '[OUT]', out_filepath
+    myplot.cdf(ys, labels=labels, xlabel=X_AXIS[args.opt],\
+        #title=plot_title,\
+        filename=out_filepath, **MANUAL_ARGS[out_filename])
+    
+    
+    ##
+    ## plot 2: compare slice strategies (SPP only)
+    ##
+    out_filename, out_filepath = outfile(args.opt, remote, machine,\
+        extra_tag='_slicing-comparison')
+
+    ys = []  # holds arrays of y values, 1 per series
+    labels = []
+    plot_title = ''
+
+    SLICE_LEGEND = {
+        'spp_one-slice': 'TruMP (1 Slice)',
+        'spp_four-slices': 'TruMP (4 Slices)',
+        'spp_mod_four-slices': 'TruMP (4 Slices, Nagle Off)',
+        'spp_all': 'TruMP (Slice per Header)',
+    }
+
+    for protocol in ('spp_one-slice', 'spp_four-slices', 'spp_mod_four-slices', 'spp_all'):
+        if protocol not in result_files: continue
+        filepath = result_files[protocol]
+        print '[IN]', protocol, filepath
+        data = numpy.loadtxt(filepath)
+        if len(data) == 0 or\
+           len(data.shape) != 2 or\
+           data.shape[1] != 3:
+            print 'WARNING: malformed data: %s' % filepath
+            continue
+        
+        transform = numpy.vectorize(DATA_TRANSFORMS[args.opt])
+
+        ys.append(transform(data[:,2]))
+        labels.append(SLICE_LEGEND[protocol])
+        plot_title = title(args.opt, remote, data)
+
+    print '[OUT]', out_filepath
+    myplot.cdf(ys, labels=labels, xlabel=X_AXIS[args.opt],\
+        #title=plot_title,\
+        filename=out_filepath, **MANUAL_ARGS[out_filename])
+
+
 
 
 
@@ -301,11 +397,12 @@ def main():
     remote_files = defaultdict(lambda:defaultdict(list))  
     local_files = defaultdict(lambda:defaultdict(list))
     for result_file in glob.glob(RESULT_DIR + '/*%s*' % EXPERIMENT_NAMES[args.opt]):
-        m = re.match(r'.*res_(.{3}|spp_mod)_(remote_)?%s(_(.*))?' % EXPERIMENT_NAMES[args.opt], result_file)
+        m = re.match(r'.*res_((.{3}|spp_mod)(_one-slice|_four-slices)?)_(remote_)?%s(_(.*))?' %\
+            EXPERIMENT_NAMES[args.opt], result_file)
         if m:
             protocol = m.group(1)
-            remote = (m.group(2) is not None)
-            remainder = m.group(4)
+            remote = (m.group(4) is not None)
+            remainder = m.group(6)
             machine = None
 
             if remainder:  # decide if it's garbage or machine name
@@ -333,6 +430,13 @@ def main():
         for machine, result_files in local_files.iteritems():
             plot_series(machine, False, result_files)
 
+    elif args.opt == 6:
+        for machine, result_files in remote_files.iteritems():
+            plot_browser(machine, True, result_files)
+
+        for machine, result_files in local_files.iteritems():
+            plot_browser(machine, False, result_files)
+
     elif args.opt in (8,):
         for machine, result_files in remote_files.iteritems():
             plot_byte_overhead.plot_byte_scenarios(machine, True, result_files)
@@ -340,9 +444,6 @@ def main():
         for machine, result_files in local_files.iteritems():
             plot_byte_overhead.plot_byte_scenarios(machine, False, result_files)
         
-
-    # TODO: CDF for opt 6
-
     
 
     

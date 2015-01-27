@@ -42,10 +42,10 @@
 {\@dottedtocline{1}{0em}{2.3em}} \makeatother
 
 \newcommand{\spp}{TruMP\xspace}
-\newcommand{\tcpmode}{\texttt{NoEncrypt}\xspace}
-\newcommand{\etemode}{\texttt{E2E-TLS}\xspace}
-\newcommand{\splitmode}{\texttt{SplitTLS}\xspace}
-\newcommand{\sppmode}{\texttt{\spp}\xspace}
+\newcommand{\pln}{\texttt{NoEncrypt}\xspace}
+\newcommand{\fwd}{\texttt{E2E-TLS}\xspace}
+\newcommand{\ssl}{\texttt{SplitTLS}\xspace}
+\newcommand{\sppt}{\texttt{\spp}\xspace}
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 \section{Experiments}
@@ -86,27 +86,27 @@ we start on different locations.
 the number of slices $S$ and mode of operation. In this scenario, we
 run one client, mbox and server, which are connected through an 8~Mbs
 link with 20~ms network delay, \ie~80~ms RTT between client and
-server. We consider a worst case scenario for \sppmode where the mbox
+server. We consider a worst case scenario for \sppt where the mbox
 has read/write access to each slice, independently of the number of
 slices. Note that, unless otherwise specified, in the coming scenarios
 we will always assume each mbox has full read/write access to each
 slice.
 
-In \fig~\ref{fig:eval_1} \tcpmode, or no encryption, shows the
+In \fig~\ref{fig:eval_1} \pln, or no encryption, shows the
 baseline of our experiments, with a time to first byte of about 120~ms
 or 1.5 RTT. We now add focus on the modes dealing with encrypted
-traffic. Compared to today (\etemode), \sppmode only add a negligible
+traffic. Compared to today (\fwd), \sppt only add a negligible
 delay of 10~ms when $S$ is between 1 and 8 slices. With 16 slices, the
-time to first byte with \sppmode grows by about 50\%. This is due to
-the Nagle algorithm (...). \splitmode, overall, saves about 1~RTT
-compared to both \sppmode and \tcpmode: this is due to the fact that
+time to first byte with \sppt grows by about 50\%. This is due to
+the Nagle algorithm (...). \ssl, overall, saves about 1~RTT
+compared to both \sppt and \pln: this is due to the fact that
 the two TLS sessions (client-mbox and mbox-server) carry on in
-parallel. Note that we could also implement \sppmode in a split
+parallel. Note that we could also implement \sppt in a split
 fashion and enjoy a similar performance boost, but this would indeed
 violate our end-to-end principle.
 
 
-\TODO{Q: why again is \tcpmode1.5 RTT? }\\
+\TODO{Q: why again is \pln1.5 RTT? }\\
 \TODO{Run experiment for Nagel algorithm (add support to client) and
   explain results}\\
 
@@ -155,11 +155,11 @@ $N$ between 1 and 16.
 file transferred for each mode of operation described above. In this
 scenario, we set $S$ equal to 4, the network delay to 20~ms, and $N$
 equal to one.  As expected from the time to first byte analysis,
-\sppmode only minimally increases the download time compared to
-\etemode: for example, for a file transfer of 1280~KB we measure a
-download time of 570 and 540~ms for \sppmode and \etemode, \ie~an
+\sppt only minimally increases the download time compared to
+\fwd: for example, for a file transfer of 1280~KB we measure a
+download time of 570 and 540~ms for \sppt and \fwd, \ie~an
 increase of only 5\%. While difference in download time between
-\sppmode and \splitmode is more prominent, it becomes negligible at
+\sppt and \ssl is more prominent, it becomes negligible at
 the size of the transferred file grows (...) \\
 
 \TODO{Transform the figure as percentace of increase time versus the
@@ -200,10 +200,10 @@ server. Accordingly, results from controlled environment are verified.
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 We now aim to understand the impact of the additional complexity of
-\sppmode on the number of connections per second that a server (and a
+\sppt on the number of connections per second that a server (and a
 mbox) can sustain. To do so, we extend \texttt{s\_time}, the measuring
 application contained within the OpenSSL package, to support
-\sppmode. Overall, this required about X line changes. 
+\sppt. Overall, this required about X line changes. 
 
 \texttt{S\_time} infers the number of connections per second a client
 can launch without invoking the server through concurrent
@@ -234,7 +234,7 @@ measured respectively by client, mbox and server on an Intel i5
 \TODO{Due to an error in the script, server results are missing. REDO}
 
 \newpage
-Figure \ref{fig:conn_2} compares the performance of \sppmode on different hardware.
+Figure \ref{fig:conn_2} compares the performance of \sppt on different hardware.
 
 \begin{figure}[t]
 \centering

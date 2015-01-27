@@ -21,7 +21,7 @@ def records(filepath):
             if line[0] != '#':
                 fields = line.strip().split()
 
-                scenario = 'Slice: %s\nMbox: %s\nFile: %0.0f kB' %\
+                scenario = 'Slice: %s\nMbox: %s\n%0.0f kB' %\
                     (fields[0], fields[1], transform(fields[2]))
 
                 total_bytes = transform(fields[3])
@@ -41,12 +41,12 @@ def load_data(data, res_file, protocol):
         header_total, handshake_total, mac_total, alert_total,\
         in records(res_file):
 
-        data[scenario][protocol]['total'] = total_bytes
-        data[scenario][protocol]['app'] = app_total
-        data[scenario][protocol]['padding'] = padding_total
-        data[scenario][protocol]['header'] = header_total
-        data[scenario][protocol]['handshake'] = handshake_total
-        data[scenario][protocol]['mac'] = mac_total
+        data[scenario][protocol]['Total'] = total_bytes
+        data[scenario][protocol]['App Data'] = app_total
+        data[scenario][protocol]['Padding'] = padding_total
+        data[scenario][protocol]['Header'] = header_total
+        data[scenario][protocol]['Handshake'] = handshake_total
+        data[scenario][protocol]['MAC'] = mac_total
 
         scenarios.append(scenario)
 
@@ -69,7 +69,7 @@ def plot_byte_scenarios(machine, remote, result_files):
 
     #scenarios = data.keys()
     protocols = data[scenarios[0]].keys()
-    byte_types = ('app', 'header', 'padding', 'handshake', 'mac')
+    byte_types = ('App Data', 'Header', 'Padding', 'Handshake', 'MAC')
 
 
 
