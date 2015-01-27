@@ -1010,6 +1010,8 @@ int main(int argc, char **argv){
 
 			// Client/Server behavior 
 			case 'o':	action = atoi(optarg); 
+						if (action == 2)
+							action = 3;
 						break; 
 
 			// Control slicing strategy

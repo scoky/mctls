@@ -1107,6 +1107,11 @@ int main(int argc, char **argv){
 
 			// Client/Server behavior 
 			case 'o':	action = atoi(optarg); 
+						if (action == 2)
+						{
+							action = 3;
+							file_requested = "1";
+						}
 						break; 
 
 			// Action file 

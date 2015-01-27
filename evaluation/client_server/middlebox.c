@@ -548,7 +548,9 @@ int main(int argc, char **argv){
     clock_t start, end;
     double cpu_time_used; 
 	int loadTime = 0;                  // time used for load estimation (not used but for future. 0 means no printing)
-	
+	char buf[BUFSIZZ];
+	int ret;
+
 	// Handle user input parameters
 	while((c = getopt(argc, argv, "h:c:a:p:m:l:")) != -1){
 			
@@ -652,6 +654,16 @@ int main(int argc, char **argv){
 				/* no encryption... just tcp forwarding... */
 				char* fwd_host = strtok(strdup(address_to_forward), ":");	// TODO: memory leak here...
     			int fwd_port = atoi(strtok(NULL, ":"));	// port 
+
+				#ifdef DEBUG            
+		        printf("[middlebox] Waiting for request before connecting to next hop...\n"); 
+		        #endif
+    			//peeking data...
+    			ret = recv(s, buf, sizeof( buf ), MSG_PEEK); 
+				#ifdef DEBUG            
+		        printf("[middlebox] Got request (%d bytes)... connecting...\n", ret); 
+		        #endif
+
 				int next_hop =  tcp_connect(fwd_host, fwd_port);
 				tcp_forwarder(s, next_hop);
 			} else {
@@ -680,6 +692,17 @@ int main(int argc, char **argv){
 						printf("SSL accept OK\n"); 
 						#endif
 					}
+
+					#ifdef DEBUG            
+		        	printf("[middlebox] Waiting for request before connecting to next hop...\n"); 
+		        	#endif
+    				//peeking data...
+    				ret = recv(s, buf, sizeof( buf ), MSG_PEEK); 
+					#ifdef DEBUG            
+		        	printf("[middlebox] Got request (%d bytes)... connecting...\n", ret); 
+		        	#endif
+
+
 					ssl_next = create_SSL_connection(address_to_forward, "ssl");
 				}
 				/*
