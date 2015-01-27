@@ -412,14 +412,19 @@ void sendRequestBrowser(char *filename){
 	char *padding;
 	int toAllocate; 
 	if (strcmp(proto, "spp") == 0){
-		toAllocate = (req_len_arr[0] - get_len - 5); 
+		//toAllocate = (req_len_arr[0] - get_len - 5); 
+		toAllocate = (req_len_arr[0] - get_len); 
 	} else {
-		toAllocate = (request_len - get_len - 5); 
+		//toAllocate = (request_len - get_len - 5); 
+		toAllocate = (request_len - get_len); 
 	}
 
+	#ifdef DEBUG	
 	printf ("[DEBUG] Allocating %d for padding\n", toAllocate); 
-	padding = (char*) malloc(toAllocate);
+	#endif 
+	padding = (char*) malloc(toAllocate + 1);
 	memset(padding, '?', toAllocate);	
+	padding[toAllocate] = 0;
 	if (strcmp(proto, "spp") == 0){
 		request = (char*) malloc(req_len_arr[0]);
 	}else{

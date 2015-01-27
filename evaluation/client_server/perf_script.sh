@@ -36,7 +36,7 @@ protoList[1]="ssl"         # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
-#protoList[5]="spp_mod"
+protoList[5]="spp_mod"
 
 #--------------------------# ADDITION FOR REMOTE VERSION
 REMOTE=$5                  # 1=remote ; 0=local 
@@ -423,27 +423,19 @@ case $expType in
 		;;
 
 	6)	# Measure download time in browser-like behavior 
-		echo "[PERF] Measure download time in browser-like behavior"
+		MAX_LOOP=10000
 		opt=4
 		strategy="cs"
-	
-		# switch on user input (one ; four ; all)
-		#str="one"
-		str="four"
-		#str="all"
-		if [ $str == "one" ] 
-		then 
-			key="one-slice"
-		fi
-		if [ $str == "four" ] 
-		then 
-			key="four-slices"
-		fi
-		if [ $str == "all" ] 
-		then 
-			key="slice-per-header"
-		fi
-
+		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
+		browser_fold="./browser"
+		mkdir -p $browser_fold
+		rm $browser_fold"log_perf_"*
+		
+		# test with specif subset of files 
+		expSlice[0]="one"
+		expSlice[1]="four"
+		expSlice[2]="all"
+		
 		# Remote NOT supported yet
 		if [ $REMOTE -eq 1 ] 
 		then 
@@ -451,13 +443,14 @@ case $expType in
 			exit 0 
 		fi	
 	
-		# Update res file 
-		resFile=$resFile"_downloadTime_browser"
-
-		# Cleaning
-		if [ -f $resFile ] 
-		then 
-			rm -v $resFile
+		# Cleaning 
+		if [ -f .tmp ] 
+		then
+			rm .tmp
+		fi
+		if [ -f .tmpMore ] 
+		then
+			rm .tmpMore
 		fi
 
 		# Start the server 
@@ -466,113 +459,140 @@ case $expType in
 		# Start middleboxes 
 		organizeMBOXES
 
-		# Run until no action 
-		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
+		# Start loop among input files 
 		loop=0
-		MAX_LOOP=10
 		th=10
 		counter=1
-		for f in `ls $actionFolder | grep "$key"`    
-		do
-			echo "[PERF] Working on action file $f"
-			if [ $loop -eq $MAX_LOOP ] 
-			then 
-				echo "[PERF] Stopping since tested already <<$loop>> actionFiles"
-				break 
-			fi
-            
-			# cleanup + prepare 1 file per connection 
-            for i in `ls ./actionFiles`
-			do
-				rm "./actionFiles/"$i
-			done
-			N_clients=`cat $actionFolder"/"$f | awk '{if (conn[$NF] == 0){conn[$NF] = 1; count = count + 1;}}END{print count}'`
-			
-			# filter last bogus object 
-			let "N_clients--"
-			
-			if [ $N_clients -gt $th ] 
-			then 
-				echo "[PERF] File $f skipped since it requires more than $th connections"
-				continue
-			else
-				echo "[PERF] $N_clients connections were found"
-				if [ $N_clients -eq 1 ]
-				then
-					# Compute number of objects requested in that single connection  
-					N_objects=`wc -l $actionFolder"/"$f | cut -f 1 -d " "`
-					
-					# filter last bogus object 
-					let "N_objects--"
-					
-					if [ $N_objects -eq 1 ]
-					then 
-						echo "[PERF] File $f skipped since it contains only $N_clients connection with $N_objects object"
-						continue 
-					else
-						echo "[PERF] File $f contains $N_clients connection with $N_objects objects"
-					fi
-				fi	
-			fi
-			cat $actionFolder"/"$f | awk '{if (NF>0){print $0 >> "./actionFiles/conn_"$NF}}'
-			N_clients=0
 		
-			# Compute number of slices needed 
-			s=`head -n 1 "./actionFiles/conn_0" | cut -f 2 -d " " | cut -f 1 -d ";" | awk 'BEGIN{FS="_";}{print NF}'`
-			echo "[PERF] $s slices extracted from action file"
+		# external loop on subset of files
+		k_count=${#expSlice[@]}
+		for ((j=0; j<k_count; j++))
+		do
+			str=${expSlice[j]}
+			if [ $str == "one" ] 
+			then 
+				k="one-slice"
+			fi
+			if [ $str == "four" ] 
+			then 
+				k="four-slices"
+			fi
+			if [ $str == "all" ] 
+			then 
+				k="slice-per-header"
+			fi
+
+			# Update res file 
+			resFileK=$resFile"_"$k"_page_load_time"
+			resTraces=$resFolder"/res_traces_"$k"_page_load_time"
 			
-			# Starting all clients needed
-			for i in `ls ./actionFiles`
-			do
-				#echo $loop >> .tmp
-				let "N_clients++"
-				echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i"
-				# parallel
-				#./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> $log"_"$i 2>/dev/null &
-				# sequential 
-				./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> log_test_browser
-				echo $counter >> counter_test_browser
-				let "counter++"
-				sleep 1
-			done
+			# Cleaning
+			if [ -f $resFileK ] 
+			then 
+				rm -v $resFileK
+			fi
+			if [ -f $resTraces ] 
+			then 
+				rm -v $resTraces
+			fi
+
 			# Logging 
-			echo "[PERF] Started $N_clients in parallel"
-			active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
-			while [ $active -gt 0 ] 
-			do 
-				echo "[PERF] Still $active clients running (sleeping 5 sec)"
-				sleep 5 
+			echo "[PERF] Measure download time in browser-like behavior. Max loop = $MAX_LOOP. Traces with key $k"
+
+			for f in `ls $actionFolder | grep "$k"`    
+			do
+				echo "[PERF] Working on action file $f"
+				if [ $loop -eq $MAX_LOOP ] 
+				then 
+					echo "[PERF] Stopping since tested already <<$loop>> actionFiles"
+					break 
+				fi
+				
+				# cleanup + prepare 1 file per connection 
+				for i in `ls ./actionFiles`
+				do
+					rm "./actionFiles/"$i
+				done
+				N_clients=`cat $actionFolder"/"$f | awk '{if (conn[$NF] == 0){conn[$NF] = 1; count = count + 1;}}END{print count}'`
+				
+				# update download time from traces 
+				tail -n 1 $actionFolder"/"$f | cut -f 1 -d " " >>  $resTraces
+				
+				# filter last bogus object 
+				let "N_clients--"
+				
+				if [ $N_clients -gt $th ] 
+				then 
+					echo "[PERF] File $f skipped since it requires more than $th connections"
+					continue
+				else
+					echo "[PERF] $N_clients connections were found"
+					if [ $N_clients -eq 1 ]
+					then
+						# Compute number of objects requested in that single connection  
+						N_objects=`wc -l $actionFolder"/"$f | cut -f 1 -d " "`
+						
+						# filter last bogus object  (not there anymore)
+						#let "N_objects--"
+						
+						if [ $N_objects -eq 1 ]
+						then 
+							echo "[PERF] File $f skipped since it contains only $N_clients connection with $N_objects object"
+							continue 
+						else
+							echo "[PERF] File $f contains $N_clients connection with $N_objects objects"
+						fi
+					fi	
+				fi
+				# retrieve site name 
+				suff=`echo $f | cut -f 1 -d "_" | awk 'BEGIN{FS="---";}{print $2}'`
+				
+				# split per connection 
+				cat $actionFolder"/"$f | awk '{if (NF>0){print $0 >> "./actionFiles/conn_"$NF}}'
+				N_clients=0
+			
+				# Compute number of slices needed 
+				s=`head -n 1 "./actionFiles/conn_0" | cut -f 2 -d " " | cut -f 1 -d ";" | awk 'BEGIN{FS="_";}{print NF}'`
+				echo "[PERF] $s slices extracted from action file"
+				
+				# Starting all clients needed
+				for i in `ls ./actionFiles`
+				do
+					#echo $loop >> .tmp
+					let "N_clients++"
+					echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i"
+					# parallel
+					(./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i > $browser_fold"/"$log"_"$k"_"$suff"_"$i 2>/dev/null &)
+					# sequential (for testing) 
+					#./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> log_test_browser
+					#echo $counter >> counter_test_browser
+					let "counter++"
+				done
+				# Logging 
+				echo "[PERF] Started $N_clients in parallel"
 				active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
+				while [ $active -gt 0 ] 
+				do 
+					echo "[PERF] Still $active clients running (sleeping 5 sec)"
+					sleep 5 
+					active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
+				done
+				
+				# Wait for all connections to be done than compute page load time (max across)
+				cat $browser_fold"/"$log"_"$k"_"$suff"_"* | awk 'BEGIN{MAX = 0;}{if($NF > MAX){MAX = $NF;}}END{print MAX}' >> .tmpMore
+				let "loop++"
+				echo $delay $nProxy >> .tmp
+
 			done
-			# Wait to be all done then either analyze or merge or other 
-			# TODO
-			#	
-			let "loop++"
+			
+		
+			# Merge results for plotting
+			paste .tmp .tmpMore > $resFileK
+			rm .tmp .tmpMore
 		done
 		
-		echo "[PERF] !!Temoporary stopping!!! Analysis need to bed done yet (check files $log"_*")!!"
-		exit 0 
-	
-		# Results
-		if [ -f $log ] 
-		then  
-			if [ $debug -eq 1 ]
-			then 
-				echo "#Download Time Analysis" > $resFile
-				echo "#Loop Slices Delay AvgDur StdDur" >> $resFile 
-			fi
-			let "fix2=nProxy"
-			
-			# fixing log file 
-			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
-			paste .tmp .tmpMore > .res
-			
-			# Analyzing (corrected) log 
-			cat .res  |  awk -v fix1=$s -v fix2=$delay -v S=0 -f stdev.awk > $resFile
-			rm .tmp .tmpMore 
-		else
-			echo "[PERF] No file <<$log>> created, check for ERRORS!"
-		fi
+		# All good 
+		echo "[PERF] All good -- check logs $log"_browser_* in folder $browser_fold")!!"
 		;;
 
 	7)  

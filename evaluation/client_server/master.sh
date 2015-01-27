@@ -2,7 +2,7 @@
 
 # Function to print script usage
 usage(){
-    echo -e "Usage: $0 opt remote [plotCommand]"
+    echo -e "Usage: $0 opt remote [plotCommand debug tmp]"
     echo -e "opt = {(0) (1) (2) (3) (4) (5) (6) (7) (8)}"
     echo -e "\t(0) Pull new code and compile"
 	echo -e "\t(1) Handshake duration (not used)" 
@@ -38,12 +38,12 @@ tcpTrick(){
 [[ $# -lt 3 ]] && usage
 
 # Parameters
-if [ $# -eq 6 ]
+if [ $# -ge 6 ]
 then 
 	tmp=$6
 else
 	tmp=0
-end
+fi
 
 # result folder 
 if [ $tmp -eq 1 ] 
@@ -52,6 +52,8 @@ then
 else
 	resFolder="../results/tmp"  
 fi 
+
+matlabFolder="../results" # matlab folder 
 R=50                      # number of repetitions
 S_max=16                  # max number of slices 
 rate=1                    # common rate
@@ -82,12 +84,12 @@ localFolder=$HOME"WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol
 proto_count=${#protoList[@]}
 
 # read user plot input if provided
-if [[ $# -eq 4 ]]
+if [[ $# -ge 4 ]]
 then 
 	plotCommand=$4
 fi
 # instead of running just print commands
-if [ $# -eq 5 ]
+if [ $# -ge 5 ]
 then 
 	debug=$5                  
 fi
@@ -372,7 +374,14 @@ if [ $plotCommand == "matlab" ]
 then 
 	echo "[MASTER] Plotting results (option $opt)"
 	echo "[MATLAB] Running MATLAB...(it takes some time at first launch)"
-	matlab -nodisplay -nosplash -r "cd $resFolder; plotSigcomm($opt, $remote, $parallel); quit"
+
+	if [ $opt -eq 7 ] 
+	then 
+		matlab -nodisplay -nosplash -r "cd $matlabFolder; plotSigcomm($opt, $remote, $parallel, 'client', $tmp); plotSigcomm($opt, $remote, $parallel, 'mbox', $tmp); plotSigcomm($opt, $remote, $parallel, 'server', $tmp);quit"
+	else 
+		echo "plotSigcomm($opt, $remote, $parallel, 'none', $tmp)"
+		matlab -nodisplay -nosplash -r "cd $matlabFolder; plotSigcomm($opt, $remote, $parallel, 'none', $tmp); quit"
+	fi
 
 	# Generating summary report 
 	cd ../results 
