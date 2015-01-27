@@ -62,7 +62,10 @@ again:
             /* New header fields: slice_id, proxy_id */
             rr->slice_id = *(p++);
             
-            s->read_stats.header_bytes += SPP_RT_HEADER_LENGTH;
+            if (rr->type == SSL3_RT_HANDSHAKE || rr->type == SSL3_RT_CHANGE_CIPHER_SPEC)
+                s->read_stats.handshake_bytes += SPP_RT_HEADER_LENGTH;
+            else
+                s->read_stats.header_bytes += SPP_RT_HEADER_LENGTH;
             s->read_stats.bytes += rr->length + SPP_RT_HEADER_LENGTH;
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -1070,7 +1073,11 @@ static int do_spp_write(SSL *s, int type, const unsigned char *buf,
         s->write_stats.handshake_bytes += len;
     else if (type == SSL3_RT_ALERT)
         s->write_stats.alert_bytes += len;
-    s->write_stats.header_bytes += SPP_RT_HEADER_LENGTH;
+    
+    if (type == SSL3_RT_HANDSHAKE || type == SSL3_RT_CHANGE_CIPHER_SPEC)
+        s->write_stats.handshake_bytes += SPP_RT_HEADER_LENGTH;
+    else
+        s->write_stats.header_bytes += SPP_RT_HEADER_LENGTH;
 #ifdef DEBUG
     fprintf(stderr, "Writing record header: ");
     spp_print_buffer(wb->buf + wb->offset, SPP_RT_HEADER_LENGTH);

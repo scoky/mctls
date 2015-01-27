@@ -334,7 +334,10 @@ again:
 		version=(ssl_major<<8)|ssl_minor;
 		n2s(p,rr->length);
                 
-                s->read_stats.header_bytes += SSL3_RT_HEADER_LENGTH;
+                if (rr->type == SSL3_RT_HANDSHAKE || rr->type == SSL3_RT_CHANGE_CIPHER_SPEC)
+                    s->read_stats.handshake_bytes += SSL3_RT_HEADER_LENGTH;
+                else
+                    s->read_stats.header_bytes += SSL3_RT_HEADER_LENGTH;
                 s->read_stats.bytes += rr->length + SSL3_RT_HEADER_LENGTH;
 #if 0
 fprintf(stderr, "Record type=%d, Length=%d\n", rr->type, rr->length);
@@ -810,7 +813,11 @@ static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
             s->write_stats.handshake_bytes += len;
         else if (type == SSL3_RT_ALERT)
             s->write_stats.alert_bytes += len;
-        s->write_stats.header_bytes += SSL3_RT_HEADER_LENGTH;
+        
+        if (type == SSL3_RT_HANDSHAKE || type == SSL3_RT_CHANGE_CIPHER_SPEC)
+            s->write_stats.handshake_bytes += SSL3_RT_HEADER_LENGTH;
+        else
+            s->write_stats.header_bytes += SSL3_RT_HEADER_LENGTH;
         
 	/* Explicit IV length, block ciphers and TLS version 1.1 or later */
 	if (s->enc_write_ctx && s->version >= TLS1_1_VERSION)
