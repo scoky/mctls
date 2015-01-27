@@ -433,8 +433,8 @@ case $expType in
 		
 		# test with specif subset of files 
 		expSlice[0]="one"
-		expSlice[1]="four"
-		expSlice[2]="all"
+		#expSlice[0]="four"
+		#expSlice[2]="all"
 		
 		# Remote NOT supported yet
 		if [ $REMOTE -eq 1 ] 
@@ -807,6 +807,157 @@ case $expType in
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
 		fi
 		;;
+
+	
+	9) 
+		echo "[PERF] Time to first byte (f[scenarios])"
+		opt=3
+		strategy="cs"
+
+		## File sizes percentile from Alexa
+		#10th percentile:        470.000000 B  			<--------
+		#25th percentile:        1473.250000 B
+		#50th percentile:        5009.000000 B			<--------
+		#75th percentile:        16201.000000 B
+		#90th percentile:        42101.000000 B
+		#99th percentile:        190073.900000 B		<--------
+		##
+		## Avg from YouTube
+		#	10MB										<--------
+		## Speed from SpeedTets [1, 10, 100]Mbps
+
+		# Define scenarios to test (file size, rate, local/remote)
+		declare -A scenarios
+		# variable fileSize 
+		scenarios[1,"fileSize"]=470   #Bytes
+		scenarios[1,"rate"]=1         #Mbps
+		scenarios[1,"remote"]=0       #0=local, 1=remote
+		
+		scenarios[2,"fileSize"]=5009
+		scenarios[2,"rate"]=1
+		scenarios[2,"remote"]=0       
+		
+		scenarios[3,"fileSize"]=190073
+		scenarios[3,"rate"]=1
+		scenarios[3,"remote"]=0       
+	
+		scenarios[4,"fileSize"]=10485760
+		scenarios[4,"rate"]=1
+		scenarios[4,"remote"]=0       
+		
+		# variable Rate
+		scenarios[5,"fileSize"]=470   
+		scenarios[5,"rate"]=10        
+		scenarios[5,"remote"]=0       
+		
+		scenarios[6,"fileSize"]=5009
+		scenarios[6,"rate"]=10
+		scenarios[6,"remote"]=0       
+		
+		scenarios[7,"fileSize"]=190073
+		scenarios[7,"rate"]=10
+		scenarios[7,"remote"]=0       
+	
+		scenarios[8,"fileSize"]=10485760
+		scenarios[8,"rate"]=10
+		scenarios[8,"remote"]=0       
+
+		scenarios[9,"fileSize"]=470   
+		scenarios[9,"rate"]=100        
+		scenarios[9,"remote"]=0       
+		
+		scenarios[10,"fileSize"]=5009
+		scenarios[10,"rate"]=100
+		scenarios[10,"remote"]=0       
+		
+		scenarios[11,"fileSize"]=190073
+		scenarios[11,"rate"]=100
+		scenarios[11,"remote"]=0       
+	
+		scenarios[12,"fileSize"]=10485760
+		scenarios[12,"rate"]=100
+		scenarios[12,"remote"]=0       
+
+		# Amazon 
+		scenarios[13,"fileSize"]=5009
+		scenarios[13,"rate"]=-1
+		scenarios[13,"remote"]=1       
+
+		scenarios[14,"fileSize"]=10485760
+		scenarios[14,"rate"]=-1
+		scenarios[14,"remote"]=1       
+
+		let "numScenarios=${#scenarios[@]}/3"
+		echo "[PERF] Testing $numScenarios scenarios"
+
+		# Update res file 
+		resFile=$resFile"_rate_fsize_scenarios"
+		if [ -f $resFile ] 
+		then 
+			rm -v $resFile
+		fi
+
+		# Start the server
+		start_server
+		
+		# Run each scenario
+		for((s=1; s<=$numScenarios; s++))
+		do
+			# Extract file size 
+			fSize=${scenarios[$s,"fileSize"]}
+
+			# Setup network if not remote 
+			remote=${scenarios[$s,"remote"]}
+			if [ $remote -eq 0 ]
+			then 
+				rate=${scenarios[$s,"rate"]}
+				./network.sh 1 $rate $rate $delay $iface
+			fi		
+
+			# Read proxy from (updated) file
+			readMboxes
+
+			# Proxy setup 
+			organizeMBOXES
+
+			# Run R repetitions	of scenario s
+			echo "[PERF] Testing $R reps with ${scenarios[$s,"numSlices"]} slices, ${scenarios[$s,"numMboxes"]} mboxes, ${scenarios[$s,"fileSize"]} byte file"
+			for((i=1; i<=R; i++))
+			do
+				echo $fSize $rate $remote >> .tmp
+				./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1
+			done
+	
+			# cleanup the local network if not remote
+			if [ $remote -eq 0 ]
+			then 
+				./network.sh 2
+			fi
+		done
+		
+		# Results
+		if [ -f $log ] 
+		then  
+			if [ $debug -eq 1 ]
+			then 
+				echo "#Time to first byte Analysis" > $resFile
+				echo "#FileSize Rate Remote Duration" >> $resFile 
+			fi
+			# fixing log file 
+			cat $log | grep "Action" | cut -f 7 -d " " > .tmpMore
+			paste .tmp .tmpMore > .res
+			
+			# Analyzing (corrected) log 
+			match=`head -n 1 .res | awk '{print $1"_"$2"_"$3}'`
+			cat .res  |  awk -v S=$match -f stdev3.awk > $resFile
+			rm .tmp .tmpMore 
+
+		else
+			echo "[PERF] No file <<$log>> created, check for ERRORS!"
+		fi
+		;;
+
+
 
 	*)	
 		;;

@@ -304,12 +304,7 @@ then
 		;;
 	
 	6) 
-		echo "[MASTER] $adj analysis of download time in browser-like mode"
-		echo "!!![MASTER] Using only 10 repetitions (for testing)!!!"
-		#----------------
-		R=10
-		#----------------
-		S_max=4
+		echo "[MASTER] $adj analysis of page loading time in browser-like mode"
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
@@ -318,9 +313,9 @@ then
 			# run analysis
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $rate $maxRate $delay $iface >> $log"
+				echo "./perf_script.sh 1 1 $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null"
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				./perf_script.sh 1 1 $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
 		done
 		;;
