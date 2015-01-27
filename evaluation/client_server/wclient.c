@@ -424,18 +424,20 @@ void sendRequestBrowser(char *filename){
 	printf ("[DEBUG] Allocating %d for padding\n", toAllocate); 
 	#endif 
 	padding = (char*) malloc(toAllocate + 1);
-	printf ("[DEBUG] Padding = %p\nMemsetting\n", padding); 
 	memset(padding, '?', toAllocate);
-	printf ("[DEBUG] Setting \0\n"); 
 	padding[toAllocate] = 0;
 	if (strcmp(proto, "spp") == 0){
 		request = (char*) malloc(req_len_arr[0] + 1);
 	}else{
 		request = (char*) malloc(request_len + 1); 
 	}
-	
+	// Copy get_str without \0
+	memcpy(request, get_str, strlen(get_str));
+	// Copy padding with \0
+	memcpy(request+strlen(get_str), padding, strlen(padding)+1);
+
 	//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
-	sprintf(request, "%s%s", get_str, padding); 
+	//sprintf(request, "%s%s", get_str, padding); 
 	
 	
 	#ifdef DEBUG

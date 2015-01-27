@@ -1,0 +1,2972 @@
+<!doctype html>
+
+<html class="no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="description" content="Explore broadband and mobile performance statistics from around the world. Compiled from billions of tests run on Ookla’s websites and apps like Ookla Speedtest" />
+	<meta name="keywords" lang="en" content="download speed, upload speed, r-factor, mos, voip, quality, internet, connection, broadband, dsl, cable, residential, household, statistics" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Download Speed by Country | Net Index from Ookla</title>
+	<link rel="stylesheet" type="text/css" href="//cloud.typography.com/7800252/634742/css/fonts.css" />
+	<link rel="stylesheet" type="text/css" href="http://cdn.netindex.com/global/dist/styles/main.css?v=1.8" media="screen" />
+	<link rel="stylesheet" href="//api.tiles.mapbox.com/mapbox.js/v1.6.0/mapbox.css">
+	<link rel="shortcut icon" href="http://cdn.netindex.com/images/favicon.ico?v=1.2" type="image/x-icon" />
+	<script src="//api.tiles.mapbox.com/mapbox.js/v1.6.0/mapbox.js"></script>
+	<script src="http://cdn.netindex.com/global/lib/modernizr-2.7.1.min.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/lib/grunticon-loader.min.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/lib/jquery-1.9.1.min.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/lib/underscore-1.4.4.min.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/lib/d3.v3.min.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/lib/topojson.v1.min.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/main.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/map.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/map-controller.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/graph.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/graph-controller.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/bar-chart-controller.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/fixie.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/dropdown.js?v=1.0"></script>
+	<script src="http://cdn.netindex.com/global/js/modal.js?v=1.0"></script>
+	
+</head>
+<body id="top" class="">
+<!-- Google Tag Manager -->
+<noscript><iframe src="//www.googletagmanager.com/ns.html?id=GTM-5PLCZL"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-5PLCZL');</script>
+<!-- End Google Tag Manager -->
+
+<div class="ookla-properties-nav container clearfix">
+  <ul class="ookla-properties">
+    <li><a href="https://www.ookla.com/">Ookla</a></li>
+    <li><a href="http://www.speedtest.net/">Speedtest</a></li>
+    <li><a href="http://www.pingtest.net/">Pingtest</a></li>
+    <li class="active">NetIndex</li>
+  </ul>
+  <p class="ookla-properties-tagline">The Global Standard in Internet Metrics</p>
+</div>
+
+    <header class="header clearfix" role="banner">
+      <div class="container">
+        <a href="/" class="logo"><b class="text-hide icon-logo">Ookla</b> Net Index</a>
+
+        <ul class="user-menu">
+
+          <li class="user-menu-centered">
+            <a id="my_loc_href" href="#" onClick="getMyLocation()"><i class="icon-location"></i> Go to my Location</a>
+            <script type="text/javascript">  
+	
+	  function goMyLocation(loc) {
+		if (loc.address) {
+			var zip = loc.address.postalCode;
+		} else {
+			var zip = '';
+		}
+		
+	    window.location = "/my_location.php?index=download&lat=" + loc.coords.latitude + "&lon=" + loc.coords.longitude + "&accuracy=" + loc.coords.accuracy +
+	        "&zip=" + zip;
+	  }
+
+      function errorHandler(err) {
+		if (err.code == 1) {
+			// user said no!
+		} else if (err.code == 2) {
+			// position unavailable
+		} else if (err.code == 3) {
+			// timeout
+		} else {
+			// unknown
+		}
+		
+		window.location = "/my_location.php?index=download";
+      }
+
+	  function getMyLocation() {
+		if (navigator.geolocation) {
+	      navigator.geolocation.getCurrentPosition(goMyLocation, errorHandler, {enableHighAccuracy: false, timeout: 5000, maximumAge: 24*60*60*1000});  // cache for 24 hours
+	      var href = document.getElementById("my_loc_href"); 
+	    } else {
+			window.location = "/my_location.php?index=download";
+	    }
+	  }
+</script>
+          </li>
+
+          <li>
+            <a class="icon-uservoice" id="feedback" href="#">Feedback</a>
+          </li>
+
+          <li>
+            <a class="user-menu-faq" href="/faq.php">FAQ</a>
+          </li>
+
+          <li>
+            <ul class="list-horizontal">
+              <li>
+                <a class="text-hide icon-facebook" href="http://go.ookla.com/facebook">Facebook</a>
+              </li>
+              <li>
+                <a class="text-hide icon-twitter" href="http://go.ookla.com/twitter">Twitter</a>
+              </li>
+              <li>
+                <a class="text-hide icon-google-plus" href="http://go.ookla.com/google+">Google +</a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+
+        <nav class="nav clearfix" role="navigation">
+          <section class="nav-section">
+            <h2 class="nav-heading">Global Broadband</h2>
+
+            <ul>
+              <li>
+                <a class="nav-item highlight active" href="/download/">
+                  Download
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip-mini-masthead">
+                      <p>Rolling average consumer download speed, extrapolated by IP and averaged over the last 30 days.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">22.0</b>
+                    <span class="figure-unit">Mbps</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="nav-item highlight " href="/upload/">
+                  Upload
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip-mini">
+                      <p>Rolling average consumer upload speed, extrapolated by IP and averaged over the last 30 days.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">9.8</b>
+                    <span class="figure-unit">Mbps</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="nav-item " href="/quality/">
+                  Quality
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip-mini">
+                      <p>The average R-Factor, which is an industry standard method for measuring connection stability by monitoring packet loss and delay. We average tests collected via Pingtest.net over the past 30 days.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">84.4</b>
+                    <span class="figure-unit">R-Factor</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="nav-item " href="/value/">
+                  Value
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip-mini">
+                      <p>The global median broadband cost in US dollars per Megabit per second, averaged based on customer surveys.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">$5.44</b>
+                    <span class="figure-unit">USD</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="nav-item " href="/promise/">
+                  Promise
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip-mini">
+                      <p>The global median download speed as a percentage of service providers’ advertised speed, averaged based on customer surveys.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">87.0 %</b>
+                  </div>
+                </a>
+              </li>
+            </ul>
+          </section>
+
+          <section class="nav-section">
+            <h2 class="nav-heading">Global Mobile</h2>
+
+            <ul>
+              <li>
+                <a class="nav-item highlight-alt " href="/mdownload/">
+                  Download
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip-mini-masthead">
+                      <p>Rolling average consumer download speed on mobile devices, extrapolated by device and averaged over the last 30 days.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">11.6</b>
+                    <span class="figure-unit">Mbps</span>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="nav-item highlight-alt " href="/mupload/">
+                  Upload
+                  <div class="tooltip-container nav-item-tooltip">
+                    <button class="icon-info-mini text-hide tooltip-toggle"></button>
+                    <div class="tooltip tooltip--bottomleft tooltip-mini-masthead">
+                      <p>Rolling average consumer upload speed on mobile devices, extrapolated by device and averaged over the last 30 days.</p>
+                    </div>
+                  </div>
+                  <div class="figure">
+                    <b class="figure-content">4.7</b>
+                    <span class="figure-unit">Mbps</span>
+                  </div>
+                </a>
+              </li>
+            </ul>
+          </section>
+        </nav>
+      </div>
+    </header>
+    <main class="">
+<div class="brick container-narrow">
+        <div class="pure-g-r">
+          <div class="pure-u-5-8 copy-small module">
+            <h1 class="copy-headline">Household Download Index</h1>
+
+            <p>Based on millions of recent test results from <a href="http://www.speedtest.net" target="_blank">Ookla Speedtest</a>, this index compares and ranks consumer download speeds around the globe. The value is the rolling mean speed in Mbps over the past 30 days. Only tests taken within 300 miles of the server are eligible for inclusion in the index.
+</p>
+          </div>
+
+          <div class="pure-u-1-4 summary-figure">
+            <div class="figure figure-large">
+              <b class="figure-content top-mbps">22.00</b>
+              <span class="figure-unit">Mbps</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="location-section container-narrow">
+        <h2 class="record-heading area"></h2>
+        <ul class="record-group">
+	
+<li class="record g8">
+	<a href="/download/1,5/G8/">
+		G8
+		<div class="figure">
+			<b class="figure-content value">28.7</b>
+			<span class="figure-unit">Mbps</span>
+		</div>
+	</a>
+</li>
+
+<li class="record oecd">
+	<a href="/download/1,8/OECD/">
+		OECD
+		<div class="figure">
+			<b class="figure-content value">27.3</b>
+			<span class="figure-unit">Mbps</span>
+		</div>
+	</a>
+</li>
+
+<li class="record eu">
+	<a href="/download/1,7/EU/">
+		EU
+		<div class="figure">
+			<b class="figure-content value">27.1</b>
+			<span class="figure-unit">Mbps</span>
+		</div>
+	</a>
+</li>
+
+<li class="record apec">
+	<a href="/download/1,1/APEC/">
+		APEC
+		<div class="figure">
+			<b class="figure-content value">25.0</b>
+			<span class="figure-unit">Mbps</span>
+		</div>
+	</a>
+</li>
+
+</ul>
+  
+
+      </div>
+
+      <div class="graph"></div>
+      <script>
+  App.incomingGraphs.push({
+    containerSelector: ".graph",
+    index: "download",
+    index_level: "1",
+    id: "9"
+  });
+</script>
+
+
+      <section>
+        <h2 class="map-heading heading">Global Map</h2>
+        <div class="map map-large"></div>
+        <script>
+  App.incomingMaps.push({
+    containerSelector: ".map",
+    dataUrl: "http://cdn.netindex.com/ammap-data.php?level=1&id=9&index=download&update=Jan 26, 2015"
+  });
+</script>
+
+      </section>
+
+      <div class="banner">
+        <div class="container">
+          <a class="btn btn-inverse" href="http://explorer.netindex.com/" target="_blank"><i class="icon-globe-btn icon-inline"></i> View in Net Index Explorer</a>
+        </div>
+      </div>
+
+      <div class="ranking-group container">
+        <div class="all-countries"></div>
+        <div class="top-20-countries"><div class="brick">
+	<h2 class="heading">
+    All Countries
+
+    <div class="tooltip-container heading-tooltip ">
+      <button class="icon-info-mini text-hide tooltip-toggle"></button>
+      <div class="tooltip tooltip-mini">
+      	<p>Top Twenty Country Ranking requires at least 100,000 unique IP addresses for a given country.</p>
+      	<p>Graph Period:<br> Jul 27, 2012 - Jan 26, 2015</p>
+      </div>
+    </div>
+  </h2>
+</div>
+
+<div class="ranking-grid pure-g-r">
+  <div class="col-spaced pure-u-1-2">
+	<ol class="ranking">
+    <li class="ranking-item">
+  <a class="ranking-link" href="/download/2,17/Singapore/">
+    <div class="figure">
+      <b class="figure-content">104.21</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SG'></i>Singapore
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,91/Hong-Kong/">
+    <div class="figure">
+      <b class="figure-content">96.36</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag HK'></i>Hong Kong
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,78/Japan/">
+    <div class="figure">
+      <b class="figure-content">70.81</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag JP'></i>Japan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,89/South-Korea/">
+    <div class="figure">
+      <b class="figure-content">64.24</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KR'></i>South Korea
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,9/Romania/">
+    <div class="figure">
+      <b class="figure-content">59.52</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag RO'></i>Romania
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,6/Sweden/">
+    <div class="figure">
+      <b class="figure-content">54.38</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SE'></i>Sweden
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,149/Macau/">
+    <div class="figure">
+      <b class="figure-content">48.45</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MO'></i>Macau
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,115/Monaco/">
+    <div class="figure">
+      <b class="figure-content">47.58</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MC'></i>Monaco
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,77/Lithuania/">
+    <div class="figure">
+      <b class="figure-content">45.70</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LT'></i>Lithuania
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,48/Netherlands/">
+    <div class="figure">
+      <b class="figure-content">45.35</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NL'></i>Netherlands
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,45/Switzerland/">
+    <div class="figure">
+      <b class="figure-content">45.20</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CH'></i>Switzerland
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,98/Taiwan/">
+    <div class="figure">
+      <b class="figure-content">44.01</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TW'></i>Taiwan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,12/Denmark/">
+    <div class="figure">
+      <b class="figure-content">42.44</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag DK'></i>Denmark
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,39/Latvia/">
+    <div class="figure">
+      <b class="figure-content">42.14</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LV'></i>Latvia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,79/Iceland/">
+    <div class="figure">
+      <b class="figure-content">40.19</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IS'></i>Iceland
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,82/Republic-of-Moldova/">
+    <div class="figure">
+      <b class="figure-content">39.57</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MD'></i>Republic of Moldova
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,118/Luxembourg/">
+    <div class="figure">
+      <b class="figure-content">37.30</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LU'></i>Luxembourg
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,28/France/">
+    <div class="figure">
+      <b class="figure-content">36.85</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag FR'></i>France
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,29/Andorra/">
+    <div class="figure">
+      <b class="figure-content">36.52</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AD'></i>Andorra
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,33/Finland/">
+    <div class="figure">
+      <b class="figure-content">33.32</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag FI'></i>Finland
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,57/Norway/">
+    <div class="figure">
+      <b class="figure-content">33.10</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NO'></i>Norway
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,71/Belgium/">
+    <div class="figure">
+      <b class="figure-content">33.09</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BE'></i>Belgium
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,234/Aland-Islands/">
+    <div class="figure">
+      <b class="figure-content">33.06</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AX'></i>Aland Islands
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,19/Estonia/">
+    <div class="figure">
+      <b class="figure-content">32.59</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag EE'></i>Estonia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,1/United-States/">
+    <div class="figure">
+      <b class="figure-content">32.41</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag US'></i>United States
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,70/Bulgaria/">
+    <div class="figure">
+      <b class="figure-content">32.36</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BG'></i>Bulgaria
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,34/Hungary/">
+    <div class="figure">
+      <b class="figure-content">31.76</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag HU'></i>Hungary
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,4/United-Kingdom/">
+    <div class="figure">
+      <b class="figure-content">29.40</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GB'></i>United Kingdom
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,32/Israel/">
+    <div class="figure">
+      <b class="figure-content">29.33</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IL'></i>Israel
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,54/Portugal/">
+    <div class="figure">
+      <b class="figure-content">28.82</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PT'></i>Portugal
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,27/Germany/">
+    <div class="figure">
+      <b class="figure-content">28.61</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag DE'></i>Germany
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,95/United-Arab-Emirates/">
+    <div class="figure">
+      <b class="figure-content">28.12</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AE'></i>United Arab Emirates
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,239/Jersey/">
+    <div class="figure">
+      <b class="figure-content">28.06</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag JE'></i>Jersey
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,15/Spain/">
+    <div class="figure">
+      <b class="figure-content">27.44</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ES'></i>Spain
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,14/Russia/">
+    <div class="figure">
+      <b class="figure-content">27.15</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag RU'></i>Russia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,83/Czech-Republic/">
+    <div class="figure">
+      <b class="figure-content">27.01</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CZ'></i>Czech Republic
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,49/Ireland/">
+    <div class="figure">
+      <b class="figure-content">26.80</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IE'></i>Ireland
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,25/Slovakia/">
+    <div class="figure">
+      <b class="figure-content">25.54</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SK'></i>Slovakia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,20/Austria/">
+    <div class="figure">
+      <b class="figure-content">25.22</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AT'></i>Austria
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,7/Canada/">
+    <div class="figure">
+      <b class="figure-content">25.09</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CA'></i>Canada
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,155/Liechtenstein/">
+    <div class="figure">
+      <b class="figure-content">25.04</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LI'></i>Liechtenstein
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,183/Saint-Pierre-and-Miquelon/">
+    <div class="figure">
+      <b class="figure-content">24.89</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PM'></i>Saint Pierre and Miquelon
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,107/Malta/">
+    <div class="figure">
+      <b class="figure-content">24.83</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MT'></i>Malta
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,88/China/">
+    <div class="figure">
+      <b class="figure-content">24.55</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CN'></i>China
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,240/Guernsey/">
+    <div class="figure">
+      <b class="figure-content">23.61</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GG'></i>Guernsey
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,5/New-Zealand/">
+    <div class="figure">
+      <b class="figure-content">23.22</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NZ'></i>New Zealand
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,8/Ukraine/">
+    <div class="figure">
+      <b class="figure-content">22.79</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag UA'></i>Ukraine
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,38/Slovenia/">
+    <div class="figure">
+      <b class="figure-content">22.67</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SI'></i>Slovenia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,2/Poland/">
+    <div class="figure">
+      <b class="figure-content">22.02</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PL'></i>Poland
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,103/Uruguay/">
+    <div class="figure">
+      <b class="figure-content">21.33</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag UY'></i>Uruguay
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,168/Maldives/">
+    <div class="figure">
+      <b class="figure-content">20.93</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MV'></i>Maldives
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,134/Mauritius/">
+    <div class="figure">
+      <b class="figure-content">19.91</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MU'></i>Mauritius
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,129/Gibraltar/">
+    <div class="figure">
+      <b class="figure-content">19.72</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GI'></i>Gibraltar
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,23/Thailand/">
+    <div class="figure">
+      <b class="figure-content">19.54</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TH'></i>Thailand
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,136/Qatar/">
+    <div class="figure">
+      <b class="figure-content">18.74</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag QA'></i>Qatar
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,228/Sao-Tome-and-Principe/">
+    <div class="figure">
+      <b class="figure-content">17.70</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ST'></i>Sao Tome and Principe
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,90/Vietnam/">
+    <div class="figure">
+      <b class="figure-content">17.69</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag VN'></i>Vietnam
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,81/Kazakstan/">
+    <div class="figure">
+      <b class="figure-content">16.52</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KZ'></i>Kazakstan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,18/Australia/">
+    <div class="figure">
+      <b class="figure-content">16.32</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AU'></i>Australia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,144/Tajikistan/">
+    <div class="figure">
+      <b class="figure-content">16.12</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TJ'></i>Tajikistan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,151/Cayman-Islands/">
+    <div class="figure">
+      <b class="figure-content">15.72</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KY'></i>Cayman Islands
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,80/Belarus/">
+    <div class="figure">
+      <b class="figure-content">14.84</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BY'></i>Belarus
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,76/Aruba/">
+    <div class="figure">
+      <b class="figure-content">14.73</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AW'></i>Aruba
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,235/Isle-of-Man/">
+    <div class="figure">
+      <b class="figure-content">14.31</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IM'></i>Isle of Man
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,40/Chile/">
+    <div class="figure">
+      <b class="figure-content">14.07</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CL'></i>Chile
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,105/Armenia/">
+    <div class="figure">
+      <b class="figure-content">14.04</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AM'></i>Armenia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,121/Mongolia/">
+    <div class="figure">
+      <b class="figure-content">13.98</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MN'></i>Mongolia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,85/Georgia/">
+    <div class="figure">
+      <b class="figure-content">13.92</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GE'></i>Georgia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,249/Curacao/">
+    <div class="figure">
+      <b class="figure-content">13.76</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CW'></i>Curacao
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,92/Oman/">
+    <div class="figure">
+      <b class="figure-content">13.67</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag OM'></i>Oman
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,52/Macedonia/">
+    <div class="figure">
+      <b class="figure-content">13.42</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MK'></i>Macedonia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,47/Puerto-Rico/">
+    <div class="figure">
+      <b class="figure-content">13.36</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PR'></i>Puerto Rico
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,67/Trinidad-and-Tobago/">
+    <div class="figure">
+      <b class="figure-content">13.15</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TT'></i>Trinidad and Tobago
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,148/Madagascar/">
+    <div class="figure">
+      <b class="figure-content">12.96</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MG'></i>Madagascar
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,96/Bahrain/">
+    <div class="figure">
+      <b class="figure-content">12.84</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BH'></i>Bahrain
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,13/Brazil/">
+    <div class="figure">
+      <b class="figure-content">12.69</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BR'></i>Brazil
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,72/Bahamas/">
+    <div class="figure">
+      <b class="figure-content">12.41</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BS'></i>Bahamas
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,116/Guam/">
+    <div class="figure">
+      <b class="figure-content">12.40</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GU'></i>Guam
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,161/Faroe-Islands/">
+    <div class="figure">
+      <b class="figure-content">12.36</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag FO'></i>Faroe Islands
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,42/Turkey/">
+    <div class="figure">
+      <b class="figure-content">12.32</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TR'></i>Turkey
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,131/St.-Vincent-and-Grenadines/">
+    <div class="figure">
+      <b class="figure-content">12.24</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag VC'></i>St. Vincent and Grenadines
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,68/Barbados/">
+    <div class="figure">
+      <b class="figure-content">11.96</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BB'></i>Barbados
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,119/Kyrgyzstan/">
+    <div class="figure">
+      <b class="figure-content">11.76</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KG'></i>Kyrgyzstan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,191/San-Marino/">
+    <div class="figure">
+      <b class="figure-content">11.66</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SM'></i>San Marino
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,132/Seychelles/">
+    <div class="figure">
+      <b class="figure-content">11.27</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SC'></i>Seychelles
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,225/Serbia/">
+    <div class="figure">
+      <b class="figure-content">11.22</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag RS'></i>Serbia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,16/Mexico/">
+    <div class="figure">
+      <b class="figure-content">11.16</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MX'></i>Mexico
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,152/Reunion/">
+    <div class="figure">
+      <b class="figure-content">9.93</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag RE'></i>Reunion
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,53/Saudi-Arabia/">
+    <div class="figure">
+      <b class="figure-content">9.86</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SA'></i>Saudi Arabia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,30/Croatia/">
+    <div class="figure">
+      <b class="figure-content">9.78</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag HR'></i>Croatia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,22/Greece/">
+    <div class="figure">
+      <b class="figure-content">9.53</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GR'></i>Greece
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,86/Kuwait/">
+    <div class="figure">
+      <b class="figure-content">9.43</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KW'></i>Kuwait
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,159/New-Caledonia/">
+    <div class="figure">
+      <b class="figure-content">9.39</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NC'></i>New Caledonia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,189/Namibia/">
+    <div class="figure">
+      <b class="figure-content">9.35</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NA'></i>Namibia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,3/Italy/">
+    <div class="figure">
+      <b class="figure-content">9.03</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IT'></i>Italy
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,219/Turks-and-Caicos-Islands/">
+    <div class="figure">
+      <b class="figure-content">8.93</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TC'></i>Turks and Caicos Islands
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,122/Virgin-Islands,-U.S./">
+    <div class="figure">
+      <b class="figure-content">8.85</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag VI'></i>Virgin Islands, U.S.
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,157/Grenada/">
+    <div class="figure">
+      <b class="figure-content">8.68</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GD'></i>Grenada
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li>
+	</ol>
+</div>
+<div class="col-spaced pure-u-1-2">
+	<ol class="ranking">
+    <li class="ranking-item">
+  <a class="ranking-link" href="/download/2,123/Bosnia-and-Herzegovina/">
+    <div class="figure">
+      <b class="figure-content">8.62</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BA'></i>Bosnia and Herzegovina
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,200/Lesotho/">
+    <div class="figure">
+      <b class="figure-content">8.49</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LS'></i>Lesotho
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,84/Cyprus/">
+    <div class="figure">
+      <b class="figure-content">8.48</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CY'></i>Cyprus
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,112/Dominica/">
+    <div class="figure">
+      <b class="figure-content">8.32</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag DM'></i>Dominica
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,125/Nepal/">
+    <div class="figure">
+      <b class="figure-content">8.28</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NP'></i>Nepal
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,174/Rwanda/">
+    <div class="figure">
+      <b class="figure-content">8.08</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag RW'></i>Rwanda
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,64/Fiji/">
+    <div class="figure">
+      <b class="figure-content">7.90</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag FJ'></i>Fiji
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,195/Martinique/">
+    <div class="figure">
+      <b class="figure-content">7.90</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MQ'></i>Martinique
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,128/Kenya/">
+    <div class="figure">
+      <b class="figure-content">7.87</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KE'></i>Kenya
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,204/Ethiopia/">
+    <div class="figure">
+      <b class="figure-content">7.74</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ET'></i>Ethiopia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,147/Bermuda/">
+    <div class="figure">
+      <b class="figure-content">7.73</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BM'></i>Bermuda
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,113/Cambodia/">
+    <div class="figure">
+      <b class="figure-content">7.70</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KH'></i>Cambodia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,178/Anguilla/">
+    <div class="figure">
+      <b class="figure-content">7.59</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AI'></i>Anguilla
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,250/Saint-Martin/">
+    <div class="figure">
+      <b class="figure-content">7.53</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MF'></i>Saint Martin
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,138/Bangladesh/">
+    <div class="figure">
+      <b class="figure-content">7.49</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BD'></i>Bangladesh
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,135/Albania/">
+    <div class="figure">
+      <b class="figure-content">7.45</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AL'></i>Albania
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,154/Cape-Verde/">
+    <div class="figure">
+      <b class="figure-content">7.01</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CV'></i>Cape Verde
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,167/Saint-Lucia/">
+    <div class="figure">
+      <b class="figure-content">6.91</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LC'></i>Saint Lucia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,198/Zimbabwe/">
+    <div class="figure">
+      <b class="figure-content">6.89</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ZW'></i>Zimbabwe
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,74/Sri-Lanka/">
+    <div class="figure">
+      <b class="figure-content">6.75</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LK'></i>Sri Lanka
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,192/Guadeloupe/">
+    <div class="figure">
+      <b class="figure-content">6.72</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GP'></i>Guadeloupe
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,130/Angola/">
+    <div class="figure">
+      <b class="figure-content">6.64</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AO'></i>Angola
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,94/Jordan/">
+    <div class="figure">
+      <b class="figure-content">6.64</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag JO'></i>Jordan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,24/Colombia/">
+    <div class="figure">
+      <b class="figure-content">6.62</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CO'></i>Colombia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,26/Malaysia/">
+    <div class="figure">
+      <b class="figure-content">6.60</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MY'></i>Malaysia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,224/Montenegro/">
+    <div class="figure">
+      <b class="figure-content">6.54</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ME'></i>Montenegro
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,51/Peru/">
+    <div class="figure">
+      <b class="figure-content">6.45</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PE'></i>Peru
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,143/Laos/">
+    <div class="figure">
+      <b class="figure-content">6.45</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LA'></i>Laos
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,11/India/">
+    <div class="figure">
+      <b class="figure-content">6.41</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IN'></i>India
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,66/Jamaica/">
+    <div class="figure">
+      <b class="figure-content">6.41</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag JM'></i>Jamaica
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,124/Ghana/">
+    <div class="figure">
+      <b class="figure-content">6.40</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GH'></i>Ghana
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,93/Iraq/">
+    <div class="figure">
+      <b class="figure-content">6.35</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IQ'></i>Iraq
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,46/South-Africa/">
+    <div class="figure">
+      <b class="figure-content">6.31</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ZA'></i>South Africa
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,153/Libya/">
+    <div class="figure">
+      <b class="figure-content">6.20</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LY'></i>Libya
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,41/Argentina/">
+    <div class="figure">
+      <b class="figure-content">6.09</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AR'></i>Argentina
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,199/Zambia/">
+    <div class="figure">
+      <b class="figure-content">6.08</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ZM'></i>Zambia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,145/Brunei-Darussalam/">
+    <div class="figure">
+      <b class="figure-content">5.82</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BN'></i>Brunei Darussalam
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,181/Vanuatu/">
+    <div class="figure">
+      <b class="figure-content">5.81</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag VU'></i>Vanuatu
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,60/Panama/">
+    <div class="figure">
+      <b class="figure-content">5.77</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PA'></i>Panama
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,170/Myanmar/">
+    <div class="figure">
+      <b class="figure-content">5.76</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MM'></i>Myanmar
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,142/Tonga/">
+    <div class="figure">
+      <b class="figure-content">5.68</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TO'></i>Tonga
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,59/Nigeria/">
+    <div class="figure">
+      <b class="figure-content">5.64</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NG'></i>Nigeria
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,31/Indonesia/">
+    <div class="figure">
+      <b class="figure-content">5.43</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ID'></i>Indonesia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,101/Morocco/">
+    <div class="figure">
+      <b class="figure-content">5.43</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MA'></i>Morocco
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,50/Saint-Kitts-and-Nevis/">
+    <div class="figure">
+      <b class="figure-content">5.34</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag KN'></i>Saint Kitts and Nevis
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,58/Tanzania/">
+    <div class="figure">
+      <b class="figure-content">5.23</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TZ'></i>Tanzania
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,110/Azerbaijan/">
+    <div class="figure">
+      <b class="figure-content">5.22</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AZ'></i>Azerbaijan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,56/Ecuador/">
+    <div class="figure">
+      <b class="figure-content">5.21</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag EC'></i>Ecuador
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,213/Djibouti/">
+    <div class="figure">
+      <b class="figure-content">4.94</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag DJ'></i>Djibouti
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,35/Costa-Rica/">
+    <div class="figure">
+      <b class="figure-content">4.92</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CR'></i>Costa Rica
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,61/Dominican-Republic/">
+    <div class="figure">
+      <b class="figure-content">4.86</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag DO'></i>Dominican Republic
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,37/Iran,-Islamic-Republic-of/">
+    <div class="figure">
+      <b class="figure-content">4.80</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag IR'></i>Iran, Islamic Republic of
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,171/Papua-New-Guinea/">
+    <div class="figure">
+      <b class="figure-content">4.58</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PG'></i>Papua New Guinea
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,215/Mauritania/">
+    <div class="figure">
+      <b class="figure-content">4.47</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MR'></i>Mauritania
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,87/Palestinian-Territory/">
+    <div class="figure">
+      <b class="figure-content">4.44</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PS'></i>Palestinian Territory
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,140/Haiti/">
+    <div class="figure">
+      <b class="figure-content">4.29</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag HT'></i>Haiti
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,73/Honduras/">
+    <div class="figure">
+      <b class="figure-content">4.25</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag HN'></i>Honduras
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,185/Botswana/">
+    <div class="figure">
+      <b class="figure-content">4.24</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BW'></i>Botswana
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,173/Uganda/">
+    <div class="figure">
+      <b class="figure-content">4.23</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag UG'></i>Uganda
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,206/Bhutan/">
+    <div class="figure">
+      <b class="figure-content">4.16</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BT'></i>Bhutan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,36/Guatemala/">
+    <div class="figure">
+      <b class="figure-content">4.16</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GT'></i>Guatemala
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,162/Virgin-Islands,-British/">
+    <div class="figure">
+      <b class="figure-content">3.90</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag VG'></i>Virgin Islands, British
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,75/Nicaragua/">
+    <div class="figure">
+      <b class="figure-content">3.84</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag NI'></i>Nicaragua
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,133/Tunisia/">
+    <div class="figure">
+      <b class="figure-content">3.69</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TN'></i>Tunisia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,176/Suriname/">
+    <div class="figure">
+      <b class="figure-content">3.64</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SR'></i>Suriname
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,197/French-Guiana/">
+    <div class="figure">
+      <b class="figure-content">3.64</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GF'></i>French Guiana
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,156/Senegal/">
+    <div class="figure">
+      <b class="figure-content">3.46</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SN'></i>Senegal
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,100/Uzbekistan/">
+    <div class="figure">
+      <b class="figure-content">3.43</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag UZ'></i>Uzbekistan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,10/Philippines/">
+    <div class="figure">
+      <b class="figure-content">3.39</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PH'></i>Philippines
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,69/El-Salvador/">
+    <div class="figure">
+      <b class="figure-content">3.36</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SV'></i>El Salvador
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,127/Antigua-and-Barbuda/">
+    <div class="figure">
+      <b class="figure-content">3.18</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AG'></i>Antigua and Barbuda
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,21/Pakistan/">
+    <div class="figure">
+      <b class="figure-content">3.11</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PK'></i>Pakistan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,158/Belize/">
+    <div class="figure">
+      <b class="figure-content">3.11</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BZ'></i>Belize
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,104/Lebanon/">
+    <div class="figure">
+      <b class="figure-content">3.09</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag LB'></i>Lebanon
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,163/Mozambique/">
+    <div class="figure">
+      <b class="figure-content">3.07</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MZ'></i>Mozambique
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,172/Gabon/">
+    <div class="figure">
+      <b class="figure-content">3.05</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GA'></i>Gabon
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,111/Paraguay/">
+    <div class="figure">
+      <b class="figure-content">2.96</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag PY'></i>Paraguay
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,165/Northern-Mariana-Islands/">
+    <div class="figure">
+      <b class="figure-content">2.72</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MP'></i>Northern Mariana Islands
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,97/Sudan/">
+    <div class="figure">
+      <b class="figure-content">2.54</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SD'></i>Sudan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,108/Algeria/">
+    <div class="figure">
+      <b class="figure-content">2.52</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag DZ'></i>Algeria
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,182/Togo/">
+    <div class="figure">
+      <b class="figure-content">2.51</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag TG'></i>Togo
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,62/Bolivia/">
+    <div class="figure">
+      <b class="figure-content">2.46</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BO'></i>Bolivia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,146/Cuba/">
+    <div class="figure">
+      <b class="figure-content">2.44</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CU'></i>Cuba
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,63/Egypt/">
+    <div class="figure">
+      <b class="figure-content">2.41</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag EG'></i>Egypt
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,201/Malawi/">
+    <div class="figure">
+      <b class="figure-content">2.39</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag MW'></i>Malawi
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,120/Cote-DIvoire/">
+    <div class="figure">
+      <b class="figure-content">2.36</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CI'></i>Cote D'Ivoire
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,207/Equatorial-Guinea/">
+    <div class="figure">
+      <b class="figure-content">2.18</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GQ'></i>Equatorial Guinea
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,117/Afghanistan/">
+    <div class="figure">
+      <b class="figure-content">2.15</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag AF'></i>Afghanistan
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,43/Venezuela/">
+    <div class="figure">
+      <b class="figure-content">2.08</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag VE'></i>Venezuela
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,160/Guyana/">
+    <div class="figure">
+      <b class="figure-content">2.06</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GY'></i>Guyana
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,205/Guinea/">
+    <div class="figure">
+      <b class="figure-content">1.73</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GN'></i>Guinea
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,109/Mali/">
+    <div class="figure">
+      <b class="figure-content">1.67</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag ML'></i>Mali
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,194/DR-Congo/">
+    <div class="figure">
+      <b class="figure-content">1.67</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag CD'></i>DR Congo
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,106/Syrian-Arab-Republic/">
+    <div class="figure">
+      <b class="figure-content">1.58</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SY'></i>Syrian Arab Republic
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,211/Swaziland/">
+    <div class="figure">
+      <b class="figure-content">1.51</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag SZ'></i>Swaziland
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,186/Gambia/">
+    <div class="figure">
+      <b class="figure-content">1.35</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag GM'></i>Gambia
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,137/Benin/">
+    <div class="figure">
+      <b class="figure-content">1.08</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BJ'></i>Benin
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li><li class="ranking-item">
+  <a class="ranking-link" href="/download/2,188/Burkina-Faso/">
+    <div class="figure">
+      <b class="figure-content">0.79</b>
+      <span class="figure-unit">Mbps </span>
+    </div>
+    <div class="ranking-content">
+      <div class="ranking-heading">
+        <i class='flag BF'></i>Burkina Faso
+      </div>
+      <div class="ranking-chart country-list"></div>
+    </div>
+  </a>
+</li>
+	</ol>
+</div>
+
+</div>
+</div>
+      </div>
+
+      </div>
+</main>
+  <footer class="footer">
+    <div class="container pure-g">
+      <section class="pure-u footer-column">
+        <h6 class="footer-heading">Net Index</h6>
+        <ul class="footer-menu">
+          <li><a href="http://explorer.netindex.com">Net Index Explorer</a></li>
+          <li><a href="/#source">Source Data</a></li>
+        </ul>
+      </section>
+
+      <section class="pure-u footer-column">
+        <h6 class="footer-heading">Apps</h6>
+        <ul class="footer-menu">
+          <li><a href="http://www.speedtest.net">Ookla Speedtest</a></li>
+          <li><a href="http://www.speedtest.net/mini.php">Speedtest Mini</a></li>
+          <li><a href="http://www.pingtest.net">Pingtest.net</a></li>
+        </ul>
+      </section>
+
+      <section class="pure-u footer-column">
+        <h6 class="footer-heading">Company</h6>
+        <ul class="footer-menu">
+          <li><a href="http://www.ookla.com/about">About Ookla</a></li>
+          <li><a href="http://www.ookla.com/netgauge">NetGauge</a></li>
+          <li><a href="http://www.ookla.com/netmetrics">NetMetrics</a></li>
+        </ul>
+      </section>
+
+      <section class="pure-u footer-column footer-column-offset">
+        <a class="text-hide footer-logo icon-logo-footer" href="http://www.ookla.com">Ookla</a>
+        <ul class="footer-menu">
+          <li>Copyright 2014 Ookla</li>
+		  <li><a href="/terms.php">Terms &amp; Conditions</a></li>
+		  <li><a href="/privacy.php">Privacy Policy</a></li>
+		  <li><a href="http://status.ookla.com">Network Status</a></li>
+          <li class="footer-item-horizontal">
+            <a class="text-hide icon-facebook" href="http://go.ookla.com/facebook">Facebook</a>
+          </li>
+          <li class="footer-item-horizontal">
+            <a class="text-hide icon-twitter" href="http://go.ookla.com/twitter">Twitter</a>
+          </li>
+          <li class="footer-item-horizontal">
+            <a class="text-hide icon-google-plus" href="http://go.ookla.com/google+">Google +</a>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </footer>
+</body>
+</html>
