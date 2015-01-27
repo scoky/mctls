@@ -157,6 +157,7 @@ case $expType in
 		echo "[PERF] Test time to first byte (function of slice complexity)"
 		opt=2
 		strategy="uni"
+		comm="ping"
 
 		# Update res file 
 		resFile=$resFile"_timeFirstByte_slice"
@@ -175,7 +176,7 @@ case $expType in
 		if [ $REMOTE -eq 1 ]
 		then 
 			echo "[MASTER] Start RTT estimation script"
-			(./ping_script.sh &)
+			(./ping_script.sh $comm &)
 		fi
 
 		# Run S_MAX repetitions
