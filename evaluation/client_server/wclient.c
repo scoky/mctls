@@ -335,6 +335,28 @@ void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_se
 	}
 }
 
+int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
+	int j = 0;
+	unsigned int i_Offset = 0;
+	char b_Flag = 0;
+	int count = 0;
+	for (i_Offset = 0;i_Offset <= strlen(s_String);i_Offset++){
+		if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
+			s_Token[count][j] = s_String[i_Offset];
+			j++;
+			b_Flag = 1;
+			continue;
+		}
+		if (b_Flag){
+		s_Token[count][j] = '\0';
+		count++;
+		j = 0;
+		b_Flag = 0;
+		}
+	}
+	return (count - 1);
+}
+
 // Form and send GET
 void sendRequestBrowser(char *filename){
 	
@@ -342,10 +364,10 @@ void sendRequestBrowser(char *filename){
 	// data structures to store sizes of requests and responses 
 	int slices_len = ssl->slices_len; 
 	int req_len_arr[slices_len]; 
-	int request_len; 
+	int request_len = 0; 
 	
 	// Remove trailing newline (NOTE: strtoK is not thread safe)
-	strtok(filename, "\n");
+	//strtok(filename, "\n");
 
 	// extract list of response sizes 
 	char *str = strtok(filename, ";");
@@ -353,35 +375,33 @@ void sendRequestBrowser(char *filename){
 	char *resp_sizes = strtok(str, " "); 
  
 	// extract request sizes 
-	req_len_arr[0] = atoi(strtok(filename, "_")); 
-	request_len = req_len_arr[0]; 
-	int counter = 1; 
-	while (counter < slices_len){
-		req_len_arr[counter] = atoi(strtok(NULL, "_")); 
-		request_len += req_len_arr[counter]; 
-		counter++; 
+	char s_Token[15][25];
+	memset(s_Token, 0, 200);
+	int count = TokenizeString(filename, s_Token, '_');
+	int i;
+	for(i=0; i <= count; i++){
+		req_len_arr[i] = atoi(s_Token[i]); 
+		request_len += req_len_arr[i]; 
 	}
-	// extract expected response size
-	char *tool; 
-	tool = (char*) malloc(sizeof(resp_sizes));
-	sprintf(tool, "%s", resp_sizes); 
-	fSize = atol(strtok(tool, "_")); 
-	counter = 1; 
-	while (counter < slices_len){
-		fSize += atol(strtok(NULL, "_")); 
-		counter++; 
-	}	
-	free(tool);
+	// compute total response size
+	memset(s_Token, 0, 200);
+	fSize = 0; 
+	count = TokenizeString(resp_sizes, s_Token, '_');
+	i;
+	for(i=0; i <= count; i++){
+		fSize += atol(s_Token[i]); 
+	}
  
 	#ifdef DEBUG
-	printf ("[DEBUG] Expected response with size %d\n", fSize); 
+	printf("[DEBUG] String %s with lenght %d\n", resp_sizes, strlen(resp_sizes)); 
+	printf("[DEBUG] Expected response with size %d\n", fSize); 
 	#endif 	
 	
 	// prepare common GET request 	- FIXME: sometimes string generated is slightly longer. WHY?
 	char get_str[200];
-	int get_len;
 	memset(get_str, '0', sizeof(get_str));
-	sprintf(get_str, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\nPadding:\0", resp_sizes, clientID, host, port); 
+	int get_len;
+	sprintf(get_str, "Get %s HTTP/1.1\r\nUser-Agent:SVA-%d\r\nHost: %s:%d\nPadding:", resp_sizes, clientID, host, port); 
 	get_len = strlen(get_str); 
 	#ifdef DEBUG
 	printf ("[DEBUG] GET string (size %d):\n%s\n", get_len, get_str); 
@@ -390,28 +410,30 @@ void sendRequestBrowser(char *filename){
 	//prepare final request with appropriate padding
 	char *request;
 	char *padding;
+	int toAllocate; 
 	if (strcmp(proto, "spp") == 0){
-		printf ("[DEBUG] Allocating %d\n", (req_len_arr[0] - get_len - 1)); 
-		padding = (char*) malloc(sizeof(char) * (req_len_arr[0] - get_len - 1));
-		memset(padding, '?', sizeof(char) * (req_len_arr[0] - get_len - 1));	
-		request = (char*) malloc(sizeof(char) * req_len_arr[0]);
-		//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
-		sprintf(request, "%s %s", get_str, padding); 
+		toAllocate = (req_len_arr[0] - get_len - 5); 
 	} else {
-		printf ("[DEBUG] Allocating %d\n", (request_len - get_len - 1)); 
-		padding = (char*) malloc(sizeof(char) * (request_len - get_len - 1));
-		memset(padding, '?', sizeof(char) * (request_len - get_len - 1));	
-		request = (char*) malloc(sizeof(char) * request_len);
-		//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
-		sprintf(request, "%s %s", get_str, padding); 
+		toAllocate = (request_len - get_len - 5); 
 	}
 
+	printf ("[DEBUG] Allocating %d for padding\n", toAllocate); 
+	padding = (char*) malloc(toAllocate);
+	memset(padding, '?', toAllocate);	
+	if (strcmp(proto, "spp") == 0){
+		request = (char*) malloc(req_len_arr[0]);
+	}else{
+		request = (char*) malloc(request_len); 
+	}
+	
+	//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
+	sprintf(request, "%s%s", get_str, padding); 
+	
 	// free memory 
 	free(padding); 
 	
 	#ifdef DEBUG
-	int tmp_len = strlen(request); 
-	printf ("[DEBUG] Prepared GET request (size %d):\n%s\n", tmp_len, request); 
+	printf ("[DEBUG] Padded GET request (size %d):\n%s\n", strlen(request), request); 
 	#endif 	
 	
 	// SPP write
@@ -437,8 +459,8 @@ void sendRequestBrowser(char *filename){
 			}else{
 				// prepare fake request slices if needed  
 				if (req_len_arr[i] > 0){
-					char *fake_request = (char*) malloc(sizeof(char) * req_len_arr[i]);
-					memset(fake_request, '?', sizeof(char) * req_len_arr[i]);	
+					char *fake_request = (char*) malloc(req_len_arr[i]);
+					memset(fake_request, '?', req_len_arr[i]);	
 					#ifdef VERBOSE
 					printf ("[DEBUG] Prepared padding:\n%s\n", fake_request); 
 					#endif
@@ -574,8 +596,7 @@ static void *browser_replay(void *ptr){
     }
 	
     // Read file line-by-line
-    while ( fgets ( line, sizeof line, fp ) != NULL ) {
-
+    while ( fgets ( line, sizeof line, fp ) != NULL &&  curr_line < lines) {
 		double time;
 		//double duration; 
 		char file_request[128]; 

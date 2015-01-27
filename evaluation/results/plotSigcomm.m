@@ -56,6 +56,25 @@ machinesHardware = [
 nProt = size(protocol, 1); 
 nMachines = size(machines, 1); 
 
+if (opt == 1) 
+	h = figure(); 
+	a = dlmread('number_tls');
+	l = cdfplot(a);                   
+	set (l, 'color', kind_line(1), 'LineWidth', 3); 
+	hold on; 
+	x1 = 10; 
+	y1 = get(gca,'ylim'); 
+	hold on
+	l1 = plot([x1 x1], y1); 
+	set (l1, 'color', kind_line(2), 'LineWidth', 3, 'LineStyle', '--');
+	xlabel('Number of connections (#)');
+	ylabel('CDF (0-1)');
+	title('Alexa TOP 500');
+	outFile = sprintf ('%s/cdf_tls.eps', figFolder) 
+	saveas (h, outFile, 'psc2');
+	error('done, check plot'); 
+end 
+
 if (parallel == 0) 
 	nMachines = 1 
 end 

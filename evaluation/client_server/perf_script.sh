@@ -36,6 +36,8 @@ protoList[1]="ssl"         # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
+#protoList[5]="spp_mod"
+
 #--------------------------# ADDITION FOR REMOTE VERSION
 REMOTE=$5                  # 1=remote ; 0=local 
 key="amazon.pem"           # amazon key 
@@ -425,7 +427,9 @@ case $expType in
 		strategy="cs"
 	
 		# switch on user input (one ; four ; all)
-		str="one"
+		#str="one"
+		str="four"
+		#str="all"
 		if [ $str == "one" ] 
 		then 
 			key="one-slice"
@@ -464,8 +468,9 @@ case $expType in
 		# Run until no action 
 		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
 		loop=0
-		MAX_LOOP=1
+		MAX_LOOP=10
 		th=10
+		counter=1
 		for f in `ls $actionFolder | grep "$key"`    
 		do
 			echo "[PERF] Working on action file $f"
@@ -508,22 +513,26 @@ case $expType in
 					fi
 				fi	
 			fi
-			cat $actionFolder"/"$f | sed s/";"/" "/g | awk '{if ($2 != -1){print $0 >> "./actionFiles/conn_"$NF}}'
-			line=`tail -n 1  $actionFolder"/"$f`
+			cat $actionFolder"/"$f | awk '{if (NF>0){print $0 >> "./actionFiles/conn_"$NF}}'
 			N_clients=0
 		
 			# Compute number of slices needed 
-			s=`head -n 1 "./actionFiles/conn_0" | awk '{print (NF - 2)/2}'`	
+			s=`head -n 1 "./actionFiles/conn_0" | cut -f 2 -d " " | cut -f 1 -d ";" | awk 'BEGIN{FS="_";}{print NF}'`
 			echo "[PERF] $s slices extracted from action file"
 			
 			# Starting all clients needed
 			for i in `ls ./actionFiles`
 			do
 				#echo $loop >> .tmp
-				echo $line >> "./actionFiles/"$i
 				let "N_clients++"
 				echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i"
+				# parallel
 				#./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> $log"_"$i 2>/dev/null &
+				# sequential 
+				./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> log_test_browser
+				echo $counter >> counter_test_browser
+				let "counter++"
+				sleep 1
 			done
 			# Logging 
 			echo "[PERF] Started $N_clients in parallel"
@@ -540,7 +549,7 @@ case $expType in
 			let "loop++"
 		done
 		
-		echo "[PERF] !!Temoporary stopping!!!"
+		echo "[PERF] !!Temoporary stopping!!! Analysis need to bed done yet (check files $log"_*")!!"
 		exit 0 
 	
 		# Results

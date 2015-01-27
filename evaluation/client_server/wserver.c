@@ -467,6 +467,31 @@ int serveFile(SSL *ssl, int s, char *filename, char *proto){
 	return 0; 
 }	
 
+
+// tokenizer helper 
+int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
+    int j = 0; 
+    unsigned int i_Offset = 0; 
+    char b_Flag = 0; 
+    int count = 0; 
+    for (i_Offset = 0;i_Offset <= strlen(s_String);i_Offset++){
+        if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
+            s_Token[count][j] = s_String[i_Offset];
+            j++;
+            b_Flag = 1; 
+            continue;
+        }
+        if (b_Flag){
+        s_Token[count][j] = '\0';
+        count++;
+        j = 0; 
+        b_Flag = 0; 
+        }
+    }    
+    return (count - 1);
+}
+
+
 // serve requests in browser-like mode 
 static int http_serve_request_browser(SSL *ssl, int s, char *proto){
   
@@ -478,44 +503,42 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 
 	// Read HTTP GET (assuming a single read is enough)
 	while(1){
-		if (strcmp(proto, "spp") == 0){
-			SPP_SLICE *slice;       
-			SPP_CTX *ctx;           
-			r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
+		if (strcmp(proto, "pln") == 0){
+			r = read(s, buf, BUFSIZZ);
+			if (r < 0){
+				berr_exit("[ERROR] TCP read problem - exit");
+			}
+		} else{
+			if (strcmp(proto, "spp") == 0){
+				SPP_SLICE *slice;       
+				SPP_CTX *ctx;           
+				r = SPP_read_record(ssl, buf, BUFSIZZ, &slice, &ctx);
+			} else if (strcmp(proto, "ssl") == 0){
+				r = SSL_read(ssl, buf, BUFSIZZ);
+			}
 			if (SSL_get_error(ssl, r) == SSL_ERROR_ZERO_RETURN){
 				#ifdef DEBUG
 				printf("[DEBUG] Client closed the connection\n");
 				#endif
 				return -1; 
+			} else if (SSL_get_error(ssl, r) != SSL_ERROR_NONE){
+				//berr_exit("[ERROR] SSL read problem - exit");
+				#ifdef DEBUG
+				printf("[DEBUG] Client closed the connection or error?\n");
+				#endif
+				return -1; 
 			}
-			if (SSL_get_error(ssl, r) != SSL_ERROR_NONE){
-				berr_exit("[DEBUG] SSL read problem - closed connection?");
-			}
-			#ifdef DEBUG
-			printf("[DEBUG] Read %d bytes\n", r);
-			#endif
 		}
-		else if (strcmp(proto, "ssl") == 0){
-			r = SSL_read(ssl, buf, BUFSIZZ);
-			if (SSL_get_error(ssl, r) != SSL_ERROR_NONE)
-				berr_exit("[DEBUG] SSL read problem");
-		}
-		else if (strcmp(proto, "pln") == 0){
-			r = read(s, buf, BUFSIZZ);
-		}
-
 		#ifdef DEBUG
-		printf("[DEBUG] Request received:\n"); 
-		printf("%s\n", buf); 
+		printf("[DEBUG] Request contains %d bytes:\n%s\n", r, buf); 
 		#endif
-
+		
 		//Look for the blank line that signals the end of the HTTP header (FIXME: assume 1 read is enough)
 		if(strstr(buf, "\r\n") || strstr(buf, "\n")){
 			break; 
 		}else{
 			return 0;  
 		}
-		
 	}
 
 	// Parsing 
@@ -530,24 +553,23 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 	#endif 
 	
 	// data structures to store sizes of responses 
-    int slices_len = ssl->slices_len; 
-    long resp_len_arr[slices_len]; 
-    long response_len; 
+    long response_len = 0; 
     
     // extract list of response sizes 
-    resp_len_arr[0] = atol(strtok(fn, "_")); 
-    response_len = resp_len_arr[0]; 
-    int counter = 1; 
-    while (counter < slices_len){
-        resp_len_arr[counter] = atol(strtok(NULL, "_")); 
-        response_len += resp_len_arr[counter]; 
-        counter++; 
-    }    
-	#ifdef DEBUG
-	int i; 
-	for (i = 0; i < slices_len; i++){
+    char s_Token[15][25];
+    memset(s_Token, 0, 200);
+    int count = TokenizeString(fn, s_Token, '_');
+    long resp_len_arr[count]; 
+    int i;
+    for(i=0; i <= count; i++){
+		resp_len_arr[i] = atol(s_Token[i]); 
+    	response_len += resp_len_arr[i]; 
+		#ifdef DEBUG
 		printf("[DEBUG] Requested Slice %d with size %ld\n", i, resp_len_arr[i]);
-	}
+		#endif 
+    }
+
+	#ifdef DEBUG
 	printf("[DEBUG] Total size is %ld\n", response_len);
 	#endif 
 	
@@ -556,6 +578,9 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 		serveDataSPPBrowser(ssl, s,  resp_len_arr, proto, resp_len_arr); 
 	} else {	
 		// use classic method to serve data if not SPP
+		#ifdef DEBUG
+		printf("[DEBUG] Classic method to serve %ld data\n", response_len);
+		#endif 
 		serveData(ssl, s, response_len, proto); 
 	}
 	
@@ -1047,7 +1072,7 @@ int main(int argc, char **argv){
 		// Fork a new process
 		signal(SIGCHLD, SIG_IGN); 
 		pid = fork(); 
-		if (pid -= 0){
+		if (pid != 0){
 			/* In chil process */
 			if (pid == -1) {
 				berr_exit("FORK error"); 
