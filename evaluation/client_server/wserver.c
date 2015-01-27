@@ -516,15 +516,18 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 			} else if (strcmp(proto, "ssl") == 0){
 				r = SSL_read(ssl, buf, BUFSIZZ);
 			}
-			if (SSL_get_error(ssl, r) == SSL_ERROR_ZERO_RETURN){
+			long error = SSL_get_error(ssl, r); 
+			if ( error == SSL_ERROR_ZERO_RETURN){
 				#ifdef DEBUG
 				printf("[DEBUG] Client closed the connection\n");
 				#endif
 				return -1; 
-			} else if (SSL_get_error(ssl, r) != SSL_ERROR_NONE){
+			} else if (error != SSL_ERROR_NONE){
+				char tempBuf[100]; 
+				ERR_error_string(error, tempBuf); 
 				//berr_exit("[ERROR] SSL read problem - exit");
 				#ifdef DEBUG
-				printf("[DEBUG] Client closed the connection or error?\n");
+				printf("[DEBUG] Client closed the connection or error %s\n", tempBuf);
 				#endif
 				return -1; 
 			}

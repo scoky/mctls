@@ -208,8 +208,10 @@ int shut_down_connections(SSL* ssl)
 	int r;
 	int socket;
 
+	// get socket 
+	socket =  SSL_get_fd(ssl);
 	#ifdef DEBUG
-	printf("[middlebox ] Shutting down  connection!\n");
+	printf("[middlebox] Shutting down  connection!\n");
 	#endif
 
 	//shutdown(SSL_get_fd(ssl), SHUT_WR);
@@ -219,9 +221,9 @@ int shut_down_connections(SSL* ssl)
 	if (r == 0)
 	{
 		#ifdef DEBUG
-		printf("[middlebox ] r=0 trying again to shutdown\n");
+		printf("[middlebox] r=0 trying again to shutdown\n");
 		#endif
-		shutdown(SSL_get_fd(ssl), 1);
+		shutdown(socket, 1);
 		r = SSL_shutdown(ssl);
 	}
 	
@@ -229,7 +231,7 @@ int shut_down_connections(SSL* ssl)
 	switch(r){  
 		case 1:
 			#ifdef DEBUG
-			printf("[middlebox ] Succesfully shut down client connection!\n");
+			printf("[middlebox] Succesfully shut down connection!\n");
 			#endif
        		break; // Success
 		case 0:
@@ -238,9 +240,13 @@ int shut_down_connections(SSL* ssl)
 			printf("[middlebox] Connection shutdown failed\n");
 	}
 
-	//socket =  SSL_get_fd(ssl);
-	//close(socket);
-    
+	// FIXME -- this should not be need it but ...
+	shutdown(SSL_get_fd(ssl), SHUT_WR);
+
+	// close here
+	close(socket);
+   
+	// All good  
     return 0;
 }
 
@@ -253,7 +259,8 @@ TODO: in theory the two handlers can be merged in a single function...
 int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 {  
 	
-    int r,w, status; 
+    int r,w; 
+	long status; 
 	char buf[BUFSIZZ];
 	SPP_SLICE *slice;       
 	SPP_CTX *ctx;   
@@ -274,9 +281,11 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		}
 
 		status = SSL_get_error(prev_ssl, r);
-		if (status ==  SSL_ERROR_ZERO_RETURN || status ==  SSL_ERROR_SYSCALL ){
+		if (status ==  SSL_ERROR_ZERO_RETURN || status != SSL_ERROR_NONE){
 			#ifdef DEBUG
-			fprintf(stderr, "[middlebox-p] Connection with previous hop closed, exiting previous hop handler\n");
+			char tempBuf[100]; 
+			ERR_error_string(status, tempBuf); 
+			fprintf(stderr, "[middlebox-p] Connection with previous hop closed, exiting previous hop handler (error %s)\n", tempBuf);
 			#endif
 			break;
 		}
@@ -310,7 +319,13 @@ int handle_previous_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 	}
 
 	// NEW SHUT DOWN 
+	#ifdef DEBUG
+	printf("[middlebox-p] Shutting down next hop\n"); 
+	#endif 
 	shut_down_connections(next_ssl);
+	#ifdef DEBUG
+	printf("[middlebox-p] Next hop shut down\n"); 
+	#endif 
 	// The previous connection has been terminated by the client... we just free the SSL object... 
 	//SSL_free(prev_ssl);
 	// All good 
@@ -340,7 +355,7 @@ int handle_next_hop_data(SSL* prev_ssl, SSL* next_ssl, char* proto)
 		}
 
 		status = SSL_get_error(next_ssl, r);
-		if (status ==  SSL_ERROR_ZERO_RETURN || status ==  SSL_ERROR_SYSCALL ){
+		if (status ==  SSL_ERROR_ZERO_RETURN || status != SSL_ERROR_NONE){
 			#ifdef DEBUG
 			fprintf(stderr, "[middlebox-n] Connection with next hop closed, exiting next hop handler and also closing previous hop connection\n");
 			#endif

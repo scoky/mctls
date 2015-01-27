@@ -755,10 +755,15 @@ static int http_complex(char *proto, char *fn, struct timeval *tvEnd){
 	gettimeofday(tvEnd, NULL);
 	
 	// Shutdown connection 
-	r = SSL_shutdown(ssl);
 	#ifdef DEBUG
-	printf("[DEBUG] Shutdown was requested\n"); 
+	printf("[DEBUG] Shutdown was requested -- HERE\n"); 
 	#endif 
+	r = SSL_shutdown(ssl);
+	if( !r ){
+			shutdown(SSL_get_fd(ssl), 1);
+			r = SSL_shutdown(ssl);
+		}
+
 
 	switch(r){
 		case 1:
@@ -923,6 +928,10 @@ static int http_request(char *filename, char *proto, bool requestingFile, struct
 		printf("[DEBUG] Shutdown was requested\n"); 
 		#endif 
 		r = SSL_shutdown(ssl);
+		if( !r ){
+			shutdown(SSL_get_fd(ssl), 1);
+			r = SSL_shutdown(ssl);
+		}
 
 		switch(r){
 			case 1:
@@ -1191,8 +1200,6 @@ int main(int argc, char **argv){
 	printf("[DEBUG] CLIENT-ID=%d host=%s port=%d slices=%d read=%d write=%d n_proxies=%d proto=%s action=%d(%s)\n", clientID, host, port, slices_len, r, w, N_proxies, proto, action, temp_str); 
 	#endif 
 
-
-
 	// Build SSL context
 	ctx = initialize_ctx(KEYFILE, PASSWORD, proto);
 	ssl = SSL_new(ctx);
@@ -1208,14 +1215,17 @@ int main(int argc, char **argv){
 	print_proxy_list(proxies, N_proxies); 
 	#endif
 
+	// Start timer for SPP (do not count slice creation for SSL instead) 
+	if (strcmp(proto, "spp") == 0){
+		gettimeofday(&tvBegin, NULL);
+	}
+
 	// Create slices_n slices with incremental purpose 
-	gettimeofday(&tvBegin, NULL);
-	int i; 
-	//SPP_SLICE *slice_set[slices_len];
 	slice_set  = malloc( slices_len * sizeof (SPP_SLICE*));
 	#ifdef DEBUG
 	printf("[DEBUG] Generating %d slices\n", slices_len); 
 	#endif
+	int i; 
 	for (i = 0;  i < slices_len; i++){
 		char *newPurpose;  
 		char str[30]; 
@@ -1254,9 +1264,15 @@ int main(int argc, char **argv){
 			}
 		}
 	}
+	
+	// Start timer for "ssl" and "pln" 
+	if (strcmp(proto, "ssl") == 0 || strcmp(proto, "pln") == 0){
+		gettimeofday(&tvBegin, NULL);
+	}
+	
 	// TCP Connect
-	char* address = (char*)malloc(strlen(proxies[0]->address)+1); // Large enough for string+\0
-	memcpy(address, proxies[0]->address, strlen(proxies[0]->address)+1);
+	char* address = (char*)malloc(strlen(proxies[0]->address) + 1); // Large enough for string+\0
+	memcpy(address, proxies[0]->address, strlen(proxies[0]->address) + 1);
 	host = strtok(address, ":");
 	port = atoi(strtok(NULL, ":")); 
 	#ifdef DEBUG 
@@ -1272,42 +1288,39 @@ int main(int argc, char **argv){
 		sbio = BIO_new_socket(sock, BIO_NOCLOSE);
     	SSL_set_bio(ssl, sbio, sbio);
     }
-		// SSL Connect 
+	
+	// SSL Connect 
 	gettimeofday(&tvBeginConnect, NULL);
 
-	if (strcmp(proto, "pln") != 0) 
+	if (strcmp(proto, "pln") != 0){
 		doConnect (proto, slices_len, N_proxies, slice_set, proxies);
+	}
 
+	// Measure duration of "ssl"/"spp" connect (it does not apply to "pln" of course) 
 	gettimeofday(&tvEndConnect, NULL);
 	timeval_subtract(&tvConnect, &tvEndConnect, &tvBegin);
 	
-
 	// Switch across possible client-server behavior
 	// // NOTE: here we can add more complex strategies
 	switch(action){
 		// Handshake only 
-		case 1:  
-			break; 
+		case 1:		break; 
                 
 		// Send simple request, wait for 200 OK
-		case 2:  
-			http_request(file_requested, proto, false, &tvEnd);
-			break; 
+		case 2:		http_request(file_requested, proto, false, &tvEnd);
+					break; 
 
 		// Send HTTP GET request and wait for file to be received
-		case 3:  		
-			http_request(file_requested, proto, true, &tvEnd);
-			break; 
+		case 3:		http_request(file_requested, proto, true, &tvEnd);
+					break; 
 
 		// Send several GET request following a browser-like behavior  
-		case 4:  
-			http_complex(proto, file_action, &tvEnd);
-			break; 
+		case 4:		http_complex(proto, file_action, &tvEnd);
+					break; 
  
 		// Unknown option 
-		default: 
-			usage();
-			break; 
+		default:	usage();
+					break; 
 	}
 	// Compute duration of action
 	if (action > 1){

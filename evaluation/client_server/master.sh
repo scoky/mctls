@@ -17,7 +17,8 @@ usage(){
 	echo -e "run    = {(1) run experiment, (0) no run just plot"
 	echo -e "----------------------------------OPTIONAL-----------------------------------------------"
     echo -e "[plotCommand = {matlab, myplot, none, ...} add your own to the script (default is no plotting)]"
-    echo -e "[debug - instead of running it just prints the command it uses]"
+    echo -e "[debug =  {(0) OFF (1) ON (instead of running just prints commands used)}]"
+    echo -e "[tmp   =  {(0) OFF (1) ON (use tmp resulst folder)}]"
 	exit 0
 }
 	
@@ -36,8 +37,21 @@ tcpTrick(){
 # Set of checks for correctness
 [[ $# -lt 3 ]] && usage
 
-# Static parameters
-resFolder="../results/tmp"  # result folder 
+# Parameters
+if [ $# -eq 6 ]
+then 
+	tmp=$6
+else
+	tmp=0
+end
+
+# result folder 
+if [ $tmp -eq 1 ] 
+then
+	resFolder="../results/tmp"  
+else
+	resFolder="../results/tmp"  
+fi 
 R=50                      # number of repetitions
 S_max=16                  # max number of slices 
 rate=1                    # common rate
@@ -56,6 +70,7 @@ protoList[1]="ssl"        # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"     
+protoList[5]="spp_mod"     
 key="amazon.pem"          # amazon key 
 user="ubuntu"             # amazon user 
 
