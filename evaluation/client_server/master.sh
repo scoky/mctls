@@ -2,8 +2,8 @@
 
 # Function to print script usage
 usage(){
-    echo -e "Usage: $0 opt remote [plotCommand debug tmp]"
-    echo -e "opt = {(0) (1) (2) (3) (4) (5) (6) (7) (8)}"
+    echo -e "Usage: $0 opt remote run resFolder [plotCommand debug tmp]"
+    echo -e "opt          = {(0) (1) (2) (3) (4) (5) (6) (7) (8)}"
     echo -e "\t(0) Pull new code and compile"
 	echo -e "\t(1) Handshake duration (not used)" 
 	echo -e "\t(2) Time to first byte f(no. slices)"
@@ -14,12 +14,12 @@ usage(){
 	echo -e "\t(7) Number of connections per second"
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
 	echo -e "\t(9) Time to first byte f(scenarios) -- scenarios from file <<scenarios>>, 10 reps"
-	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
-	echo -e "run    = {(1) run experiment, (0) no run just plot"
+	echo -e "remote       = {(0) local experiments (1) Amazon experiments}"
+	echo -e "run          = {(1) run experiment, (0) no run just plot"
+	echo -e "resFolder    = folder where to store results (../results ; ../results/tmp ; ../results/final)"
 	echo -e "----------------------------------OPTIONAL-----------------------------------------------"
     echo -e "[plotCommand = {matlab, myplot, none, ...} add your own to the script (default is no plotting)]"
-    echo -e "[debug =  {(0) OFF (1) ON (instead of running just prints commands used)}]"
-    echo -e "[tmp   =  {(0) OFF (1) ON (use tmp resulst folder)}]"
+    echo -e "[debug       =  {(0) OFF (1) ON (instead of running just prints commands used)}]"
 	exit 0
 }
 	
@@ -36,16 +36,13 @@ tcpTrick(){
 }
 
 # Set of checks for correctness
-[[ $# -lt 3 ]] && usage
+[[ $# -lt 4 ]] && usage
 
-# result folder 
-if [ $tmp -eq 1 ] 
-then
-	resFolder="../results/tmp"  
-else
-	resFolder="../results/tmp"  
-fi 
-
+# Parameters
+opt=$1                    # user choice for experiment
+remote=$2                 # user choice, local or Amazon exp
+RUN_EXP=$3                # run experiment or not 
+resFolder=$4              # results folder 
 matlabFolder="../results" # matlab folder 
 R=50                      # number of repetitions
 S_max=16                  # max number of slices 
@@ -53,12 +50,8 @@ rate=1                    # common rate
 maxRate=8                 # max rate with no traffic
 delay=20                  # delay 
 iface="lo"                # interface
-log="log_script"          # log file 
 logCompile="log_compile"  # log file 
-opt=$1                    # user choice for experiment
-remote=$2                 # user choice, local or Amazon exp
 parallel=0                # parallel experiment (not used here but needed for plotting)
-RUN_EXP=$3                # run experiment or not 
 debug=0                   # no debugging by default
 plotCommand="none"        # Usere selection for plotting 
 protoList[1]="ssl"        # array for protocol types currently supported
@@ -77,20 +70,14 @@ localFolder=$HOME"WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol
 proto_count=${#protoList[@]}
 
 # read user plot input if provided
-if [[ $# -ge 4 ]]
+if [[ $# -ge 5 ]]
 then 
-	plotCommand=$4
+	plotCommand=$5
 fi
 # instead of running just print commands
-if [ $# -ge 5 ]
+if [ $# -ge 6 ]
 then 
-	debug=$5                  
-fi
-
-#cleanup 
-if [ -f $log ]
-then 
-	rm -v $log 
+	debug=$6                 
 fi
 
 # check key exhists (for remote exp)
@@ -210,24 +197,31 @@ then
 		;;
 	2)
 		echo "[MASTER] $adj analysis of first time to byte as a function of number of slices (check <<$log>> for experiment progress)"
+		R=10
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			#cleanup 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto (Running <<$R>> tests per configuration)"
 			if [ $remote -eq 0 ]
 			then
 				if [ $debug -eq 1 ] 
 				then
-					echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+					echo "./perf_script.sh $S_max $R $proto $opt $resFolder $remote $rate $maxRate $delay $iface >> $log"
 				else
-					./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+					./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 				fi
 			else
 				if [ $debug -eq 1 ] 
 				then
-					echo "./perf_script.sh $S_max $R $proto $opt $remote >> $log"
+					echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder >> $log"
 				else
-					./perf_script.sh $S_max $R $proto $opt $remote >> $log 2>/dev/null
+					./perf_script.sh $S_max $R $proto $opt $remote $resFolder >> $log 2>/dev/null
 				fi
 			fi
 		done
@@ -239,14 +233,19 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 
 			# run analysis
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null"
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null"
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -257,14 +256,19 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# run analysis
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null"
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null"
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -281,6 +285,11 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# deal with SPP_MOD
@@ -289,9 +298,9 @@ then
 			# run analysis
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface"
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface"
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -301,14 +310,19 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# run analysis
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh 1 1 $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null"
+				echo "./perf_script.sh 1 1 $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null"
 			else
-				./perf_script.sh 1 1 $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				./perf_script.sh 1 1 $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -323,12 +337,17 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto (30 second per parameter value and repetition. Est time $estTime minutes)"
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log"
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log"
 			else
-				./perf_script.sh $S_max $R $proto $opt $remote $rate $maxRate $delay $iface >> $log 2>/dev/null
+				./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -341,15 +360,20 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# run analysis
 			# TODO: use local/Amazon flag here once supported (instead of 0)
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt 0 >> $log 2>/dev/null"
+				echo "./perf_script.sh $S_max $R $proto $opt 0 $resFolder >> $log 2>/dev/null"
 			else
-				./perf_script.sh $S_max $R $proto $opt 0 >> $log 2>/dev/null
+				./perf_script.sh $S_max $R $proto $opt 0 $resFolder >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -360,13 +384,18 @@ then
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
+			log="log_script_"$proto 
+			if [ -f $log ]
+			then 
+				rm -v $log 
+			fi
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh 0 0 $proto $opt 0 >> $log 2>/dev/null"
+				echo "./perf_script.sh 0 0 $proto $opt 0 $resFolder"
 			else
-				./perf_script.sh 0 0 $proto $opt 0 >> $log 2>/dev/null
+				./perf_script.sh 0 0 $proto $opt 0 $resFolder >> $log 2>/dev/null
 			fi
 		done
 		;;
@@ -390,10 +419,10 @@ then
 
 	if [ $opt -eq 7 ] 
 	then 
-		matlab -nodisplay -nosplash -r "cd $matlabFolder; plotSigcomm($opt, $remote, $parallel, 'client', $tmp); plotSigcomm($opt, $remote, $parallel, 'mbox', $tmp); plotSigcomm($opt, $remote, $parallel, 'server', $tmp);quit"
+		matlab -nodisplay -nosplash -r "cd $matlabFolder; plotSigcomm($opt, $remote, $parallel, 'client', $resFolder, ''); plotSigcomm($opt, $remote, $parallel, 'mbox', $resFolder, ''); plotSigcomm($opt, $remote, $parallel, 'server', $resFolder, '');quit"
 	else 
-		echo "plotSigcomm($opt, $remote, $parallel, 'none', $tmp)"
-		matlab -nodisplay -nosplash -r "cd $matlabFolder; plotSigcomm($opt, $remote, $parallel, 'none', $tmp); quit"
+		echo "plotSigcomm($opt, $remote, $parallel, 'none', $resFolder, '')"
+		matlab -nodisplay -nosplash -r "cd $matlabFolder; plotSigcomm($opt, $remote, $parallel, 'none', $resFolder, ''); quit"
 	fi
 
 	# Generating summary report 

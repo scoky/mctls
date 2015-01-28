@@ -28,7 +28,7 @@ proto=$3                   # protocol to be used
 expType=$4                 # experiment type
 REMOTE=$5                  # 1=remote ; 0=local 
 resFolder=$6               # result folder        
-log="log_perf"             # performance log file
+log="log_perf_"$proto      # performance log file
 MAX=16                     # hard coded max number of slices as per Kyle
 fSizeMAX=5		           # max file size is 5MB
 proxyFile="./proxyList"    # contains proxy information 
@@ -121,7 +121,6 @@ then
 		c=$((nReqParam+4))
 		iface=${!c}
 		echo "[PERF] Setting up local network parameters - Rate=" $rate"Mbps MaxRate="$maxRate"Mbps Delay="$delay"ms Interface=$iface"
-		exit 0 
 		./network.sh 1 $rate $maxRate $delay $iface
 		echo "[PERF] Veryfying network configuration"
 		if [ $iface == "lo" ] 
@@ -190,7 +189,8 @@ case $expType in
 		fi
 
 		# Run S_MAX repetitions
-		for((s=1; s<=S_MAX; s=2*s))
+		#for((s=1; s<=S_MAX; s=2*s))
+		for((s=1; s<=S_MAX; s++))
 		do
 			# Run R handshake repetitions	
 			echo "[PERF] Testing $R handshakes with $s slices (protocol <<$proto>>)"
@@ -850,13 +850,14 @@ case $expType in
 		scenFile="./scenarios"     # file containing scenarios to run 
 		load_scenarios
 		
-		let "numScenarios=${#scenarios[@]}/3"
+		let "numScenarios=${#scenarios[@]}/4"
+		let "endScen=initScen + numScenarios"
 
 		# Update res file 
 		resFile=$resFile"_timeFirstByte_scenarios"
 		
 		# Logging
-		echo "[PERF] Testing $numScenarios scenarios. Results go in $resFile"
+		echo "[PERF] Testing $numScenarios scenarios. From id $initScen to id $endScen Results go in $resFile"
 		
 		# Cleaning
 		if [ -f $resFile ] 
@@ -871,9 +872,12 @@ case $expType in
 		then 
 			rm -v .tmpMore
 		fi
-		
+	
+		# Set to crazy value so sure server and mbox are started on first run 	
+		prevRemote=2
+
 		# Run each scenario
-		for((s=1; s<=$numScenarios; s++))
+		for((s=initScen; s<endScen; s++))
 		do
 			# Extract file size 
 			fSize=${scenarios[$s,"fileSize"]}
@@ -886,50 +890,59 @@ case $expType in
 
 			# Setup network if not remote 
 			REMOTE=${scenarios[$s,"remote"]}
+
+			# Logging 
+			if [ $REMOTE -eq 0 ]
+			then
+				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; Rate=$rate; Interface=$iface ; LOCAL$(tput sgr0)"
+			else
+				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; Interface=$iface ; AMAZON$(tput sgr0)"
+			fi
+			
+			# Setup 	
 			if [ $REMOTE -eq 0 ]
 			then 
 				cp $proxyFile"_original" $proxyFile 
 				echo "[PERF] Organizing local network with parameters <<./network.sh 1 $rate $rate $delay $iface>>"
 				./network.sh 1 $rate $rate $delay $iface
-				if [ $iface -eq "lo" ] 
+				if [ $iface == "lo" ] 
 				then 
 					ping -c 3 localhost
 				fi
-				cp $proxyFile"_amazon" $proxyFile 
-				echo "[PERF] No network organization since we are running on Amazon (remote=$REMOTE)"
-
+			else 
+				cp $proxyFile"_amazon" $proxyFile
 			fi	
 
 			# Read proxy and server from (updated) file
 			readMboxes
 			
 			# Add route to use 3G if requested 
-			if [ $iface -eq "ppp0" ] 
+			if [ $iface == "ppp0" ] 
 			then 
-				echo "[PERF] Setting up 3G route -- <<route add $mboxAdr dev ppp0>>"
+				echo "[PERF] Setting up 3G route -- <<sudo route add $mboxAdr dev ppp0>>"
 				sudo route add $mboxAdr dev ppp0
+				sleep 2 
 				ping -c 3 $mboxAdr
 			fi
 
-			# Start the server
-			start_server
-
-			# Proxy setup 
-			organizeMBOXES
-
-			# Logging 
-			if [ $REMOTE -eq 0 ]
+			# Start server and mboxes ? 
+			if [ $prevRemote -ne $REMOTE ] 
 			then
-				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; Rate=$rate; LOCAL$(tput sgr0)"
-			else
-				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; AMAZON$(tput sgr0)"
+				# Start the server
+				start_server
+
+				# Proxy setup 
+				organizeMBOXES
+			else 
+				echo "[PERF] Not restarting server and mboxes since current scenario is on same location as previous (prevRemote=$prevRemote ; currRemote=$REMOTE)"
 			fi
-	
+
 			# Run R repetitions	of scenario s
 			for((i=1; i<=R; i++))
 			do
 				echo $fSize $rate $REMOTE >> .tmp
-				#echo "./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1"
+				echo "Starting client"
+				echo -e "\t ./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1"
 				./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1
 			done
 	
@@ -941,26 +954,37 @@ case $expType in
 			fi
 			
 			# Cleanup 3G route in case
-			if [ $iface -eq "ppp0" ] 
+			if [ $iface == "ppp0" ] 
 			then 
-				echo "[PERF] Re-setting 3G route -- <<route del $mboxAdr dev ppp0>>"
-				sudo route del $mbox dev ppp0
+				echo "[PERF] Re-setting 3G route -- <<sudo route del $mboxAdr dev ppp0>>"
+				sudo route del $mboxAdr dev ppp0
+				sleep 2 
+				ping -c 3 $mboxAdr
 			fi
-
-			if [ $s -ne $numScenarios ]
+			
+			let "lastS=endScen-1"
+			if [ $s -ne $lastS ]
 			then
 				let "j=s+1"
-				nextRemote=${scenarios[$s,"remote"]}
+				nextRemote=${scenarios[$j,"remote"]}
 				if [ $nextRemote -ne $REMOTE ]
 				then 	
 					echo "[PERF] Killing server and mbox since next scenaro is on a different location (currRemote=$REMOTE ; nextRemote=$nextRemote)"
 					# Kill the server
 					killServer
-
 					# Kill mboxes
 					killMbox
 				fi
+			else
+				echo "[PERF] All scenario completed  - Killing server and mbox"
+				# Kill the server
+				killServer
+				# Kill mboxes
+				killMbox
 			fi
+			# Save previous remote information to decide whether to start the server or not   
+			prevRemote=$REMOTE
+			
 		done
 			
 		# Results
@@ -993,7 +1017,7 @@ case $expType in
 esac 
 
 # Cleanup
-if [ $# -eq 9 ]
+if [ $# -eq $totParam -a $expType -ne 9 ]
 then
 	echo "[PERF] Resetting network parameters (after experiment)"
 	./network.sh 2

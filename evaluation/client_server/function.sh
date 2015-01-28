@@ -41,7 +41,7 @@ killMbox(){
 
 # Start a server instance (either remote or local)
 start_server(){
-	echo "[FUNCTION] Starting server"
+	echo "[FUNCTION] Starting server $serverAdr (port: $serverPort)"
 	echo -e "\t./wserver -c $proto -o $opt -s $strategy -l $loadTime"
 	if [ -f log_server ]
 	then 
@@ -125,7 +125,8 @@ organizeMBOXES(){
 		if [ $proto == "spp" -o $proto == "spp_mod" ]
 		then
 			# Logging 
-			echo "[FUNCTION] Starting proxy $proxy (port extracted: $port)"
+			echo "[FUNCTION] Starting proxy $proxy (port: $port)"
+			echo -e "\t./mbox -c $proto -p $port -m $proxy -l $loadTime"
 			
 			# Start!		
 			if [ $REMOTE -eq 0 ] 
@@ -144,6 +145,7 @@ organizeMBOXES(){
 		then 
 			# Logging 
 			echo "[FUNCTION] Starting proxy $proxy (port extracted: $port - Next proxy: $nextProxy)"
+			echo -e "\t./mbox -c $proto -p $port -m $proxy -a $nextProxy -l $loadTime"
 			
 			# Start!		
 			if [ $REMOTE -eq 0 ] 
@@ -192,12 +194,17 @@ proxyFileUpdate(){
 
 # Load scenarios from file to memory
 load_scenarios(){
-	count=1        # int for proxy ID
-	
+	first=1        # flag for first line
+
 	# load proxy list in memory 
 	while read line
 	do
 		i=`echo $line | cut -f 1 -d " "`
+		if [ $first -eq 1 ] 
+		then 
+			initScen=$i
+			first=0
+		fi
 		label=`echo $line | cut -f 2 -d " "`
 		value=`echo $line | cut -f 3 -d " "`
 		scenarios[$i,$label]=$value
