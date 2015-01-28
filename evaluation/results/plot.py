@@ -12,10 +12,11 @@ import numpy
 sys.path.append('./myplot')
 import myplot
 import plot_byte_overhead
+import plot_time_scenarios
 
 # configuration
 FIG_DIR = './fig/myplot'
-RESULT_DIR = '.'
+RESULT_DIR = './final'
 PROTOCOLS = ('spp', 'ssl', 'fwd', 'pln', 'spp_mod')#, 'spp_one-slice',\
     #'ssl_one-slice', 'fwd_one-slice', 'spp_four-slices', 'ssl_four-slices',\
     #'fwd_four-slices')
@@ -34,6 +35,7 @@ EXPERIMENT_NAMES = {
     6: 'page_load_time',
     7: 'connections_slice',
     8: 'byteOverhead_scenarios',
+    9: 'timeFirstByte_scenarios',
 }
 #SUFFIXES = {
 #    2: {0: 'timeFirstByte_slice', 1: 'remote_timeFirstByte_slice'},
@@ -56,7 +58,7 @@ X_AXIS = {
     3: 'Link Latency (ms)',
     4: 'Number of Middleboxes',
     5: 'File Size (kB)',
-    6: 'Download Time (ms)',
+    6: 'Load Time (s)',
     7: 'Number of Slices',
 }
 Y_AXIS = {
@@ -67,6 +69,7 @@ Y_AXIS = {
     6: 'CDF',
     7: 'Connections per Second',
     8: 'Data Transmitted (kB)',
+    9: 'Download Time (s)',
 }
 DATA_TRANSFORMS = {
     2: lambda x: x*1000,
@@ -76,6 +79,7 @@ DATA_TRANSFORMS = {
     6: lambda x: x,
     7: lambda x: x,
     8: lambda x: float(x)/1024.,
+    9: lambda x: float(x),
 }
 SHOW_RTTS = {
     2: 4,
@@ -85,6 +89,7 @@ SHOW_RTTS = {
     6: 0,
     7: 0,
     8: 0,
+    9: 4,
 }
 
 ##
@@ -96,6 +101,16 @@ MANUAL_ARGS['connections_slice_local_tid.system-ns.net.pdf'] = {
 }
 MANUAL_ARGS['timeFirstByte_slice_local_local.pdf'] = {
     'legend': 'upper left',
+}
+MANUAL_ARGS['page_load_time_local_local_slicing-comparison.pdf'] = {
+    'xlim':(0, 12),
+}
+MANUAL_ARGS['page_load_time_local_local_proto-comparison.pdf'] = {
+    'xlim':(0, 12),
+}
+MANUAL_ARGS['timeFirstByte_scenarios_local_local.pdf'] = {
+    'width_scale':3,
+    'yscale':'log',
 }
 
 
@@ -290,7 +305,7 @@ def plot_series(machine, remote, result_files):
 
     print '[OUT]', out_filepath
     myplot.plot(xs, ys, yerrs=yerrs, labels=labels, xlabel=X_AXIS[args.opt],\
-        ylabel=Y_AXIS[args.opt], guide_lines=rtt_lines,\
+        ylabel=Y_AXIS[args.opt], guide_lines=rtt_lines[1:],\
         #title=plot_title,\
         filename=out_filepath, **MANUAL_ARGS[out_filename])
             
@@ -335,7 +350,12 @@ def plot_browser(machine, remote, result_files):
         transform = numpy.vectorize(DATA_TRANSFORMS[args.opt])
 
         ys.append(transform(data[:,2]))
-        labels.append(LEGEND_STRINGS[protocol])
+        if protocol == 'spp':
+            labels.append(LEGEND_STRINGS[protocol] + ' (4 Slices)')
+        elif protocol == 'spp_mod':
+            labels.append('TruMP (4 Slices, Nagle Off)')
+        else:
+            labels.append(LEGEND_STRINGS[protocol])
         plot_title = title(args.opt, remote, data)
 
     print '[OUT]', out_filepath
@@ -443,6 +463,13 @@ def main():
 
         for machine, result_files in local_files.iteritems():
             plot_byte_overhead.plot_byte_scenarios(machine, False, result_files)
+
+    elif args.opt == 9:
+        for machine, result_files in remote_files.iteritems():
+            plot_time_scenarios.plot_time_scenarios(machine, True, result_files)
+
+        for machine, result_files in local_files.iteritems():
+            plot_time_scenarios.plot_time_scenarios(machine, False, result_files)
         
     
 
