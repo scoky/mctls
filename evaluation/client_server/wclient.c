@@ -420,8 +420,14 @@ void sendRequestBrowser(char *filename){
 		toAllocate = (request_len - get_len); 
 	}
 
+	// Deal with the case when the GET is bigger than requested slice 0 
+	if (toAllocate < 0){
+		toAllocate = 0;
+	}
+
+	// Logging
 	#ifdef DEBUG	
-	printf ("[DEBUG] Allocating %d for padding\n", toAllocate); 
+	printf ("[DEBUG] Allocating %d for padding\n", toAllocate + 1); 
 	#endif 
 	padding = (char*) malloc(toAllocate + 1);
 	memset(padding, '?', toAllocate);

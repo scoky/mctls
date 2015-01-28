@@ -214,7 +214,15 @@ void sendData(SSL *ssl, int s, char *request, char *proto, int request_len){
 	// SPP
 	if (strcmp(proto, "spp") == 0){
 		// TO DO implement further splitting here 
-		splitting(ssl, request, request_len); 
+		if (request_len < ssl->slices_len){
+			r = SPP_write_record(ssl, request, request_len, ssl->slices[0]);
+			#ifdef DEBUG
+			printf("Wrote %d bytes\n", r);
+			#endif
+			check_SSL_write_error(ssl, r, request_len);
+		}else{
+			splitting(ssl, request, request_len); 
+		}
 	}	
 	// SSL
 	else if (strcmp(proto, "ssl") == 0){
