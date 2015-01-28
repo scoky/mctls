@@ -8,14 +8,13 @@ import numpy
 sys.path.append('./myplot')
 import myplot
 
-from plot import LEGEND_STRINGS, Y_AXIS, EXPERIMENT_NAMES, PROTOCOLS,\
-    MANUAL_ARGS, DATA_TRANSFORMS, outfile
+import plot
 
 OPT=8
 
 
 def records(filepath):
-    transform = numpy.vectorize(DATA_TRANSFORMS[OPT])
+    transform = plot.DATA_TRANSFORMS[OPT]
     with open(filepath, 'r') as f:
         for line in f:
             if line[0] != '#':
@@ -53,14 +52,14 @@ def load_data(data, res_file, protocol):
     return scenarios
 
 def plot_byte_scenarios(machine, remote, result_files):
-    out_filename, out_filepath = outfile(OPT, remote, machine)
+    out_filename, out_filepath = plot.outfile(OPT, remote, machine)
 
     ## LOAD DATA
     # scenario -> protocol -> data type -> value
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     scenarios = None
     
-    for protocol in PROTOCOLS:
+    for protocol in plot.PROTOCOLS:
         if protocol not in result_files: continue
         filepath = result_files[protocol]
         print '[IN]', protocol, filepath
@@ -88,7 +87,7 @@ def plot_byte_scenarios(machine, remote, result_files):
     #    for scenario in scenarios:
     #        vals.append(data[scenario][protocol]['total'])
     #    ys.append(vals)
-    #    labels.append(LEGEND_STRINGS[protocol])
+    #    labels.append(plot.LEGEND_STRINGS[protocol])
 
     #myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
     #    xtick_label_horizontal_alignment='center', ylabel='Total Data Transmitted (kB)',\
@@ -101,6 +100,7 @@ def plot_byte_scenarios(machine, remote, result_files):
     xs = []
     ys = []  # array of arrays of arrays: each protocol has an array containing arrays for byte types
     labels = []
+    colors = []
 
     for protocol in protocols:
         xs.append(scenarios)
@@ -111,12 +111,15 @@ def plot_byte_scenarios(machine, remote, result_files):
                 vals.append(data[scenario][protocol][byte_type])
             val_arrays.append(vals)
         ys.append(val_arrays)
-        labels.append(LEGEND_STRINGS[protocol])
+        labels.append(plot.LEGEND_STRINGS[protocol])
+
+    # skip the colors used for the protocols to avoid confusion
+    colors=[7, 5, 8, 6, 9]
 
     print '[OUT]', out_filepath
     myplot.stackbar(xs, ys, labels=labels, xtick_label_rotation=0,\
-        xtick_label_horizontal_alignment='center', ylabel=Y_AXIS[OPT],\
+        xtick_label_horizontal_alignment='center', ylabel=plot.Y_AXIS[OPT],\
         stackbar_pattern_labels=byte_types,\
         stackbar_colors_denote='segments',\
-        width_scale=1.4, grid='y',\
-        filename=out_filepath, **MANUAL_ARGS[out_filename])
+        colors=colors, width_scale=1.4, grid='y',\
+        filename=out_filepath, **plot.MANUAL_ARGS[out_filename])
