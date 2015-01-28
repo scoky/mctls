@@ -985,12 +985,20 @@ int SPP_connect(SSL *ssl, SPP_SLICE* slices[], int slices_len, SPP_PROXY *proxie
         printf("Too few slices defined!\n");
         return -1;
     }
+    if (slices_len > MAX_SPP_SLICES) {
+        printf("Too many slices defined!\n");
+        return -1;
+    }
     ssl->slices_len = slices_len;
     for (i = 0; i < slices_len; i++) {
         ssl->slices[i] = slices[i];
     }
     if (proxies_len < 1) {
         printf("Too few proxies defined!\n");
+        return -1;
+    }
+    if (proxies_len > MAX_SPP_PROXIES) {
+        printf("Too many proxies defined!\n");
         return -1;
     }
     ssl->proxies_len = proxies_len-1;
