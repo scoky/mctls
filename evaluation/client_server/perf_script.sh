@@ -3,12 +3,13 @@
 
 # Function to print script usage
 usage(){
-    echo -e "Usage: $0 MAX_S MAX_R proto expType remote [rate[Mbps] max_rate[Mbps] delay[ms] iface[lo,eth0,...]"
+    echo -e "Usage: $0 MAX_S MAX_R proto expType remote resFold [rate[Mbps] max_rate[Mbps] delay[ms] iface[lo,eth0,...]"
     echo -e "MAX_S   = max number of slices (min is 2)"
     echo -e "MAX_R   = number of repetition of handshake per slice value"
     echo -e "proto   = protocol requested (ssl; spp; fwd)"
     echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=ping-like (f[N_proxy]) ; 5=file download (f[size(1K-10MB)]) ; 6=browser-like behavior ; 7=test number of connections per second ; 8=byte analysis 9=file download by scenarios (f[size, rate, remote)}"
-    echo -e "remote =  {(0) local experiments (1) Amazon experiments}"
+    echo -e "remote  =  {(0) local experiments (1) Amazon experiments}"
+    echo -e "resFold =  folder where results should be stored"
     exit 0
 }
 
@@ -16,18 +17,21 @@ usage(){
 source function.sh
 
 # Check input for minimum number of parameteres requestes
-[[ $# -lt 5 ]] && usage
+nReqParam=6
+let "totParam=nReqParam+4"
+[[ $# -lt $nReqParam ]] && usage
 
 # Parameters
 S_MAX=$1                   # max number of slices
 R=$2                       # number of repetitions per experiment
 proto=$3                   # protocol to be used
 expType=$4                 # experiment type
+REMOTE=$5                  # 1=remote ; 0=local 
+resFolder=$6               # result folder        
 log="log_perf"             # performance log file
 MAX=16                     # hard coded max number of slices as per Kyle
 fSizeMAX=5		           # max file size is 5MB
 proxyFile="./proxyList"    # contains proxy information 
-resFolder="../results/tmp" # result folder        
 resFile=$resFolder"/res"   # result file 
 debug=0                    # more logging 
 delay=-1                   # default delay (-1 means no delay) 
@@ -37,7 +41,6 @@ protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
 protoList[5]="spp_mod"
-REMOTE=$5                  # 1=remote ; 0=local 
 key="amazon.pem"           # amazon key 
 user="ubuntu"              # amazon user 
 remoteFolder="/home/$user/secure_proxy_protocol/evaluation/client_server" # remote folder
@@ -103,17 +106,22 @@ else
 fi
 
 # Optional parameters handling 
-if [ $# -gt 5 ]
+if [ $# -gt $nReqParam ]
 then 
-	if [ $# -lt 9 ]
+	if [ $# -lt $totParam ]
 	then 
 		echo "[PERF] Running with no network config. For net conf. you need 4 optional parameters: [rate[Mbps] max_rate[Mbps] delay[ms] iface"
 	else
-		rate=$6
-		maxRate=$7
-		delay=$8
-		iface=$9
+		c=$((nReqParam+1))
+		rate=${!c}
+		c=$((nReqParam+2))
+		maxRate=${!c}
+		c=$((nReqParam+3))
+		delay=${!c}
+		c=$((nReqParam+4))
+		iface=${!c}
 		echo "[PERF] Setting up local network parameters - Rate=" $rate"Mbps MaxRate="$maxRate"Mbps Delay="$delay"ms Interface=$iface"
+		exit 0 
 		./network.sh 1 $rate $maxRate $delay $iface
 		echo "[PERF] Veryfying network configuration"
 		if [ $iface == "lo" ] 
@@ -819,8 +827,8 @@ case $expType in
 		iface="lo"             # default network interface
 		
 		#------------------------
-		timeSleep=5
-		R=3
+		timeSleep=3
+		R=10
 		echo "[PERF] Default param: Rep=$R ; Delay=$delay (for LOCAL). Reducing server sleeping time to $timeSleep (CHECK)"
 		#-----------------------
 
@@ -839,7 +847,7 @@ case $expType in
 		## Download speed (rate) from speedtest (1, 10, 100Mbps)
 		# Define scenarios to test (file size, rate, local/remote)
 		declare -A scenarios
-		scenFile="./scenarios_tmp"     # file containing scenarios to run 
+		scenFile="./scenarios"     # file containing scenarios to run 
 		load_scenarios
 		
 		let "numScenarios=${#scenarios[@]}/3"
@@ -873,6 +881,9 @@ case $expType in
 			# Extract rate 	
 			rate=${scenarios[$s,"rate"]}
 
+			# Extract interface 
+			iface=${scenarios[$s,"iface"]}
+
 			# Setup network if not remote 
 			REMOTE=${scenarios[$s,"remote"]}
 			if [ $REMOTE -eq 0 ]
@@ -880,14 +891,26 @@ case $expType in
 				cp $proxyFile"_original" $proxyFile 
 				echo "[PERF] Organizing local network with parameters <<./network.sh 1 $rate $rate $delay $iface>>"
 				./network.sh 1 $rate $rate $delay $iface
-			else
+				if [ $iface -eq "lo" ] 
+				then 
+					ping -c 3 localhost
+				fi
 				cp $proxyFile"_amazon" $proxyFile 
 				echo "[PERF] No network organization since we are running on Amazon (remote=$REMOTE)"
+
 			fi	
 
 			# Read proxy and server from (updated) file
 			readMboxes
 			
+			# Add route to use 3G if requested 
+			if [ $iface -eq "ppp0" ] 
+			then 
+				echo "[PERF] Setting up 3G route -- <<route add $mboxAdr dev ppp0>>"
+				sudo route add $mboxAdr dev ppp0
+				ping -c 3 $mboxAdr
+			fi
+
 			# Start the server
 			start_server
 
@@ -917,6 +940,13 @@ case $expType in
 				./network.sh 2
 			fi
 			
+			# Cleanup 3G route in case
+			if [ $iface -eq "ppp0" ] 
+			then 
+				echo "[PERF] Re-setting 3G route -- <<route del $mboxAdr dev ppp0>>"
+				sudo route del $mbox dev ppp0
+			fi
+
 			if [ $s -ne $numScenarios ]
 			then
 				let "j=s+1"

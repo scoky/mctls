@@ -84,6 +84,10 @@ readMboxes(){
 				proxyList[$count]=$line
 				echo "[FUNCTION] Read server info (addr=$serverAdr ; port=$serverPort)"
 			else
+				if [ $count -eq 1 ] 
+				then 
+					mboxAdr=`echo $line | cut -f 1 -d ":"`
+				fi
 				proxyList[$count]=$line
 				echo "[FUNCTION] Read proxy info (${proxyList[$count]})"
 			fi

@@ -13,6 +13,7 @@ usage(){
 	echo -e "\t(6) Download time in browser-like mode -- CDF"
 	echo -e "\t(7) Number of connections per second"
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
+	echo -e "\t(9) Time to first byte f(scenarios) -- scenarios from file <<scenarios>>, 10 reps"
 	echo -e "remote = {(0) local experiments (1) Amazon experiments}"
 	echo -e "run    = {(1) run experiment, (0) no run just plot"
 	echo -e "----------------------------------OPTIONAL-----------------------------------------------"
@@ -36,14 +37,6 @@ tcpTrick(){
 
 # Set of checks for correctness
 [[ $# -lt 3 ]] && usage
-
-# Parameters
-if [ $# -ge 6 ]
-then 
-	tmp=$6
-else
-	tmp=0
-fi
 
 # result folder 
 if [ $tmp -eq 1 ] 
@@ -360,7 +353,32 @@ then
 			fi
 		done
 		;;
+	
+	9)
+		echo "[MASTER] $adj analysis of time to first byte as function of scenarios from file <<scenarios>>"
+		echo "[MASTER] NOTE: This test ignores network parameters"
+		for ((i=1; i<=proto_count; i++))
+		do
+			proto=${protoList[$i]}
+			echo -e "\t[MASTER] Working on protocol $proto ..."
+			
+			if [ $debug -eq 1 ] 
+			then
+				echo "./perf_script.sh 0 0 $proto $opt 0 >> $log 2>/dev/null"
+			else
+				./perf_script.sh 0 0 $proto $opt 0 >> $log 2>/dev/null
+			fi
+		done
+		;;
 
+	10) 
+		echo "[MASTER] Collecting results"
+		m="tid.system-ns.net"
+		us_m="research"
+		echo "collect results from machine <<$m>> from final folder"
+		cd ../evaluation/results/final
+		rsync -avzh -e 'ssh -p 22222' --progress $us_m@$m:./secure_proxy_protocol/evaluation/results/final/* ./
+		cd - 
 	esac
 fi
 
