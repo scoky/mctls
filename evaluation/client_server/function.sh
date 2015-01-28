@@ -184,3 +184,20 @@ proxyFileUpdate(){
 	cat $proxyFile
 }
 
+
+# Load scenarios from file to memory
+load_scenarios(){
+	count=1        # int for proxy ID
+	
+	# load proxy list in memory 
+	while read line
+	do
+		i=`echo $line | cut -f 1 -d " "`
+		label=`echo $line | cut -f 2 -d " "`
+		value=`echo $line | cut -f 3 -d " "`
+		scenarios[$i,$label]=$value
+		echo "[FUNCTION] Added entry scenarios[$i,$label]=$value"
+	done < $scenFile
+}
+
+

@@ -7,7 +7,7 @@ usage(){
     echo -e "MAX_S   = max number of slices (min is 2)"
     echo -e "MAX_R   = number of repetition of handshake per slice value"
     echo -e "proto   = protocol requested (ssl; spp; fwd)"
-    echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=ping-like (f[N_proxy]) ; 5=file download (f[size(1K-10MB)]) ; 6=browser-like behavior ; 7=test number of connections per second ; 8=byte analysis}"
+    echo -e "expType = {1=handshake (NOT USED) ; 2=ping-like (f[slices_len]) ; 3=ping-like (f[delay]); 4=ping-like (f[N_proxy]) ; 5=file download (f[size(1K-10MB)]) ; 6=browser-like behavior ; 7=test number of connections per second ; 8=byte analysis 9=file download by scenarios (f[size, rate, remote)}"
     echo -e "remote =  {(0) local experiments (1) Amazon experiments}"
     exit 0
 }
@@ -37,14 +37,11 @@ protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
 protoList[5]="spp_mod"
-
-#--------------------------# ADDITION FOR REMOTE VERSION
 REMOTE=$5                  # 1=remote ; 0=local 
 key="amazon.pem"           # amazon key 
 user="ubuntu"              # amazon user 
 remoteFolder="/home/$user/secure_proxy_protocol/evaluation/client_server" # remote folder
 timeSleep=5                # time for server to setup
-#--------------------------# ADDITION FOR REMOTE VERSION
 
 # Max file size in MB
 let "fSizeMAX = fSizeMAX*1024*1024"
@@ -125,7 +122,12 @@ then
 		fi
 	fi
 else
-	echo "[PERF] Running with no network config. For net conf. you need 4 optional parameters: [rate[Mbps] max_rate[Mbps] delay[ms] iface"
+	if [ $expType -ne 9 ] 
+	then 
+		echo "[PERF] Experiment requested overwrite network parameters as it runs on scenarios from file <<$scen_file>>"
+	else
+		echo "[PERF] Running with no network config. For net conf. you need 4 optional parameters: [rate[Mbps] max_rate[Mbps] delay[ms] iface"
+	fi
 fi
 
 # Cleaning
@@ -158,7 +160,7 @@ case $expType in
 		opt=2
 		strategy="uni"
 		comm="ping"
-
+		
 		# Update res file 
 		resFile=$resFile"_timeFirstByte_slice"
 		if [ -f $resFile ] 
@@ -432,8 +434,8 @@ case $expType in
 		rm $browser_fold"log_perf_"*
 		
 		# test with specif subset of files 
-		expSlice[0]="one"
-		#expSlice[0]="four"
+		#expSlice[0]="one"
+		expSlice[0]="four"
 		#expSlice[2]="all"
 		
 		# Remote NOT supported yet
@@ -573,8 +575,8 @@ case $expType in
 				active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
 				while [ $active -gt 0 ] 
 				do 
-					echo "[PERF] Still $active clients running (sleeping 5 sec)"
-					sleep 5 
+					echo "[PERF] Still $active clients running (sleeping 1 sec)"
+					sleep 1
 					active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
 				done
 				
@@ -813,6 +815,14 @@ case $expType in
 		echo "[PERF] Time to first byte (f[scenarios])"
 		opt=3
 		strategy="cs"
+		delay=20               # default delay 
+		iface="lo"             # default network interface
+		
+		#------------------------
+		$timeSleep=1
+		R=10
+		echo "[PERF] Default param: Rep=$R ; Delay=$delay (for LOCAL). Reducing server sleeping time to $timeSleep (CHECK)"
+		#-----------------------
 
 		## File sizes percentile from Alexa
 		#10th percentile:        470.000000 B  			<--------
@@ -826,79 +836,33 @@ case $expType in
 		#	10MB										<--------
 		## Speed from SpeedTets [1, 10, 100]Mbps
 
+		## Download speed (rate) from speedtest (1, 10, 100Mbps)
 		# Define scenarios to test (file size, rate, local/remote)
 		declare -A scenarios
-		# variable fileSize 
-		scenarios[1,"fileSize"]=470   #Bytes
-		scenarios[1,"rate"]=1         #Mbps
-		scenarios[1,"remote"]=0       #0=local, 1=remote
+		scenFile="./scenarios"     # file containing scenarios to run 
+		load_scenarios
 		
-		scenarios[2,"fileSize"]=5009
-		scenarios[2,"rate"]=1
-		scenarios[2,"remote"]=0       
-		
-		scenarios[3,"fileSize"]=190073
-		scenarios[3,"rate"]=1
-		scenarios[3,"remote"]=0       
-	
-		scenarios[4,"fileSize"]=10485760
-		scenarios[4,"rate"]=1
-		scenarios[4,"remote"]=0       
-		
-		# variable Rate
-		scenarios[5,"fileSize"]=470   
-		scenarios[5,"rate"]=10        
-		scenarios[5,"remote"]=0       
-		
-		scenarios[6,"fileSize"]=5009
-		scenarios[6,"rate"]=10
-		scenarios[6,"remote"]=0       
-		
-		scenarios[7,"fileSize"]=190073
-		scenarios[7,"rate"]=10
-		scenarios[7,"remote"]=0       
-	
-		scenarios[8,"fileSize"]=10485760
-		scenarios[8,"rate"]=10
-		scenarios[8,"remote"]=0       
-
-		scenarios[9,"fileSize"]=470   
-		scenarios[9,"rate"]=100        
-		scenarios[9,"remote"]=0       
-		
-		scenarios[10,"fileSize"]=5009
-		scenarios[10,"rate"]=100
-		scenarios[10,"remote"]=0       
-		
-		scenarios[11,"fileSize"]=190073
-		scenarios[11,"rate"]=100
-		scenarios[11,"remote"]=0       
-	
-		scenarios[12,"fileSize"]=10485760
-		scenarios[12,"rate"]=100
-		scenarios[12,"remote"]=0       
-
-		# Amazon 
-		scenarios[13,"fileSize"]=5009
-		scenarios[13,"rate"]=-1
-		scenarios[13,"remote"]=1       
-
-		scenarios[14,"fileSize"]=10485760
-		scenarios[14,"rate"]=-1
-		scenarios[14,"remote"]=1       
-
 		let "numScenarios=${#scenarios[@]}/3"
-		echo "[PERF] Testing $numScenarios scenarios"
 
 		# Update res file 
-		resFile=$resFile"_rate_fsize_scenarios"
+		resFile=$resFile"_timeFirstByte_scenarios"
+		
+		# Logging
+		echo "[PERF] Testing $numScenarios scenarios. Results go in $resFile"
+		
+		# Cleaning
 		if [ -f $resFile ] 
 		then 
 			rm -v $resFile
 		fi
-
-		# Start the server
-		start_server
+		if [ -f .tmp ] 
+		then 
+			rm -v .tmp
+		fi
+		if [ -f .tmpMore ] 
+		then 
+			rm -v .tmpMore
+		fi
 		
 		# Run each scenario
 		for((s=1; s<=$numScenarios; s++))
@@ -911,8 +875,12 @@ case $expType in
 			if [ $remote -eq 0 ]
 			then 
 				rate=${scenarios[$s,"rate"]}
+				echo "[PERF] Organizing local network with parameters <<./network.sh 1 $rate $rate $delay $iface>>"
 				./network.sh 1 $rate $rate $delay $iface
 			fi		
+
+			# Start the server
+			start_server
 
 			# Read proxy from (updated) file
 			readMboxes
@@ -920,21 +888,45 @@ case $expType in
 			# Proxy setup 
 			organizeMBOXES
 
+			# Logging 
+			if [ $remote -eq 0 ]
+			then
+				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; Rate=$rate; LOCAL$(tput sgr0)"
+			else
+				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; AMAZON$(tput sgr0)"
+			fi
+	
 			# Run R repetitions	of scenario s
-			echo "[PERF] Testing $R reps with ${scenarios[$s,"numSlices"]} slices, ${scenarios[$s,"numMboxes"]} mboxes, ${scenarios[$s,"fileSize"]} byte file"
 			for((i=1; i<=R; i++))
 			do
 				echo $fSize $rate $remote >> .tmp
+				#echo "./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1"
 				./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1
 			done
 	
 			# cleanup the local network if not remote
 			if [ $remote -eq 0 ]
 			then 
+				echo "[PERF] Cleaning local network parameters"
 				./network.sh 2
 			fi
+			
+			if [ $s -ne $numScenarios ]
+			then
+				let "j=s+1"
+				nextRemote=${scenarios[$s,"remote"]}
+				if [ $nextRemote -ne $remote ]
+				then 	
+					echo "[PERF] Killing server and mbox since next scenaro is on a different location (currRemote=$remote ; nextRemote=$nextRemote)"
+					# Kill the server
+					killServer
+
+					# Kill mboxes
+					killMbox
+				fi
+			fi
 		done
-		
+			
 		# Results
 		if [ -f $log ] 
 		then  
@@ -950,6 +942,7 @@ case $expType in
 			# Analyzing (corrected) log 
 			match=`head -n 1 .res | awk '{print $1"_"$2"_"$3}'`
 			cat .res  |  awk -v S=$match -f stdev3.awk > $resFile
+			echo "[PERF] Results correctly written on file <<$resFile>>"
 			rm .tmp .tmpMore 
 
 		else

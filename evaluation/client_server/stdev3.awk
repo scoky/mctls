@@ -9,14 +9,16 @@ function compute()
 	for( x = 0; x < count; x++){
 		sumsq += ((array[x]-(sum/(count)))^2)
 	}
-	print key " " avg " " sqrt(sumsq/(count))
+	print oldKey " " avg " " sqrt(sumsq/(count))
 }
 {
-	key=$1" "$2" "$3
-	if($1 == S){
+	key=$1"_"$2"_"$3
+	keyPrint=$1" "$2" "$3
+	if(key == S){
 		sum += $4 
 		array[count] = $4 
 		count = count + 1
+		oldKey=keyPrint
 	} else {
 		compute()
 		count = 0
