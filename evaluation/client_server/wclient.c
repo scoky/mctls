@@ -409,7 +409,8 @@ void sendRequestBrowser(char *filename){
 	
 	//prepare final request with appropriate padding
 	char *request;
-	char *padding;
+	int actual_request_len;
+	char *padding=NULL;
 	
 	int toAllocate; 
 	if (strcmp(proto, "spp") == 0){
@@ -418,6 +419,9 @@ void sendRequestBrowser(char *filename){
 	} else {
 		//toAllocate = (request_len - get_len - 5); 
 		toAllocate = (request_len - get_len); 
+	}
+        if (toAllocate < 0) {
+		toAllocate = 0;
 	}
 
 	// Deal with the case when the GET is bigger than requested slice 0 
@@ -433,10 +437,11 @@ void sendRequestBrowser(char *filename){
 	memset(padding, '?', toAllocate);
 	padding[toAllocate] = 0;
 	if (strcmp(proto, "spp") == 0){
-		request = (char*) malloc(req_len_arr[0] + 1);
+		actual_request_len = (req_len_arr[0] > strlen(get_str) ? req_len_arr[0] : strlen(get_str)) + 1;
 	}else{
-		request = (char*) malloc(request_len + 1); 
+		actual_request_len = (request_len > strlen(get_str) ? request_len : strlen(get_str)) + 1;
 	}
+	request = (char *)malloc(actual_request_len);
 	// Copy get_str without \0
 	memcpy(request, get_str, strlen(get_str));
 	// Copy padding with \0
@@ -461,14 +466,14 @@ void sendRequestBrowser(char *filename){
 				#ifdef DEBUG
 				printf ("[DEBUG] Send GET request with slice %d. Actual size %d  -- size requested %d.\n", i, strlen(request), req_len_arr[i]); 
 				#endif 	
-				r = SPP_write_record(ssl, request, req_len_arr[i], ssl->slices[i]);
+				r = SPP_write_record(ssl, request, strlen(request)+1, ssl->slices[i]); // req_len_arr[i]
 				//r = SPP_write_record(ssl, request, strlen(request), ssl->slices[i]);
 				#ifdef DEBUG
 				printf ("[DEBUG] Send GET request with slice %d. Actual size %d  -- size requested %d. SPP_write returned %d\n", i, strlen(request), req_len_arr[i], r); 
 				#endif 	
 				// Check for errors 	
-				check_SSL_write_error(r, req_len_arr[i]); 
-				//check_SSL_write_error(r, strlen(request)); 
+				//check_SSL_write_error(r, req_len_arr[i]); 
+				check_SSL_write_error(r, strlen(request)+1); 
 
 				#ifdef DEBUG
 				printf("[DEBUG] Wrote %d bytes (on slice %d)\n", r, i);
