@@ -12,7 +12,7 @@ killServer(){
 		done
 	else
 		command="cd $remoteFolder; ./kill.sh"
-		ssh -i $key $user@$serverAdr $command 
+		ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command 
 	fi
 }
 
@@ -34,7 +34,7 @@ killMbox(){
 			proxy=${proxyList[$i]}
 			addr=`echo $proxy | cut -f 1 -d ":"`
 			command="cd $remoteFolder; ./kill.sh"
-			ssh -i $key $user@$addr $command 
+			ssh -o StrictHostKeyChecking=no -i $key $user@$addr $command 
 		done
 	fi
 }
@@ -52,6 +52,7 @@ start_server(){
 		./wserver -c $proto -o $opt -s $strategy -l $loadTime >> log_server 2>&1 &
 	else 
 		command="cd $remoteFolder; ./wserver -c $proto -o $opt -s $strategy" 
+		echo "ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &"
 		ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &
 	fi 
 	
@@ -128,9 +129,9 @@ organizeMBOXES(){
 				./mbox -c $proto -p $port -m $proxy -l $loadTime >> log_mbox_$port 2>&1 &
 			else 
 				command="killall mbox"
-				ssh -i $key $user@$addr $command 
+				ssh -o StrictHostKeyChecking=no -i $key $user@$addr $command 
 				command="cd $remoteFolder; ./mbox -c $proto -p $port -m $proxy"  
-				ssh -i $key $user@$addr $command  > log_mbox_$addr 2>&1 &
+				ssh -o StrictHostKeyChecking=no -i $key $user@$addr $command  > log_mbox_$addr 2>&1 &
 			fi
 		fi
 		
@@ -146,10 +147,10 @@ organizeMBOXES(){
 				./mbox -c $proto -p $port -m $proxy -a $nextProxy -l $loadTime >> log_mbox_$port 2>&1 &
 			else
 				command="killall mbox"
-				ssh -i $key $user@$addr $command 
+				ssh -o StrictHostKeyChecking=no -i $key $user@$addr $command 
 				command="cd $remoteFolder; ./mbox -c $proto -p $port -m $proxy -a $nextProxy"
 				echo "[FUNCTION] ssh -i $key $user@$addr $command > log_mbox_$addr 2>&1 &"
-				ssh -i $key $user@$addr $command > log_mbox_$addr 2>&1 &
+				ssh -o StrictHostKeyChecking=no -i $key $user@$addr $command > log_mbox_$addr 2>&1 &
 			fi
 		fi
 	done

@@ -819,8 +819,8 @@ case $expType in
 		iface="lo"             # default network interface
 		
 		#------------------------
-		$timeSleep=1
-		R=10
+		timeSleep=5
+		R=3
 		echo "[PERF] Default param: Rep=$R ; Delay=$delay (for LOCAL). Reducing server sleeping time to $timeSleep (CHECK)"
 		#-----------------------
 
@@ -839,7 +839,7 @@ case $expType in
 		## Download speed (rate) from speedtest (1, 10, 100Mbps)
 		# Define scenarios to test (file size, rate, local/remote)
 		declare -A scenarios
-		scenFile="./scenarios"     # file containing scenarios to run 
+		scenFile="./scenarios_tmp"     # file containing scenarios to run 
 		load_scenarios
 		
 		let "numScenarios=${#scenarios[@]}/3"
@@ -870,26 +870,32 @@ case $expType in
 			# Extract file size 
 			fSize=${scenarios[$s,"fileSize"]}
 
+			# Extract rate 	
+			rate=${scenarios[$s,"rate"]}
+
 			# Setup network if not remote 
-			remote=${scenarios[$s,"remote"]}
-			if [ $remote -eq 0 ]
+			REMOTE=${scenarios[$s,"remote"]}
+			if [ $REMOTE -eq 0 ]
 			then 
-				rate=${scenarios[$s,"rate"]}
+				cp $proxyFile"_original" $proxyFile 
 				echo "[PERF] Organizing local network with parameters <<./network.sh 1 $rate $rate $delay $iface>>"
 				./network.sh 1 $rate $rate $delay $iface
-			fi		
+			else
+				cp $proxyFile"_amazon" $proxyFile 
+				echo "[PERF] No network organization since we are running on Amazon (remote=$REMOTE)"
+			fi	
 
+			# Read proxy and server from (updated) file
+			readMboxes
+			
 			# Start the server
 			start_server
-
-			# Read proxy from (updated) file
-			readMboxes
 
 			# Proxy setup 
 			organizeMBOXES
 
 			# Logging 
-			if [ $remote -eq 0 ]
+			if [ $REMOTE -eq 0 ]
 			then
 				echo -e "$(tput setaf 1)[PERF] Testing scenario $s -- File Size=$fSize ; Rate=$rate; LOCAL$(tput sgr0)"
 			else
@@ -899,13 +905,13 @@ case $expType in
 			# Run R repetitions	of scenario s
 			for((i=1; i<=R; i++))
 			do
-				echo $fSize $rate $remote >> .tmp
+				echo $fSize $rate $REMOTE >> .tmp
 				#echo "./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1"
 				./wclient -s 4 -r 1 -w 1 -f $fSize -c $proto -o $opt -b 1 >> $log 2>&1
 			done
 	
 			# cleanup the local network if not remote
-			if [ $remote -eq 0 ]
+			if [ $REMOTE -eq 0 ]
 			then 
 				echo "[PERF] Cleaning local network parameters"
 				./network.sh 2
@@ -915,9 +921,9 @@ case $expType in
 			then
 				let "j=s+1"
 				nextRemote=${scenarios[$s,"remote"]}
-				if [ $nextRemote -ne $remote ]
+				if [ $nextRemote -ne $REMOTE ]
 				then 	
-					echo "[PERF] Killing server and mbox since next scenaro is on a different location (currRemote=$remote ; nextRemote=$nextRemote)"
+					echo "[PERF] Killing server and mbox since next scenaro is on a different location (currRemote=$REMOTE ; nextRemote=$nextRemote)"
 					# Kill the server
 					killServer
 
@@ -943,7 +949,7 @@ case $expType in
 			match=`head -n 1 .res | awk '{print $1"_"$2"_"$3}'`
 			cat .res  |  awk -v S=$match -f stdev3.awk > $resFile
 			echo "[PERF] Results correctly written on file <<$resFile>>"
-			rm .tmp .tmpMore 
+			#rm .tmp .tmpMore 
 
 		else
 			echo "[PERF] No file <<$log>> created, check for ERRORS!"
