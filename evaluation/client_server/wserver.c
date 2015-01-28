@@ -974,7 +974,7 @@ static int http_serve_SSL(SSL *ssl, int s){
 // Usage function 
 void usage(void){
 	printf("usage: wserver -c -o -s\n");
-	printf("-c:   protocol requested: ssl, spp, pln, spp-mod.\n");
+	printf("-c:   protocol requested: ssl, spp, pln, fwd, spp-mod, ssl-mod, pln-mod, fwd-mod.\n");
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-s:   content slicing strategy {uni; cs}\n");
 	printf("-l:   duration of load estimation time (10 sec default)\n");
@@ -1007,12 +1007,24 @@ int main(int argc, char **argv){
 			case 'c':	if(! (proto = strdup(optarg) )){
 							err_exit("Out of memory");
 						}
-						if (strcmp(proto, "fwd") == 0){
-							proto = "ssl"; 
-						}
 						if (strcmp(proto, "spp_mod") == 0){
 							proto = "spp"; 
 							disable_nagle = 1;
+						}
+						if (strcmp(proto, "ssl_mod") == 0){
+							proto = "ssl"; 
+							disable_nagle = 1;
+						}
+						if (strcmp(proto, "fwd_mod") == 0){
+							proto = "fwd"; 
+							disable_nagle = 1;
+						}
+						if (strcmp(proto, "pln_mod") == 0){
+							proto = "pln"; 
+							disable_nagle = 1;
+						}
+						if (strcmp(proto, "fwd") == 0){
+							proto = "ssl"; 
 						}
 						break; 
 
