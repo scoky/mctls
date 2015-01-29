@@ -123,33 +123,69 @@ void set_nagle(int sock, int flag) {
 }
 
 // tokenizer helper 
-int TokenizeString(char *s_String, char s_Token[15][50], char c_Delimiter){
+int TokenizeString(char *s_String, char **s_Token, int *size, char c_Delimiter){
+    int token_count = 0, max_token_size = 0, token_size = 0;
     int j = 0; 
     unsigned int i_Offset = 0; 
     char b_Flag = 0; 
     int count = 0; 
+    char *c;
+
+    // Get the number of tokens and the maximum token size
+    for (c = s_String;; c++) {
+	if ((*c) != c_Delimiter && (*c) != '\t' && (*c) != '\n' && (*c) != '\0') {
+	   token_size++;
+	   continue;
+	}
+	if (token_size > 0) {
+	   max_token_size = max_token_size > token_size+1 ? max_token_size : token_size+1;
+	   token_size = 0;
+	   token_count += 1;
+	}
+	if ((*c) == '\0') {
+	   break;
+	}
+    }
+    #ifdef DEBUG
+    printf("TokenizeString: token_count=%d, max_token_size=%d\n", token_count, max_token_size);
+    #endif
+    (*size) = max_token_size;
+    (*s_Token) = (char**)malloc(token_count);
+    for (j = 0; j < token_count; j++) {
+	(*s_Token)[j] = (char[])malloc(max_token_size);
+    }
+
     for (i_Offset = 0;s_String[i_Offset] != '\0';i_Offset++){
+	#ifdef DEBUG
+	printf("TokenizeString: char=%c\n", s_String[i_Offset]);
+	#endif
         if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
-            s_Token[count][j] = s_String[i_Offset];
+            ((*s_Token)[count])[j] = s_String[i_Offset];
             j++;
-	    if (j >= 15) {
+	    if (j >= max_token_size) {
 		printf("TokensizeString: token too long! exceeds 15 characters including nul terminator.\n");
 	    }
             b_Flag = 1; 
             continue;
         }
         if (b_Flag){
-	if (count >= 50) {
+	if (count >= token_count) {
 		printf("TokenizeString: too many tokens! exceeds limit of 50 tokens.\n");
 	}
-        s_Token[count][j] = '\0';
+        ((*s_Token)[count])[j] = '\0';
+	#ifdef DEBUG
+	printf("TokenizeString: token=%s\n", (*s_Token)[count]);
+	#endif
         count++;
         j = 0; 
         b_Flag = 0; 
         }
     }
     if (b_Flag || j > 0) {
-        s_Token[count][j] = '\0';
+        ((*s_Token)[count])[j] = '\0';
+	#ifdef DEBUG
+	printf("TokenizeString: token=%s\n", (*s_Token)[count]);
+	#endif
         count++;
     }
     return count;

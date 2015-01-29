@@ -31,7 +31,7 @@ int err_exit(char *string);
 SSL_CTX *initialize_ctx(char *keyfile, char *password, char *protocol);
 void destroy_ctx(SSL_CTX *ctx);
 void set_nagle(int sock, int flag);
-int TokenizeString(char *s_String, char s_Token[15][50], char c_Delimiter);
+int TokenizeString(char *s_String, char **s_Token, int *size, char c_Delimiter);
 
 typedef struct experiment_info {
 	int num_slices;
