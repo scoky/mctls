@@ -25,6 +25,8 @@
 #include <openssl/e_os2.h>
 //#define DEBUG
 #define MAX_PACKET 16384 
+#define HI_DEF_TIMER
+
 
 static char *strategy = "uni";
 static int disable_nagle = 0; //default is disabled
@@ -1012,7 +1014,8 @@ int main(int argc, char **argv){
 	int c;                              // user iput from getopt
 	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
 	int status;                         // ...
-	clock_t start, end;                 // timers for cpu time estimation 
+	//clock_t start, end;                 // timers for cpu time estimation 
+	struct timespec tps, tpe;
 	double cpu_time_used;               // cpu time used 
 	int loadTime = 10;                  // time used for load estimation (10 second default, user can change with option -l)
 
@@ -1119,7 +1122,14 @@ int main(int argc, char **argv){
 				berr_exit("FORK error"); 
 				return 1;
            	}
-			start = clock();
+			
+
+			#ifdef HI_DEF_TIMER
+           	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tps);
+           	#else
+           	start = clock();
+           	#endif
+
 			#ifdef DEBUG
 			printf("[DEBUG] child process close old socket and operate on new one\n");
 			#endif
@@ -1144,8 +1154,15 @@ int main(int argc, char **argv){
 					#endif
 				}
 			}
+			#ifdef HI_DEF_TIMER
+			clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tpe);
+			cpu_time_used =  ( tpe.tv_sec - tps.tv_sec ) + (double)( tpe.tv_nsec - tps.tv_nsec )/ (double)1000000000L;
+			#else
 			end = clock();
 			cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+			#endif
+
+
 			if (loadTime > 0){
 				printf( "CPU time=%f sec\n", cpu_time_used); 
 			}

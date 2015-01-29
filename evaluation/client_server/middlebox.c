@@ -545,7 +545,8 @@ int main(int argc, char **argv){
 	proto = "spp";
 	char *prxy_address = "127.0.0.1:8423";
 	SSL* ssl_next = NULL;
-    clock_t start, end;
+    //clock_t start, end;
+    struct timespec tps, tpe;
     double cpu_time_used; 
 	int loadTime = 0;                  // time used for load estimation (not used but for future. 0 means no printing)
 	char buf[BUFSIZZ];
@@ -657,7 +658,12 @@ int main(int argc, char **argv){
 			close(s);
 		} else {
 			// start timer for CPU time on first connection 
-			start = clock();
+			#ifdef HI_DEF_TIMER
+           	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tps);
+           	#else
+           	start = clock();
+           	#endif
+
 
 			if (strcmp(proto, "fwd") == 0){
 				#ifdef DEBUG            
@@ -726,8 +732,13 @@ int main(int argc, char **argv){
     		close(s);
     	
 			// Compute CPU time user for this connection and log it 
+			#ifdef HI_DEF_TIMER
+			clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tpe);
+			cpu_time_used =  ( tpe.tv_sec - tps.tv_sec ) + (double)( tpe.tv_nsec - tps.tv_nsec )/ (double)1000000000L;
+			#else
 			end = clock();
 			cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+			#endif
 			if (loadTime > 0){
 				printf("CPU time=%f sec\n", cpu_time_used); 
 			}		
