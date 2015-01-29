@@ -551,7 +551,7 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
     
     // extract list of response sizes 
     char s_Token[15][50];
-    memset(s_Token, 0, 375);
+    memset(s_Token, 0, sizeof(s_Token));
     int i;
     int count = TokenizeString(fn, s_Token, '_');
     #ifdef DEBUG
