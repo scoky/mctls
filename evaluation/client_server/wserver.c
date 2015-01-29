@@ -1014,7 +1014,7 @@ int main(int argc, char **argv){
 	int c;                              // user iput from getopt
 	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
 	int status;                         // ...
-	//clock_t start, end;                 // timers for cpu time estimation 
+	clock_t start, end;                 // timers for cpu time estimation 
 	struct timespec tps, tpe;
 	double cpu_time_used;               // cpu time used 
 	int loadTime = 10;                  // time used for load estimation (10 second default, user can change with option -l)
