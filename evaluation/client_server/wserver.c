@@ -535,40 +535,61 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 		}
 	}
 
-	// Parsing 
-	char *delim="\r\n"; 
-	char *token = strtok(buf , delim);   
-	delim=" "; 
-	char *fn = strtok(token, delim);   
-	fn = strtok(NULL, delim);   
+	// extract request sizes 
+    char *s_Token;
+    int  size_alloc; 
+	int c = TokenizeString(buf, &s_Token,  &size_alloc, '\n');
+	int j; 
+	for (j = 0; j <= c ; j++){
+		printf ("%d -- %s\n", j, s_Token[j]);
+	}
+    char *left = s_Token[0]; 
+	for (j = 0; j <= c ; j++){
+		free (s_Token[j]); 
+	}
+	free(s_Token); 
 	
-	#ifdef DEBUG	
-	printf("[DEBUG] List of requested slice sizes: %s\n", fn);
-	#endif 
+	#ifdef DEBUG    
+    printf("[DEBUG] Extracted first line from request: %s\n", left); 
+    #endif 
+
+    char *s_Token1;
+	c = TokenizeString(left, &s_Token1, &size_alloc, ' ');
+	for (j = 0; j <= c ; j++){
+		printf ("%d -- %s\n", j, s_Token1[j]);
+	}
+    char *fn = s_Token1[1]; 
+	for (j = 0; j <= c ; j++){
+		free (s_Token1[j]); 
+	}
+	free(s_Token1); 
 	
-	// data structures to store sizes of responses 
+	#ifdef DEBUG    
+    printf("[DEBUG] List of requested slice sizes: %s\n", fn); 
+    #endif 
+	
+    char *s_Token2;
     long response_len = 0; 
-    
-    // extract list of response sizes 
-    char s_Token[15][50];
-    memset(s_Token, 0, sizeof(s_Token));
-    int i;
-    int count = TokenizeString(fn, s_Token, '_');
+    int count = TokenizeString(fn, s_Token2, &size_alloc, '_');
     #ifdef DEBUG
 	printf("[DEBUG] Found %d tokens\n", count);
 	for (i=0; i <count; i++) {
-		printf("%s ", s_Token[i]);
+		printf("%s ", s_Token2[i]);
 	}
 	printf("\n");
     #endif
     long resp_len_arr[count]; 
-    for(i=0; i < count; i++){
-		resp_len_arr[i] = atol(s_Token[i]); 
+	for(i=0; i < count; i++){
+		resp_len_arr[i] = atol(s_Token2[i]); 
     	response_len += resp_len_arr[i]; 
 		#ifdef DEBUG
 		printf("[DEBUG] Requested Slice %d with size %ld\n", i, resp_len_arr[i]);
 		#endif 
     }
+	for (j = 0; j <= c ; j++){
+		free (s_Token2[j]); 
+	}
+	free(s_Token2); 
 
 	#ifdef DEBUG
 	printf("[DEBUG] Total size is %ld\n", response_len);
