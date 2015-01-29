@@ -308,11 +308,16 @@ char* parse_http_get(char *buf){
 
 
 // Serve some data in browser mode, just for SPP protocol 
-int serveDataSPPBrowser(SSL *ssl, int s,  int data_size, char *proto, long *resp_len_arr){ 
+int serveDataSPPBrowser(SSL *ssl, int s,  int data_size, char *proto, long *resp_len_arr, int arr_len){ 
 	
 	int i; 
 	for (i = 0; i < ssl->slices_len; i++){
-		long still_to_send = resp_len_arr[i]; 
+		long still_to_send = 0;
+		if (i >= arr_len) {
+			printf("Error! no data specified to send for slice.\n");
+		} else {
+			still_to_send = resp_len_arr[i]; 
+		}
 		if (still_to_send > 0){
 			#ifdef DEBUG
 			printf ("[DEBUG] %d bytes to be sent with slice %d\n", still_to_send, i); 
@@ -330,10 +335,10 @@ int serveDataSPPBrowser(SSL *ssl, int s,  int data_size, char *proto, long *resp
 				printf ("[DEBUG] Allocating buffer with %d data\n", toSend); 
 				#endif 
 				char *buf = (char*) malloc(sizeof(char) * toSend);
-				memset(buf, '!', sizeof(char) * toSend);	
+				memset(buf, '!', sizeof(char) * toSend);
 				
 				#ifdef VERBOSE
-				printf ("[DEBUG] Buffer=\n%s\n", buf); 
+//				printf ("[DEBUG] Buffer=\n%s\n", buf); 
 				#endif 
 			
 				// send data on slice i 
@@ -482,7 +487,7 @@ int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
     unsigned int i_Offset = 0; 
     char b_Flag = 0; 
     int count = 0; 
-    for (i_Offset = 0;i_Offset <= strlen(s_String);i_Offset++){
+    for (i_Offset = 0;s_String[i_Offset] != '\0';i_Offset++){
         if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
             s_Token[count][j] = s_String[i_Offset];
             j++;
@@ -495,8 +500,12 @@ int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
         j = 0; 
         b_Flag = 0; 
         }
-    }    
-    return (count - 1);
+    }
+    if (b_Flag || j > 0) {
+        s_Token[count][j] = '\0';
+        count++;
+    }
+    return count;
 }
 
 
@@ -568,11 +577,18 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
     
     // extract list of response sizes 
     char s_Token[15][25];
-    memset(s_Token, 0, 200);
-    int count = TokenizeString(fn, s_Token, '_');
-    long resp_len_arr[count]; 
+    memset(s_Token, 0, 375);
     int i;
-    for(i=0; i <= count; i++){
+    int count = TokenizeString(fn, s_Token, '_');
+    #ifdef DEBUG
+	printf("[DEBUG] Found %d tokens\n", count);
+	for (i=0; i <count; i++) {
+		printf("%s ", s_Token[i]);
+	}
+	printf("\n");
+    #endif
+    long resp_len_arr[count]; 
+    for(i=0; i < count; i++){
 		resp_len_arr[i] = atol(s_Token[i]); 
     	response_len += resp_len_arr[i]; 
 		#ifdef DEBUG
@@ -586,7 +602,7 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 	
 	// serve requested data 
 	if (strcmp(proto, "spp") == 0){
-		serveDataSPPBrowser(ssl, s,  resp_len_arr, proto, resp_len_arr); 
+		serveDataSPPBrowser(ssl, s,  response_len, proto, resp_len_arr, count); 
 	} else {	
 		// use classic method to serve data if not SPP
 		#ifdef DEBUG
