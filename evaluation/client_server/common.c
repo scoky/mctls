@@ -132,10 +132,16 @@ int TokenizeString(char *s_String, char s_Token[15][50], char c_Delimiter){
         if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
             s_Token[count][j] = s_String[i_Offset];
             j++;
+	    if (j >= 15) {
+		printf("TokensizeString: token too long! exceeds 15 characters including nul terminator.\n");
+	    }
             b_Flag = 1; 
             continue;
         }
         if (b_Flag){
+	if (count >= 50) {
+		printf("TokenizeString: too many tokens! exceeds limit of 50 tokens.\n");
+	}
         s_Token[count][j] = '\0';
         count++;
         j = 0; 
