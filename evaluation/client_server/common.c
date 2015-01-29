@@ -150,17 +150,18 @@ int TokenizeString(char *s_String, char ***s_Token, int *size, char c_Delimiter)
     printf("TokenizeString: token_count=%d, max_token_size=%d\n", token_count, max_token_size);
     #endif
     (*size) = max_token_size;
-    (*s_Token) = (char**)malloc(token_count);
+    (*s_Token) = (char**)malloc(token_count*sizeof(char*));
+    char **deRef = (*s_Token);
     for (j = 0; j < token_count; j++) {
-	(*s_Token)[j] = (char*)malloc(max_token_size);
+	deRef[j] = (char*)malloc(max_token_size);
     }
-
+    j=0;
     for (i_Offset = 0;s_String[i_Offset] != '\0';i_Offset++){
 	#ifdef DEBUG
 	printf("TokenizeString: char=%c\n", s_String[i_Offset]);
 	#endif
         if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
-            ((*s_Token)[count])[j] = s_String[i_Offset];
+            (deRef[count])[j] = s_String[i_Offset];
             j++;
 	    if (j >= max_token_size) {
 		printf("TokensizeString: token too long! exceeds 15 characters including nul terminator.\n");
@@ -172,9 +173,9 @@ int TokenizeString(char *s_String, char ***s_Token, int *size, char c_Delimiter)
 	if (count >= token_count) {
 		printf("TokenizeString: too many tokens! exceeds limit of 50 tokens.\n");
 	}
-        ((*s_Token)[count])[j] = '\0';
+        (deRef[count])[j] = '\0';
 	#ifdef DEBUG
-	printf("TokenizeString: token=%s\n", (*s_Token)[count]);
+	printf("TokenizeString: token=%s, j=%d, count=%d\n", deRef[count], j, count);
 	#endif
         count++;
         j = 0; 
@@ -182,12 +183,15 @@ int TokenizeString(char *s_String, char ***s_Token, int *size, char c_Delimiter)
         }
     }
     if (b_Flag || j > 0) {
-        ((*s_Token)[count])[j] = '\0';
+        (deRef[count])[j] = '\0';
 	#ifdef DEBUG
-	printf("TokenizeString: token=%s\n", (*s_Token)[count]);
+	printf("TokenizeString: token=%s, j=%d, count=%d\n", deRef[count], j , count);
 	#endif
         count++;
     }
+    for (j = 0; j < token_count; j++) {
+	printf("%s\n", deRef[j]);
+}
     return count;
 }
 
