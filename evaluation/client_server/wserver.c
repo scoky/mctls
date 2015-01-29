@@ -483,34 +483,6 @@ int serveFile(SSL *ssl, int s, char *filename, char *proto){
 }	
 
 
-// tokenizer helper 
-int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
-    int j = 0; 
-    unsigned int i_Offset = 0; 
-    char b_Flag = 0; 
-    int count = 0; 
-    for (i_Offset = 0;s_String[i_Offset] != '\0';i_Offset++){
-        if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
-            s_Token[count][j] = s_String[i_Offset];
-            j++;
-            b_Flag = 1; 
-            continue;
-        }
-        if (b_Flag){
-        s_Token[count][j] = '\0';
-        count++;
-        j = 0; 
-        b_Flag = 0; 
-        }
-    }
-    if (b_Flag || j > 0) {
-        s_Token[count][j] = '\0';
-        count++;
-    }
-    return count;
-}
-
-
 // serve requests in browser-like mode 
 static int http_serve_request_browser(SSL *ssl, int s, char *proto){
   
@@ -578,7 +550,7 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
     long response_len = 0; 
     
     // extract list of response sizes 
-    char s_Token[15][25];
+    char s_Token[15][50];
     memset(s_Token, 0, 375);
     int i;
     int count = TokenizeString(fn, s_Token, '_');

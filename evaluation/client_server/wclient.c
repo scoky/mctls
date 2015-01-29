@@ -339,35 +339,6 @@ void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_se
 	}
 }
 
-// string tokenizer 
-int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
-	int j = 0;
-	unsigned int i_Offset = 0;
-	char b_Flag = 0;
-	int count = 0;
-	#ifdef DEBUG
-	//printf("[DEBUG] TokenizeString %d - %d\n", i_Offset, strlen(s_String)); 
-	#endif
-	for (i_Offset = 0;i_Offset <= strlen(s_String);i_Offset++){
-		#ifdef DEBUG
-		//printf("[DEBUG] Indices %d - %d\n", i_Offset, strlen(s_String)); 
-		#endif
-		if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
-			s_Token[count][j] = s_String[i_Offset];
-			j++;
-			b_Flag = 1;
-			continue;
-		}
-		if (b_Flag){
-		s_Token[count][j] = '\0';
-		count++;
-		j = 0;
-		b_Flag = 0;
-		}
-	}
-	return (count - 1);
-}
-
 // Form and send GET
 void sendRequestBrowser(char *filename){
 
@@ -396,7 +367,7 @@ void sendRequestBrowser(char *filename){
 	#endif 	
  
 	// extract request sizes 
-	char s_Token[15][25];
+	char s_Token[15][50];
 	memset(s_Token, 0, 375);
 	int countSlice = TokenizeString(filename, s_Token, '_');
 	int ii;
