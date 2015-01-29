@@ -1035,7 +1035,7 @@ void usage(void){
 	printf("-f:   file for http GET (either via <name> (require file to exhist both at server and client[for testing reasons]) or via <size>)\n"); 
 	printf("-o:   {1=test handshake ; 2=200 OK ; 3=file transfer ; 4=browser-like behavior}\n");
 	printf("-a:   action file for browser-like behavior\n");
-	printf("-c:   protocol chosen (ssl ; spp; pln; spp-mod)\n"); 
+	printf("-c:   protocol chosen (ssl ; spp; pln; fwd; spp-mod; ssl-mod; fwd-mod; pln-mod)\n"); 
 	printf("-b:   report byte statistics\n");
 	exit(-1);  
 }
@@ -1109,12 +1109,24 @@ int main(int argc, char **argv){
 			case 'c':	if(! (proto = strdup(optarg) )){
 							err_exit("Out of memory");
 						}
-						if (strcmp(proto, "fwd") == 0){
-                  			proto = "ssl"; 
-						}
 						if (strcmp(proto, "spp_mod") == 0){
                   			proto = "spp"; 
                   			disable_nagle = 1;
+						}
+						if (strcmp(proto, "ssl_mod") == 0){
+                  			proto = "ssl"; 
+                  			disable_nagle = 1;
+						}
+						if (strcmp(proto, "fwd_mod") == 0){
+                  			proto = "fwd"; 
+                  			disable_nagle = 1;
+						}
+						if (strcmp(proto, "pln_mod") == 0){
+                  			proto = "pln"; 
+                  			disable_nagle = 1;
+						}
+						if (strcmp(proto, "fwd") == 0){
+                  			proto = "ssl"; 
 						}
 						break; 
 			
