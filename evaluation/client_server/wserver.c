@@ -1116,7 +1116,7 @@ int main(int argc, char **argv){
 		// Fork a new process
 		signal(SIGCHLD, SIG_IGN); 
 		pid = fork(); 
-		if (pid != 0){
+		if (pid == 0){
 			/* In chil process */
 			if (pid == -1) {
 				berr_exit("FORK error"); 
