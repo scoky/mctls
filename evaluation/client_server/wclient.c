@@ -1182,7 +1182,7 @@ int main(int argc, char **argv){
 		usage(); 
 	}
 	if ((strcmp(proto, "spp") != 0) && (strcmp(proto, "ssl") != 0) && (strcmp(proto, "pln") != 0)){
-		printf("Protocol type specified is not supported. Supported protocols are: spp, ssl, pln\n"); 
+		printf("Protocol type specified (%s) is not supported. Supported protocols are: spp, ssl, pln\n", proto); 
 		usage(); 
 	}
 	if (N_proxies == 0){

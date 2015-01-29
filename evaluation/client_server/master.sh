@@ -63,9 +63,9 @@ user="ubuntu"             # amazon user
 #protoList[5]="spp_mod"     
 # ---- Nagel OFF for ALL
 protoList[1]="ssl_mod"       
-#protoList[2]="fwd_mod"
-#protoList[3]="spp_mod"
-#protoList[4]="pln_mod"     
+protoList[2]="fwd_mod"
+protoList[3]="spp_mod"
+protoList[4]="pln_mod"     
 
 
 # folder for compilations
@@ -202,8 +202,8 @@ then
 		exit 0
 		;;
 	2)
-		echo "[MASTER] $adj analysis of first time to byte as a function of number of slices (check <<$log>> for experiment progress)"
 		R=10
+		echo "[MASTER] $adj analysis of first time to byte as a function of number of slices. !!$R repetitions!! (check <<$log>> for experiment progress)"
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}
@@ -218,7 +218,7 @@ then
 			then
 				if [ $debug -eq 1 ] 
 				then
-					echo "./perf_script.sh $S_max $R $proto $opt $resFolder $remote $rate $maxRate $delay $iface >> $log"
+					echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log"
 				else
 					./perf_script.sh $S_max $R $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
 				fi

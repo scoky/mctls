@@ -49,7 +49,7 @@ start_server(){
 	fi 
 	if [ $REMOTE -eq 0 ] 
 	then 
-		./wserver -c $proto -o $opt -s $strategy -l $loadTime >> log_server 2>&1 &
+		./wserver -c $proto -o $opt -s $strategy -l $loadTime > log_server 2>&1 &
 	else 
 		command="cd $remoteFolder; ./wserver -c $proto -o $opt -s $strategy" 
 		echo "ssh -o StrictHostKeyChecking=no -i $key $user@$serverAdr $command > log_server 2>&1 &"
@@ -141,7 +141,7 @@ organizeMBOXES(){
 		fi
 		
 		# Start proxy with SSL
-		if [ $proto == "ssl" -o $proto == "fwd" -o $proto == "pln" ]
+		if [ $proto == "ssl" -o $proto == "fwd" -o $proto == "pln" -o $proto == "ssl_mod" -o $proto == "fwd_mod" -o $proto == "pln_mod" ]
 		then 
 			# Logging 
 			echo "[FUNCTION] Starting proxy $proxy (port extracted: $port - Next proxy: $nextProxy)"
