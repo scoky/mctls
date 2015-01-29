@@ -3,7 +3,7 @@
 # Function to print script usage
 usage(){
     echo -e "Usage: $0 opt remote run resFolder [plotCommand debug tmp]"
-    echo -e "opt          = {(0) (1) (2) (3) (4) (5) (6) (7) (8)}"
+    echo -e "opt  = {(0) (1) (2) (3) (4) (5) (6) (7) (8)}"
     echo -e "\t(0) Pull new code and compile"
 	echo -e "\t(1) Handshake duration (not used)" 
 	echo -e "\t(2) Time to first byte f(no. slices)"
@@ -54,13 +54,19 @@ logCompile="log_compile"  # log file
 parallel=0                # parallel experiment (not used here but needed for plotting)
 debug=0                   # no debugging by default
 plotCommand="none"        # Usere selection for plotting 
-protoList[1]="ssl"        # array for protocol types currently supported
-protoList[2]="fwd"
-protoList[3]="spp"
-protoList[4]="pln"     
-protoList[5]="spp_mod"     
 key="amazon.pem"          # amazon key 
 user="ubuntu"             # amazon user 
+#protoList[1]="ssl"       # array for protocol types currently supported
+#protoList[2]="fwd"
+#protoList[3]="spp"
+#protoList[4]="pln"     
+#protoList[5]="spp_mod"     
+# ---- Nagel OFF for ALL
+protoList[1]="ssl_mod"       
+#protoList[2]="fwd_mod"
+#protoList[3]="spp_mod"
+#protoList[4]="pln_mod"     
+
 
 # folder for compilations
 remoteFolder="./secure_proxy_protocol" 
@@ -318,11 +324,22 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# run analysis
-			if [ $debug -eq 1 ] 
+			if [ $remote -eq 0 ]
 			then
-				echo "./perf_script.sh 1 1 $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null"
+				if [ $debug -eq 1 ] 
+				then
+					echo "./perf_script.sh 1 1 $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null"
+				else
+					./perf_script.sh 1 1 $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
+				fi
 			else
-				./perf_script.sh 1 1 $proto $opt $remote $resFolder $rate $maxRate $delay $iface >> $log 2>/dev/null
+				if [ $debug -eq 1 ] 
+				then
+					echo "./perf_script.sh 1 1 $proto $opt $remote $resFolder >> $log 2>/dev/null"
+				else
+					./perf_script.sh 1 1 $proto $opt $remote $resFolder >> $log 2>/dev/null
+				fi
+
 			fi
 		done
 		;;

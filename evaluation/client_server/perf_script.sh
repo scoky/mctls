@@ -40,7 +40,10 @@ protoList[1]="ssl"         # array for protocol types currently supported
 protoList[2]="fwd"
 protoList[3]="spp"
 protoList[4]="pln"
-protoList[5]="spp_mod"
+protoList[5]="ssl_mod"      
+protoList[6]="fwd_mod"
+protoList[7]="spp_mod"
+protoList[8]="pln_mod"
 key="amazon.pem"           # amazon key 
 user="ubuntu"              # amazon user 
 remoteFolder="/home/$user/secure_proxy_protocol/evaluation/client_server" # remote folder
@@ -446,13 +449,6 @@ case $expType in
 		expSlice[0]="four"
 		#expSlice[2]="all"
 		
-		# Remote NOT supported yet
-		if [ $REMOTE -eq 1 ] 
-		then 
-			echo "[PERF] Remote NOT supported yet"
-			exit 0 
-		fi	
-	
 		# Cleaning 
 		if [ -f .tmp ] 
 		then
