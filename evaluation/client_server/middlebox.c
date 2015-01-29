@@ -23,6 +23,8 @@
 #define PASSWORD "password"
 #define DHFILE "dh1024.pem"
 #include <openssl/e_os2.h>
+#define HI_DEF_TIMER
+ 
 static int disable_nagle  = 0 ;
 
 //#define DEBUG				// now this can be turned on/off in the Makefile 
