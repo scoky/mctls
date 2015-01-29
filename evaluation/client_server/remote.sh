@@ -97,36 +97,14 @@ then
 			exit 0 
 		fi
 
-		# check that experiment is completed everywhere  -- FIXME (this can be simplified) 
-		echo "[REMOTE] Machines where experiment was started:"
-		cat .active
-		found=0
-		while [ $found -lt $machines ] 
-		do
-			echo "[REMOTE] $found machines have already completed"
-			for line in `cat $machineFile`
-			do
-				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
-				status=`cat .active | grep "$addr" | cut -f 2 -d " "`
-				if [ -z "$status" ]
-				then
-					if [ $status -eq 1 ]
-					then  
-						active=`ps aux | grep ssh | grep master | grep "$addr" | grep -v grep | wc -l`
-						echo "[REMOTE] Checking machine $addr. Status: $active (0=DONE, 1=STILL_WORKING)"
-						if [ $active -eq 0 ] 
-						then
-							let "found++"
-							echo "[REMOTE] Machine $addr is done (counter=$found)"
-							echo "$addr 0" >> .active_new
-						else
-							echo "$addr 1" >> .active_new
-						fi	
-					fi 
-				fi
-				sleep 10
-			done
-			mv .active_new .active 
+		# check that experiment is completed everywhere 
+		sleep 5 
+		running=`ps aux | grep ssh  | grep "master.sh 7" | wc -l`
+		while [ $running -gt 0 ] 
+		do 
+			running=`ps aux | grep ssh  | grep "master.sh 7" | wc -l`
+			echo "[REMOTE] Still $running machines are active"
+			sleep 10 
 		done
 		;;
 	esac

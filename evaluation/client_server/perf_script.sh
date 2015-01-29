@@ -667,7 +667,6 @@ case $expType in
 			fullLogS="./full_results/results_server_$proto"
 			
 			# Run R handshake repetitions	
-			R=2
 			echo "[PERF] Run $R s_time based tests ($s slices, all mboxes get READ/WRITE access)"
 			for((i=1; i<=R; i++))
 			do
