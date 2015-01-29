@@ -373,12 +373,12 @@ void sendRequestBrowser(char *filename){
 
 	
 	#ifdef DEBUG
-	printf("[DEBUG] Inside sendRequestBrowser\n"); 
+	printf("[DEBUG] Inside sendRequestBrowser. Slices_len=%d\n", slices_len); 
 	#endif 	
 	
 	int r; 
 	
-	int req_len_arr[slices_len]; 
+	int req_len_arr[50]; 
 	int request_len = 0; 
 	
 	// Remove trailing newline (NOTE: strtoK is not thread safe)
@@ -396,22 +396,21 @@ void sendRequestBrowser(char *filename){
 	#endif 	
  
 	// extract request sizes 
-	char s_Token[slices_len][25];
-	//memset(s_Token, 0, 200);
-	memset(s_Token, 0, sizeof(s_Token));
-	int count = TokenizeString(filename, s_Token, '_');
+	char s_Token[15][25];
+	memset(s_Token, 0, 375);
+	int countSlice = TokenizeString(filename, s_Token, '_');
 	int ii;
-	for(ii=0; ii <= count; ii++){
+	for(ii=0; ii <= countSlice; ii++){
 		req_len_arr[ii] = atoi(s_Token[ii]); 
 		#ifdef VERBOSE
-		printf("[VERBOSE] Tokenized string is %s - Value %d [%d-%d]\n", s_Token[ii], req_len_arr[ii], ii, count); 
+		printf("[VERBOSE] Tokenized string is %s - Value %d [%d-%d]\n", s_Token[ii], req_len_arr[ii], ii, countSlice); 
 		#endif VERBOSE
 		request_len += req_len_arr[ii]; 
 	}
 	// compute total response size
 	memset(s_Token, 0, 200);
 	fSize = 0; 
-	count = TokenizeString(resp_sizes, s_Token, '_');
+	int count = TokenizeString(resp_sizes, s_Token, '_');
 	int i;
 	for(i=0; i <= count; i++){
 		fSize += atol(s_Token[i]); 
@@ -482,11 +481,12 @@ void sendRequestBrowser(char *filename){
 	#endif
 	// SPP write
 	if (strcmp(proto, "spp") == 0){
-		#ifdef DEBUG
-		printf("[DEBUG] SPP_write\n");
-		#endif 
 		int i;  
-		for (i = 0; i < ssl->slices_len; i++){
+		//for (i = 0; i < ssl->slices_len; i++){
+		for (i = 0; i < countSlice; i++){
+			#ifdef DEBUG
+			printf("[DEBUG] SPP_write (slice %d)\n", i);
+			#endif 
 			if (i == 0){
 				#ifdef DEBUG
 				printf ("[DEBUG] Send GET request with slice %d. Actual size %d  -- size requested %d.\n", i, strlen(request), req_len_arr[i]); 
@@ -506,15 +506,15 @@ void sendRequestBrowser(char *filename){
 			}else{
 				// prepare fake request slices if needed  
 				if (req_len_arr[i] > 0){
+					#ifdef DEBUG
+					printf ("[DEBUG] Send padding with slice %d (size %d)\n", i, req_len_arr[i]); 
+					#endif 	
 					char *fake_request = (char*) malloc(req_len_arr[i] + 1);
 					memset(fake_request, '?', req_len_arr[i]);	
 					fake_request[req_len_arr[i]] = 0;
 					#ifdef VERBOSE
 					printf ("[DEBUG] Prepared padding:\n%s\n", fake_request); 
 					#endif
-					#ifdef DEBUG
-					printf ("[DEBUG] Send padding with slice %d\n", i); 
-					#endif 	
 					r = SPP_write_record(ssl, fake_request, req_len_arr[i], ssl->slices[i]);
 					//r = SPP_write_record(ssl, fake_request, strlen(fake_request), ssl->slices[i]);
 					// Check for errors 	
@@ -527,11 +527,16 @@ void sendRequestBrowser(char *filename){
 					#endif
 					// free memory 
 					free(fake_request); 
-
+				}else{
+					#ifdef DEBUG
+					printf("[DEBUG] Passing here - i=%d, tot=%d\n", i, ssl->slices_len); 
+					#endif
 				}
 			
 			}
 		}
+	
+	printf("[DEBUG] Done with for loop"); 
 	}
 	// SSL write
 	else if (strcmp(proto, "ssl") == 0){
@@ -559,10 +564,17 @@ void sendRequestBrowser(char *filename){
 		#endif 
 	}
 
+	#ifdef DEBUG
+	printf("[DEBUG] Before free"); 
+	#endif 
+	
 	// free memory 
 	free(padding); 
 	free(request); 
 
+	#ifdef DEBUG
+	printf("[DEBUG] After free"); 
+	#endif 
 }
 
 
@@ -692,9 +704,11 @@ static void *browser_replay(void *ptr){
 			running = false; 
 		}
 		sendRequestBrowser(file_request); 
-		
 		// Wait on main thread to have received requested data unless we are done 
 		if (curr_line < lines){
+			#ifdef DEBUG
+			printf("[DEBUG] Wait on main thread"); 
+			#endif 
 			thr_join(); 
 		}
 		done = 0;  

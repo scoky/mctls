@@ -552,7 +552,7 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 			}
 		}
 		#ifdef DEBUG
-		printf("[DEBUG] Request contains %d bytes:\n%s\n", r, buf); 
+		printf("[DEBUG] GET request is %d bytes long:\n%s\n", r, buf); 
 		#endif
 		
 		//Look for the blank line that signals the end of the HTTP header (FIXME: assume 1 read is enough)
