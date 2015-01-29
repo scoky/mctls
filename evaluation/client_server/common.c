@@ -152,7 +152,7 @@ int TokenizeString(char *s_String, char **s_Token, int *size, char c_Delimiter){
     (*size) = max_token_size;
     (*s_Token) = (char**)malloc(token_count);
     for (j = 0; j < token_count; j++) {
-	(*s_Token)[j] = (char[])malloc(max_token_size);
+	(*s_Token)[j] = (char*)malloc(max_token_size);
     }
 
     for (i_Offset = 0;s_String[i_Offset] != '\0';i_Offset++){
