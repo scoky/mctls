@@ -121,3 +121,31 @@ void destroy_ctx(ctx)
 void set_nagle(int sock, int flag) {
 	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
 }
+
+// tokenizer helper 
+int TokenizeString(char *s_String, char s_Token[15][50], char c_Delimiter){
+    int j = 0; 
+    unsigned int i_Offset = 0; 
+    char b_Flag = 0; 
+    int count = 0; 
+    for (i_Offset = 0;s_String[i_Offset] != '\0';i_Offset++){
+        if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
+            s_Token[count][j] = s_String[i_Offset];
+            j++;
+            b_Flag = 1; 
+            continue;
+        }
+        if (b_Flag){
+        s_Token[count][j] = '\0';
+        count++;
+        j = 0; 
+        b_Flag = 0; 
+        }
+    }
+    if (b_Flag || j > 0) {
+        s_Token[count][j] = '\0';
+        count++;
+    }
+    return count;
+}
+
