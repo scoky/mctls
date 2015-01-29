@@ -352,66 +352,46 @@ void sendRequestBrowser(char *filename){
 	int req_len_arr[50]; 
 	int request_len = 0; 
 	
-	// Remove trailing newline (NOTE: strtoK is not thread safe)
-	//strtok(filename, "\n");
+	// extract list of sizes for requests and response
 	char **s_Token;
 	int  size_alloc;
 	int entries = TokenizeString(filename, &s_Token, &size_alloc, ';');
 	char *str = s_Token[0]; 
 	char *resp_sizes = s_Token[1]; 
-	for (j = 0; j <= entries ; j++){
-        free (s_Token[j]); 
+	for (j = 0; j < entries ; j++){
+		#ifdef VERBOSE
+		printf("[DEBUG] Found string %s (length %d) - Tot entries: %d\n", s_Token[j], strlen(s_Token[j]), entries); 
+		#endif
     }    
-    free(s_Token); 
-	/* extract list of response sizes 
-	char *str = strtok(filename, ";");
-	str = strtok(NULL, ";"); 
-	char *resp_sizes = strtok(str, " "); 
-	*/
  
-	// extract request sizes 
+	// parse request sizes and save 
 	char **s_Token1;
 	int countSlice = TokenizeString(str, &s_Token1,  &size_alloc, '_');
 	#ifdef DEBUG
 	printf("[DEBUG] String for request header is %s (length %d, %d slices)\n", str, strlen(str), countSlice); 
 	#endif 	
-	int ii;
-	for(ii=0; ii <= countSlice; ii++){
-		req_len_arr[ii] = atoi(s_Token1[ii]); 
+	for(j = 0; j < countSlice; j++){
+		req_len_arr[j] = atoi(s_Token1[j]); 
 		#ifdef VERBOSE
-		printf("[VERBOSE] Tokenized string is %s - Value %d [%d-%d]\n", s_Token1[ii], req_len_arr[ii], ii, countSlice); 
-		#endif VERBOSE
-		request_len += req_len_arr[ii]; 
+		printf("[VERBOSE]\tTokenized string is %s (value %d) - Tot entries:%d\n", s_Token1[j], req_len_arr[j], countSlice); 
+		#endif
+		request_len += req_len_arr[j]; 
 	}
-	for (j = 0; j <= countSlice ; j++){
-        free (s_Token1[j]); 
-    }    
-    free(s_Token1); 
 	
-	// compute total response size
+	// compute total response size (no need to save each size)
 	fSize = 0; 
 	char **s_Token2;
 	int count = TokenizeString(resp_sizes, &s_Token2, &size_alloc, '_');
 	#ifdef DEBUG
 	printf("[DEBUG] String for response sizes is %s (length %d, %d slices)\n", resp_sizes, strlen(resp_sizes), count); 
 	#endif 	
-	int i;
-	for(i=0; i <=count; i++){
-		fSize += atol(s_Token2[i]); 
+	for(j = 0; j < count; j++){
+		fSize += atol(s_Token2[j]); 
 		#ifdef VERBOSE
-		printf("[VERBOSE] Tokenized string is %s - Value %d [%d-%d]\n", s_Token2[i], req_len_arr[i], i, count); 
+		printf("[VERBOSE]\tTokenized string is %s (value %d) - Tot entries: %d\n", s_Token2[j], req_len_arr[j], count); 
 		#endif VERBOSE
 	}
-	for (j = 0; j <= count ; j++){
-        free (s_Token2[j]); 
-    }    
-    free(s_Token2); 
  
-	#ifdef DEBUG
-	printf("[DEBUG] String %s with lenght %d\n", resp_sizes, strlen(resp_sizes)); 
-	printf("[DEBUG] Expected response with size %d\n", fSize); 
-	#endif 	
-	
 	// prepare common GET request
 	char get_str[200];
 	memset(get_str, '0', sizeof(get_str));
@@ -559,6 +539,18 @@ void sendRequestBrowser(char *filename){
 	free(padding); 
 	free(request); 
 
+	for (j = 0; j <= entries ; j++){
+        free (s_Token[j]); 
+    }    
+	for (j = 0; j <= countSlice ; j++){
+        free (s_Token1[j]); 
+    }    
+	for (j = 0; j <= count ; j++){
+        free (s_Token2[j]); 
+    }    
+    free(s_Token); 
+    free(s_Token1); 
+    free(s_Token2); 
 }
 
 
