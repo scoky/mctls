@@ -354,7 +354,7 @@ void sendRequestBrowser(char *filename){
 	
 	// Remove trailing newline (NOTE: strtoK is not thread safe)
 	//strtok(filename, "\n");
-	char *s_Token;
+	char **s_Token;
 	int  size_alloc;
 	int entries = TokenizeString(filename, &s_Token, &size_alloc, ';');
 	char *str = s_Token[0]; 
@@ -370,7 +370,7 @@ void sendRequestBrowser(char *filename){
 	*/
  
 	// extract request sizes 
-	char *s_Token1;
+	char **s_Token1;
 	int countSlice = TokenizeString(str, &s_Token1,  &size_alloc, '_');
 	#ifdef DEBUG
 	printf("[DEBUG] String for request header is %s (length %d, %d slices)\n", str, strlen(str), countSlice); 
@@ -390,7 +390,7 @@ void sendRequestBrowser(char *filename){
 	
 	// compute total response size
 	fSize = 0; 
-	char *s_Token2;
+	char **s_Token2;
 	int count = TokenizeString(resp_sizes, &s_Token2, &size_alloc, '_');
 	#ifdef DEBUG
 	printf("[DEBUG] String for response sizes is %s (length %d, %d slices)\n", resp_sizes, strlen(resp_sizes), count); 

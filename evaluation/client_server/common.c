@@ -123,7 +123,7 @@ void set_nagle(int sock, int flag) {
 }
 
 // tokenizer helper 
-int TokenizeString(char *s_String, char **s_Token, int *size, char c_Delimiter){
+int TokenizeString(char *s_String, char ***s_Token, int *size, char c_Delimiter){
     int token_count = 0, max_token_size = 0, token_size = 0;
     int j = 0; 
     unsigned int i_Offset = 0; 

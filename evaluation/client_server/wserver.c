@@ -536,7 +536,7 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
 	}
 
 	// extract request sizes 
-    char *s_Token;
+    char **s_Token;
     int  size_alloc; 
 	int c = TokenizeString(buf, &s_Token,  &size_alloc, '\n');
 	int j; 
@@ -553,7 +553,7 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
     printf("[DEBUG] Extracted first line from request: %s\n", left); 
     #endif 
 
-    char *s_Token1;
+    char **s_Token1;
 	c = TokenizeString(left, &s_Token1, &size_alloc, ' ');
 	for (j = 0; j <= c ; j++){
 		printf ("%d -- %s\n", j, s_Token1[j]);
@@ -568,11 +568,12 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
     printf("[DEBUG] List of requested slice sizes: %s\n", fn); 
     #endif 
 	
-    char *s_Token2;
+    char **s_Token2;
     long response_len = 0; 
-    int count = TokenizeString(fn, s_Token2, &size_alloc, '_');
+    int count = TokenizeString(fn, &s_Token2, &size_alloc, '_');
     #ifdef DEBUG
 	printf("[DEBUG] Found %d tokens\n", count);
+	int i;
 	for (i=0; i <count; i++) {
 		printf("%s ", s_Token2[i]);
 	}
