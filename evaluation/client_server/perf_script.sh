@@ -437,7 +437,7 @@ case $expType in
 		;;
 
 	6)	# Measure download time in browser-like behavior 
-		MAX_LOOP=2
+		MAX_LOOP=1000
 		opt=4
 		strategy="cs"
 		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
@@ -667,6 +667,7 @@ case $expType in
 			fullLogS="./full_results/results_server_$proto"
 			
 			# Run R handshake repetitions	
+			R=2
 			echo "[PERF] Run $R s_time based tests ($s slices, all mboxes get READ/WRITE access)"
 			for((i=1; i<=R; i++))
 			do
@@ -707,8 +708,8 @@ case $expType in
 			
 			# Analyzing (corrected) log 
 			cat .res  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileC
-			cat .resServer  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileM
-			cat .resMbox  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileS
+			cat .resMbox  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileM
+			cat .resServer  | grep -v -i inf | awk -v fix1=$delay -v fix2=$fix2 -v S=$minS -f stdev.awk > $resFileS
 
 			# Make a local copy of full results 
 			mv .res $fullLogC

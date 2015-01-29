@@ -25,8 +25,6 @@
 #include <openssl/e_os2.h>
 //#define DEBUG
 #define MAX_PACKET 16384 
-#define HI_DEF_TIMER
-
 
 static char *strategy = "uni";
 static int disable_nagle = 0; //default is disabled
@@ -1015,7 +1013,6 @@ int main(int argc, char **argv){
 	int action = 0;                     // specify client/server behavior (handshake, 200OK, serve file, browser-like) 
 	int status;                         // ...
 	clock_t start, end;                 // timers for cpu time estimation 
-	struct timespec tps, tpe;
 	double cpu_time_used;               // cpu time used 
 	int loadTime = 10;                  // time used for load estimation (10 second default, user can change with option -l)
 
@@ -1098,11 +1095,28 @@ int main(int argc, char **argv){
 	long finishLoadEst = (long) time (NULL) + loadTime;
 	int nConn = 0; 
 	bool report = true; 
+	
+	// accept connection sequentially 
 	while(1){
-			
+		// If time is done just break 
+		if (finishLoadEst < (long) time (NULL)){
+			#ifdef DEBUG
+			printf("[DEBUG] Time is up %lu\n", finishLoadEst); 
+			#endif 	
+			end = clock();
+			cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+			printf( "CPU time=%f sec, %f connections/user sec", cpu_time_used, (double)nConn/cpu_time_used); 
+			break;
+		}else{
+			#ifdef DEBUG
+			printf("[DEBUG] Time now %lu - Time end %lu\n", (long) time (NULL), finishLoadEst); 
+			#endif 	
+		}
+		
 		#ifdef DEBUG
 		printf("[DEBUG] Waiting on TCP accept...\n"); 
 		#endif
+		
 		if((newsock = accept(sock, 0, 0)) < 0){
 			err_exit("Problem socket accept\n");
 		}else{
@@ -1110,108 +1124,37 @@ int main(int argc, char **argv){
 			printf("[DEBUG] Accepted new connection %d\n", sock); 
 			#endif
 		}
+		// start CPU clock at first connection 
+		if (nConn == 0){
+			start = clock();
+		}
+
 		// keep track of number of connections
 		nConn++;
 
-		// Fork a new process
-		signal(SIGCHLD, SIG_IGN); 
-		pid = fork(); 
-		if (pid == 0){
-			/* In chil process */
-			if (pid == -1) {
-				berr_exit("FORK error"); 
-				return 1;
-           	}
-			
-
-			#ifdef HI_DEF_TIMER
-           	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tps);
-           	#else
-           	start = clock();
-           	#endif
-
-			#ifdef DEBUG
-			printf("[DEBUG] child process close old socket and operate on new one\n");
-			#endif
-			close(sock);
-
-			if (strcmp(proto, "pln") != 0) 
-			{
-				sbio = BIO_new_socket(newsock, BIO_NOCLOSE);
-				ssl = SSL_new(ctx);
-				SSL_set_bio(ssl, sbio, sbio);
+		// SSL-like accept (does not apply for TCP) 
+		if (strcmp(proto, "pln") != 0){
+			sbio = BIO_new_socket(newsock, BIO_NOCLOSE);
+			ssl = SSL_new(ctx);
+			SSL_set_bio(ssl, sbio, sbio);
 				
-				// Wait on SSL Accept 
-				if((r = SSL_accept(ssl) <= 0)){
-					berr_exit("SSL accept error");
-				} else {
-					#ifdef DEBUG
-					if (strcmp(proto, "ssl") == 0){ 		
-						printf("[DEBUG] SSL accept OK\n"); 
-					}else{
-						printf("[DEBUG] SPP accept OK\n"); 
-					}
-					#endif
+			// Wait on SSL Accept 
+			if((r = SSL_accept(ssl) <= 0)){
+				berr_exit("SSL accept error");
+			} else {
+				#ifdef DEBUG
+				if (strcmp(proto, "ssl") == 0){ 		
+					printf("[DEBUG] SSL accept OK\n"); 
+				}else{
+					printf("[DEBUG] SPP accept OK\n"); 
 				}
+				#endif
 			}
-			#ifdef HI_DEF_TIMER
-			clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tpe);
-			cpu_time_used =  ( tpe.tv_sec - tps.tv_sec ) + (double)( tpe.tv_nsec - tps.tv_nsec )/ (double)1000000000L;
-			#else
-			end = clock();
-			cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-			#endif
-
-
-			if (loadTime > 0){
-				printf( "CPU time=%g sec\n", cpu_time_used); 
-			}
-  			
-			// Switch across possible client-server behavior 
-			// NOTE: here we can add more complex strategies
-			switch(action){
-				// Handshake only 
-				case 1: break; 
-				
-				// Respond with 200 OK
-				case 2: http_simple_response(ssl, newsock, proto);
-						break; 
-				
-				// Serve some content 
-				case 3: http_serve_request(ssl, newsock, proto, false, action);
-						break;
-			
-				// Serve a browser like behavior 
-				// NOTE
-				// This can only serve one connection at a time. 
-				// Here we would need to fire a new thread 
-				// (or re-think the code) to support multiple SSL connections 
-				// FIXME - detect closed connection 
-				case 4: while(1){
-							if (http_serve_request_browser(ssl, newsock, proto) < 0){
-								break; 
-							}
-						}
-						break;
-
-				// Unknown option 
-				default: usage();
-						 break; 
-			}
-			// Correctly end child process
-			#ifdef DEBUG
-			printf("[DEBUG] End child process (prevent zombies)\n");
-			#endif
-			exit(0);  
-			// return 0 
-		}else{
-			#ifdef DEBUG
-			printf("[DEBUG] parent process close new socket\n");
-			#endif
-			close(newsock); 
 		}
+		// close 
+		close(newsock); 
 	}
-	wait(&status);
+	//wait(&status);
 	// Clean context
 	destroy_ctx(ctx);
 	

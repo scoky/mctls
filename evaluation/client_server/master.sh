@@ -156,6 +156,7 @@ then
 			done
 		fi	
 		# check that compilation is done and ok 	
+		sleep 5
 		if [ $remote -eq 0 ] 
 		then 
 			currTime=`date | awk '{print $2"_"$3"_"$4;}'`
@@ -350,7 +351,7 @@ then
 		S_max=16
 		str="l($S_max)/l(2)"
 		X=`echo $str | bc -l  | cut -f 1 -d "."`
-		let "estTime = (R * X * 30) / 60)"
+		let "estTime = (R * X * 30) / 60"
 		for ((i=1; i<=proto_count; i++))
 		do
 			proto=${protoList[$i]}

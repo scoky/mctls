@@ -7,19 +7,20 @@ usage(){
 	echo -e "\t(0) Test number of connections per second concurrently on machines from file <<machines>>"
     echo -e "run    = {(1) run test and collect results ; (0) colect results only}"
     echo -e "debug  = {(1) debug only (print command no run); (0) run normally}"
+	echo -e "resFolder    = folder where to store results (../results ; ../results/tmp ; ../results/final)"
     echo -e "-------------------------------OPTIONAL---------------------------------------------------"
 	echo -e "[plotCommand = {matlab, myplot, ...} add your own to the script (default is no plotting)]"
 	exit 0 
 }
 	
 # Set of checks for correctness
-[[ $# -lt 2 ]] && usage
+[[ $# -lt 4 ]] && usage
 
 # Parameters
-resFolder="../results/tmp"  # result folder 
 opt=$1                      # user choice for experiment
 RUN_EXP=$2                  # run experiment or not 
 debug=$3                    # run experiment or not 
+resFolder=$4                # results folder
 plotCommand="none"          # user selection for plotting 
 key="amazon.pem"            # amazon key 
 machineFile="machines"
@@ -32,9 +33,9 @@ protoList[4]="pln"
 parallel=1                  # flag used for plotting
 
 # read type of plot to do 
-if [ $# -eq 4 ]
+if [ $# -eq 5 ]
 then 
-	plotCommand=$4
+	plotCommand=$5
 fi
 
 # derive proto size 
@@ -60,9 +61,9 @@ then
 			log="log_master_"$addr
 			if [ $addr == "localhost" ] 
 			then 
-				comm="cd $localFolder; ./master.sh 7 0 1"
+				comm="cd $localFolder; ./master.sh 7 0 1 $resFolder"
 			else
-				comm="cd $remoteFolder; ./master.sh 7 0 1"
+				comm="cd $remoteFolder; ./master.sh 7 0 1 $resFolder"
 			fi
 
 			echo "$addr 1" >> .active
@@ -96,7 +97,7 @@ then
 			exit 0 
 		fi
 
-		# check that experiment is completed everywhere 
+		# check that experiment is completed everywhere  -- FIXME (this can be simplified) 
 		echo "[REMOTE] Machines where experiment was started:"
 		cat .active
 		found=0
@@ -107,19 +108,22 @@ then
 			do
 				addr=`echo $line | cut -f 2 -d "@" | cut -f 1 -d ":"`
 				status=`cat .active | grep "$addr" | cut -f 2 -d " "`
-				if [ $status -eq 1 ]
-				then  
-					active=`ps aux | grep ssh | grep master | grep "$addr" | grep -v grep | wc -l`
-					echo "[REMOTE] Checking machine $addr. Status: $active (0=DONE, 1=STILL_WORKING)"
-					if [ $active -eq 0 ] 
-					then
-						let "found++"
-						echo "[REMOTE] Machine $addr is done (counter=$found)"
-						echo "$addr 0" >> .active_new
-					else
-						echo "$addr 1" >> .active_new
-					fi	
-				fi 
+				if [ -z "$status" ]
+				then
+					if [ $status -eq 1 ]
+					then  
+						active=`ps aux | grep ssh | grep master | grep "$addr" | grep -v grep | wc -l`
+						echo "[REMOTE] Checking machine $addr. Status: $active (0=DONE, 1=STILL_WORKING)"
+						if [ $active -eq 0 ] 
+						then
+							let "found++"
+							echo "[REMOTE] Machine $addr is done (counter=$found)"
+							echo "$addr 0" >> .active_new
+						else
+							echo "$addr 1" >> .active_new
+						fi	
+					fi 
+				fi
 				sleep 10
 			done
 			mv .active_new .active 
