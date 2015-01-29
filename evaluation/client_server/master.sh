@@ -347,7 +347,7 @@ then
 	
 	7) 
 		echo "[MASTER] $adj analysis of number of connections per second"
-		R=5
+		R=10
 		S_max=16
 		str="l($S_max)/l(2)"
 		X=`echo $str | bc -l  | cut -f 1 -d "."`
