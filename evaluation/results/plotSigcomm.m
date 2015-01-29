@@ -4,11 +4,10 @@
 % parallel - if = 1 it refers to experiment ran on multiple machines at the same time
 % role     - required by option 7 to indicate whether we wannt plot for "client", "server" or "mbox"
 
-function [] = plotHandshake(opt, remote, parallel, role) 
+function [] = plotHandshake(opt, remote, parallel, role, tmp, k_slice) 
 
 % Common variables 
-folder = '/home/varvello/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results/tmp'; 
-%folder = '/home/varvello/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/results'; 
+folder = sprintf ('/home/varvello/WorkTelefonica/HTTP-2/sigcomm_evaluation/secure_proxy_protocol/evaluation/%s', tmp);  
 figFolder = './fig/matlab';
 kind_line = ['m';'b';'g';'m';'b';'g';'m';'b';'g';'m';'o';':';'d';'+';'<';'s';'.';'-';'g';'p'];
 line_style = ['-';';';':'];
@@ -19,16 +18,18 @@ close all
 
 % Protocol  and protocol labels 
 protocol = [
-	'spp'
-	'fwd'
-	'ssl'
-	%'pln'
+	'spp    '
+	'spp_mod'
+	'fwd    '
+	'ssl    '
+	'pln    '
 	]; 
 protoLabel = [
 	'SPP             '
+	'SPP-no-NAGEL    '
 	'TLS (forwarding)'
 	'TLS (splitting) '
-	%'PLN             '
+	'PLN             '
 	]; 
 
 % machines and label and hardware 
@@ -72,12 +73,27 @@ if (opt == 1)
 	title('Alexa TOP 500');
 	outFile = sprintf ('%s/cdf_tls.eps', figFolder) 
 	saveas (h, outFile, 'psc2');
-	error('done, check plot'); 
+	
+	speed = figure(); 
+	a = dlmread('downSpeedWired'); 
+	l = cdfplot(a);                   
+	set (l, 'color', kind_line(1), 'LineWidth', 3); 
+	hold on; 
+	xlabel('Down Speed (Mbps)');
+	ylabel('CDF (0-1)');
+	set(gca, 'XScale','log'); 
+	xlim([1 100]); 
+	title('OOKLA - speedtest'); 
+	outFile = sprintf ('%s/cdf_down_speed.eps', figFolder) 
+	saveas (speed, outFile, 'psc2');
+	error('done, check plots'); 
 end 
 
 if (parallel == 0) 
 	nMachines = 1 
 end 
+
+%"one-slice" ; "four-slices" ; "slice-per-header"
 
 % File naming according to options
 if (opt == 2) 
@@ -97,7 +113,7 @@ if (opt == 5)
 	suffix = 'downloadTime'; 
 end
 if (opt == 6) 
-	suffix = 'downloadTime_browser'; 
+	suffix = sprintf('%s_page_load_time', k_slice); 
 end
 if (opt == 7) 
 	suffix = 'connections_slice'; 
@@ -121,7 +137,7 @@ for jj = 1 : nMachines
 	counter = 1;
 	for ii = 1 : nProt
 		figure(fig_handler(jj)); 
-		currProt = strtrim(protocol(ii, :)); 
+		currProt = strtrim(protocol(ii, :)) 
 		currProtLabel = strtrim(protoLabel(ii, :)); 
 		if (parallel == 0) 
 			file = sprintf('%s/res_%s_%s', folder, currProt, suffix) 
@@ -131,14 +147,18 @@ for jj = 1 : nMachines
 		if exist(file, 'file') ~= 2
 			continue
 		end
-		data = dlmread(file); 
+		data = dlmread(file);
 		
 		if (opt < 5) 
 			h = errorbar(data(:, 4).*1000, data(:, 5).*1000); 
 		elseif (opt == 5) 
 				h = errorbar(data(:, 4), data(:, 5)); 
 		elseif (opt == 6) 
-				h = cdfplot(data(:, 4)); 
+				%%% FIXME -- eliminating zeros (that should not appear)
+				B = find(data(:, 3) == 0); 
+				data(B, :) = []; 
+				%%% FIXME -- eliminating zeros
+				h = cdfplot(data(:, 3)); 
 				% h1 = cdfplot(data(:, 5)); % here we can plot CDF of stdev...
 		elseif (opt == 7) 
 				h = errorbar(data(:, 4), data(:, 5)); 
@@ -155,6 +175,7 @@ for jj = 1 : nMachines
 				leg = [leg, {sprintf('%s', currProtLabel)}];
 			end
 		end
+		leg
 		% plot only one though all are available
 		if (remote == 1 & ii == 1)  
 			h_ping = errorbar(data(:, 6), data(:, 7)); 
@@ -162,7 +183,11 @@ for jj = 1 : nMachines
 			leg = [leg, {sprintf('Measured RTT')}];
 		end 
 		counter = counter + 1; 
-		if (opt == 2 || opt == 7) 
+		if (opt == 6) 
+			rtt = data(1, 1); 
+			N = data(1, 2); 
+		end
+		if (opt == 2 || opt == 7)
 			rtt = data(1, 2); 
 			N = data(1, 3); 
 		end
@@ -170,12 +195,11 @@ for jj = 1 : nMachines
 			N_slices = data(1, 2);
 			N = data(1, 3); 
 		end
-		if (opt == 4 || opt == 5 || opt == 6)
+		if (opt == 4 || opt == 5)
 			N_slices = data(1, 2);
 			rtt = data(1, 3); 
 		end
-		% HERE
-		if (currProt == 'spp' & parallel == 1)
+		if (strcmp(currProt, 'spp') == 1 & parallel == 1)
 			figure(comparison)
 			h_comp = errorbar(data(:, 4), data(:, 5)); 
 			hold on
@@ -200,6 +224,15 @@ for jj = 1 : nMachines
 	% make sure we work on right figure
 	figure(fig_handler(jj)); 
 
+	% add one CDF
+	if (opt == 6) 
+		file = sprintf('%s/res_traces_%s', folder, suffix); 
+		B = dlmread(file); 
+		h = cdfplot(B); 
+		set (h, 'color', kind_line(counter), 'LineWidth', 3, 'LineStyle', '--');
+		leg = [leg, {sprintf('Traces')}];
+	end
+
 	% X axis labels
 	if (opt == 2 || opt == 7) 
 		xlabel('No. slices (#)');
@@ -208,13 +241,13 @@ for jj = 1 : nMachines
 		xlabel('Network Latency (ms)');
 	end
 	if (opt == 4) 
-		xlabel('No. proxies (#)');
+		xlabel('No. mboxes (#)');
 	end
 	if (opt == 5) 
 		xlabel('File size (KB)');
 	end
 	if (opt == 6) 
-		xlabel('Download Time (ms)');
+		xlabel('Page Loading Time (s)');
 	end
 	% Y axis labels
 	if (opt < 5) 
@@ -229,7 +262,11 @@ for jj = 1 : nMachines
 
 	% More plot details 
 	if (parallel == 0) 
-		legend(leg, 'Location', 'NorthWest');
+		if (opt == 6)
+			legend(leg, 'Location', 'SouthEast');
+		else
+			legend(leg, 'Location', 'NorthWest');
+		end
 	else 
 		%legend(leg, 'Location', 'SouthEast');
 		legend(leg, 'Location', 'NorthWest');
@@ -263,9 +300,9 @@ for jj = 1 : nMachines
 	end
 	if (opt == 6) 
 		if (remote == 0)  
-			t = sprintf('S=%d ; Latency=%dms ; LOCAL', N_slices, rtt); 
+			t = sprintf('Latency=%dms ; N_{prxy}=%d ; %s ; LOCAL', rtt, N, k_slice); 
 		else
-			t = sprintf('S=%d ; AMAZON', N_slices, rtt); 
+			t = sprintf('N_{prxy}=%d ; %s ; AMAZON',  N, k_slice); 
 		end
 	end
 	if (opt == 7) 
@@ -280,9 +317,11 @@ for jj = 1 : nMachines
 	title(t);
 
 	% set xtick label correctly 
-	xlim([1 size(data, 1)]); 
-	X = 1:size(data, 1); 
-	set(gca, 'XTick', X, 'XTickLabel', data(:, 1)'); 
+	if (opt ~= 6)
+		xlim([1 size(data, 1)]); 
+		X = 1:size(data, 1); 
+		set(gca, 'XTick', X, 'XTickLabel', data(:, 1)'); 
+	end
 
 	% set log scale 
 	%if (opt == 7 & parallel == 1) 
@@ -310,7 +349,7 @@ for jj = 1 : nMachines
 	end
 	if (opt == 6) 
 		if (remote == 0)  
-			outFile = sprintf ('%s/download_time_browser-like.eps', figFolder); 
+			outFile = sprintf ('%s/download_time_browser-like_%s.eps', figFolder, k_slice); 
 		else
 			outFile = sprintf ('%s/download_time_browser-like_remote.eps', figFolder); 
 		end

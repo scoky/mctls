@@ -264,7 +264,8 @@ case $expType in
 		organizeMBOXES
 		
 		# Run client  along with network setup 
-		for((delay=5; delay<=MAX_DELAY; delay=2*delay))
+		initDelay=5
+		for((delay=initDelay; delay<=MAX_DELAY; delay=2*delay))
 		do
 			# Setup network delay 
 			./network.sh 2 
@@ -294,7 +295,7 @@ case $expType in
 			fi
 			paste .tmp .tmpMore > .res
 			let "fix2=nProxy"
-			cat .res  |  awk -v fix1=$s -v fix2=$fix2 -v S=5 -f stdev.awk > $resFile
+			cat .res  |  awk -v fix1=$s -v fix2=$fix2 -v S=$initDelay -f stdev.awk > $resFile
 			rm .tmp .tmpMore 
 			#cat $log | grep "Action" | cut -f 3,7 -d " " | awk -v rtt=$delay -v N=$nProxy -f stdev.awk >> $resFile
 		else
@@ -436,7 +437,7 @@ case $expType in
 		;;
 
 	6)	# Measure download time in browser-like behavior 
-		MAX_LOOP=10000
+		MAX_LOOP=2
 		opt=4
 		strategy="cs"
 		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
@@ -446,8 +447,8 @@ case $expType in
 		
 		# test with specif subset of files 
 		#expSlice[0]="one"
-		expSlice[0]="four"
-		#expSlice[2]="all"
+		#expSlice[0]="four"
+		expSlice[0]="all"
 		
 		# Cleaning 
 		if [ -f .tmp ] 

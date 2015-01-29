@@ -37,18 +37,22 @@ static char *proto = "ssl";                   // protocol to use (ssl ; spp)
 static int stats=0;                           // Report byte statistics boolean
 static int sizeCheck; 
 static ExperimentInfo *experiment_info;       // for printing stats at the end
+static int lines = 0;                         // number of lines in action file
+static long fSize = 0; 
 
 //nagle stuff
 static int disable_nagle = 0;
+
+// allow acces to number of slices also for SSL 
+static int slices_len = 0;                    // number of slices 
 
 // Thread syncronization variables 
 static int done = 0;
 static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t c = PTHREAD_COND_INITIALIZER;
 static bool running = true; 
-static int lines = 0;                         // number of lines in action file
-static long fSize = 0; 
 
+// Thread sync functions 
 pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m);
 pthread_cond_signal(pthread_cond_t *c);
 
@@ -335,12 +339,19 @@ void doConnect (char *proto, int slices_len, int N_proxies, SPP_SLICE **slice_se
 	}
 }
 
+// string tokenizer 
 int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
 	int j = 0;
 	unsigned int i_Offset = 0;
 	char b_Flag = 0;
 	int count = 0;
+	#ifdef DEBUG
+	//printf("[DEBUG] TokenizeString %d - %d\n", i_Offset, strlen(s_String)); 
+	#endif
 	for (i_Offset = 0;i_Offset <= strlen(s_String);i_Offset++){
+		#ifdef DEBUG
+		//printf("[DEBUG] Indices %d - %d\n", i_Offset, strlen(s_String)); 
+		#endif
 		if (s_String[i_Offset] != c_Delimiter && s_String[i_Offset] != '\t' && s_String[i_Offset] != '\n' && s_String[i_Offset] != '\0'){
 			s_Token[count][j] = s_String[i_Offset];
 			j++;
@@ -359,10 +370,14 @@ int TokenizeString(char *s_String, char s_Token[][25], char c_Delimiter){
 
 // Form and send GET
 void sendRequestBrowser(char *filename){
+
+	
+	#ifdef DEBUG
+	printf("[DEBUG] Inside sendRequestBrowser\n"); 
+	#endif 	
 	
 	int r; 
-	// data structures to store sizes of requests and responses 
-	int slices_len = ssl->slices_len; 
+	
 	int req_len_arr[slices_len]; 
 	int request_len = 0; 
 	
@@ -371,23 +386,33 @@ void sendRequestBrowser(char *filename){
 
 	// extract list of response sizes 
 	char *str = strtok(filename, ";");
+	#ifdef DEBUG
+	printf("[DEBUG] Extracted string is %s with length %d\n", str, strlen(str)); 
+	#endif 	
 	str = strtok(NULL, ";"); 
 	char *resp_sizes = strtok(str, " "); 
+	#ifdef DEBUG
+	printf("[DEBUG] Extracted string is %s with length %d\n", resp_sizes, strlen(resp_sizes)); 
+	#endif 	
  
 	// extract request sizes 
-	char s_Token[15][25];
-	memset(s_Token, 0, 200);
+	char s_Token[slices_len][25];
+	//memset(s_Token, 0, 200);
+	memset(s_Token, 0, sizeof(s_Token));
 	int count = TokenizeString(filename, s_Token, '_');
-	int i;
-	for(i=0; i <= count; i++){
-		req_len_arr[i] = atoi(s_Token[i]); 
-		request_len += req_len_arr[i]; 
+	int ii;
+	for(ii=0; ii <= count; ii++){
+		req_len_arr[ii] = atoi(s_Token[ii]); 
+		#ifdef VERBOSE
+		printf("[VERBOSE] Tokenized string is %s - Value %d [%d-%d]\n", s_Token[ii], req_len_arr[ii], ii, count); 
+		#endif VERBOSE
+		request_len += req_len_arr[ii]; 
 	}
 	// compute total response size
 	memset(s_Token, 0, 200);
 	fSize = 0; 
 	count = TokenizeString(resp_sizes, s_Token, '_');
-	i;
+	int i;
 	for(i=0; i <= count; i++){
 		fSize += atol(s_Token[i]); 
 	}
@@ -397,7 +422,7 @@ void sendRequestBrowser(char *filename){
 	printf("[DEBUG] Expected response with size %d\n", fSize); 
 	#endif 	
 	
-	// prepare common GET request 	- FIXME: sometimes string generated is slightly longer. WHY?
+	// prepare common GET request
 	char get_str[200];
 	memset(get_str, '0', sizeof(get_str));
 	int get_len;
@@ -414,10 +439,8 @@ void sendRequestBrowser(char *filename){
 	
 	int toAllocate; 
 	if (strcmp(proto, "spp") == 0){
-		//toAllocate = (req_len_arr[0] - get_len - 5); 
 		toAllocate = (req_len_arr[0] - get_len); 
 	} else {
-		//toAllocate = (request_len - get_len - 5); 
 		toAllocate = (request_len - get_len); 
 	}
         if (toAllocate < 0) {
@@ -452,16 +475,18 @@ void sendRequestBrowser(char *filename){
 	
 	
 	#ifdef DEBUG
-	printf ("[DEBUG] Padded GET request (size %d):\n%s\n", strlen(request), request); 
+	printf ("[DEBUG] Padded GET request (size %d):\n", strlen(request)); 
 	#endif 	
-	
+	#ifdef VERBOSE
+	printf ("[DEBUG] Content:\n%s\n", request); 
+	#endif
 	// SPP write
 	if (strcmp(proto, "spp") == 0){
 		#ifdef DEBUG
 		printf("[DEBUG] SPP_write\n");
 		#endif 
 		int i;  
-		for (i = 0; i < slices_len; i++){
+		for (i = 0; i < ssl->slices_len; i++){
 			if (i == 0){
 				#ifdef DEBUG
 				printf ("[DEBUG] Send GET request with slice %d. Actual size %d  -- size requested %d.\n", i, strlen(request), req_len_arr[i]); 
@@ -1063,7 +1088,6 @@ int main(int argc, char **argv){
 	int r = 0, w = 0;                      // slice related parameters
 	char *file_requested = "index.html";   // file requeste for HTTP GET
 	SPP_SLICE **slice_set;                 // slice array 
-	int slices_len = 0;                    // number of slices 
 	SPP_PROXY **proxies;                   // proxy array 
 	int N_proxies = 0;                     // number of proxies in path 
 	int action = 0;                        // specify client/server behavior (handshake, 200OK, serve file, browser-like)

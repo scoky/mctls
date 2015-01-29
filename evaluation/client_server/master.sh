@@ -56,16 +56,16 @@ debug=0                   # no debugging by default
 plotCommand="none"        # Usere selection for plotting 
 key="amazon.pem"          # amazon key 
 user="ubuntu"             # amazon user 
-#protoList[1]="ssl"       # array for protocol types currently supported
-#protoList[2]="fwd"
-#protoList[3]="spp"
-#protoList[4]="pln"     
-#protoList[5]="spp_mod"     
+protoList[1]="ssl"       # array for protocol types currently supported
+protoList[2]="fwd"
+protoList[3]="spp"
+protoList[4]="pln"     
+protoList[5]="spp_mod"     
 # ---- Nagel OFF for ALL
-protoList[1]="ssl_mod"       
-protoList[2]="fwd_mod"
-protoList[3]="spp_mod"
-protoList[4]="pln_mod"     
+#protoList[1]="ssl_mod"       
+#protoList[2]="fwd_mod"
+#protoList[3]="spp_mod"
+#protoList[4]="pln_mod"     
 
 
 # folder for compilations
@@ -202,7 +202,7 @@ then
 		exit 0
 		;;
 	2)
-		R=10
+		#R=50
 		echo "[MASTER] $adj analysis of first time to byte as a function of number of slices. !!$R repetitions!! (check <<$log>> for experiment progress)"
 		for ((i=1; i<=proto_count; i++))
 		do
