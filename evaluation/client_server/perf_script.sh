@@ -307,16 +307,27 @@ case $expType in
 	4)  # Test time to first byte [f(N_proxy])
 		echo "[PERF] Test time to first byte (function of number of proxies [1:8])"
 		opt=2
-		N_MAX=16
+		N_MAX=0
+		N_low=0
+		echo "[PERF] !!! Temporary just running the no proxy scenario !!!"
 		s=4
 		strategy="cs"
-		N_low=1
 
-		# Update res file 
+		# Update res file name 
 		resFile=$resFile"_timeFirstByte_proxy"
+		
+		# Cleaning	
 		if [ -f $resFile ] 
 		then 
 			rm -v $resFile
+		fi
+		if [ -f .tmp ] 
+		then
+			rm .tmp
+		fi
+		if [ -f .tmpMore ] 
+		then
+			rm .tmpMore
 		fi
 
 		# Start the server 
@@ -336,15 +347,19 @@ case $expType in
 			
 			# Run R handshake repetitions	
 			echo "[PERF] Testing $R handshakes with $N proxies (3 slices:  for handshake, 1 for header, 1 for content)"
+			# Starting client 
+			echo "[PERF] Starting client:"
+			echo -e "\t[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt"
 			for((i=1; i<=R; i++))
 			do
 				# Logging for future correction
 				echo $N >> .tmp 
-
-				# Starting client 
-				#echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1"
 				./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt >> $log 2>&1
 			done
+			if [ $N -eq 0 ] 
+			then 
+				let "N++"
+			fi
 		done
 
 		# Results
@@ -436,10 +451,10 @@ case $expType in
 		fi
 		;;
 
-	6)	# Measure download time in browser-like behavior 
-		MAX_LOOP=1000
+	6)	# Measure download time and byte overhead in browser-like behavior 
+		MAX_LOOP=100000
 		opt=4
-		strategy="cs"
+		strategy="cs" # (not used)
 		actionFolder="../realworld_web/alexa500_https_2015-01-09/"
 		browser_fold="./browser"
 		mkdir -p $browser_fold
@@ -447,8 +462,8 @@ case $expType in
 		
 		# test with specif subset of files 
 		#expSlice[0]="one"
-		#expSlice[0]="four"
-		expSlice[0]="all"
+		expSlice[0]="four"
+		#expSlice[0]="all"
 		
 		# Cleaning 
 		if [ -f .tmp ] 
@@ -492,6 +507,7 @@ case $expType in
 			# Update res file 
 			resFileK=$resFile"_"$k"_page_load_time"
 			resTraces=$resFolder"/res_traces_"$k"_page_load_time"
+			resFileBytes=$resFile"_"$k"byteOverhead_browser"
 			
 			# Cleaning
 			if [ -f $resFileK ] 
@@ -502,9 +518,13 @@ case $expType in
 			then 
 				rm -v $resTraces
 			fi
+			if [ -f $resFileBytes ] 
+			then 
+				rm -v $resFileBytes
+			fi
 
 			# Logging 
-			echo "[PERF] Measure download time in browser-like behavior. Max loop = $MAX_LOOP. Traces with key $k"
+			echo "[PERF] Measure download time and bytes overhead in browser-like mode. Max loop = $MAX_LOOP. Traces with key $k"
 
 			for f in `ls $actionFolder | grep "$k"`    
 			do
@@ -569,7 +589,7 @@ case $expType in
 					let "N_clients++"
 					echo "[PERF] ./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i"
 					# parallel
-					(./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i > $browser_fold"/"$log"_"$k"_"$suff"_"$i 2>/dev/null &)
+					(./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i -b 1 > $browser_fold"/"$log"_"$k"_"$suff"_"$i 2>/dev/null &)
 					# sequential (for testing) 
 					#./wclient -s $s -r $nProxy -w $nProxy -c $proto -o $opt -a "./actionFiles/"$i >> log_test_browser
 					#echo $counter >> counter_test_browser
@@ -585,33 +605,31 @@ case $expType in
 					active=`ps aux | grep wclient | grep actionFiles | grep -v grep | wc -l`
 				done
 				
-				# Wait for all connections to be done than compute page load time (max across)
-				cat $browser_fold"/"$log"_"$k"_"$suff"_"* | awk 'BEGIN{MAX = 0;}{if($NF > MAX){MAX = $NF;}}END{print MAX}' >> .tmpMore
+				# Wait for all connections to be done than compute page load time (max across) and byte summary (sum across) 
+				cat $browser_fold"/"$log"_"$k"_"$suff"_"* | grep Duration | awk 'BEGIN{MAX = 0;}{if($NF > MAX){MAX = $NF;}}END{print MAX}' >> .tmpMore
+				cat $browser_fold"/"$log"_"$k"_"$suff"_"* | grep "ByteStatsSummary" | cut -f 3,4,5,6,7,8,9,10,11,12 -d " " | awk '{for (i=1; i<=NF; i++){s[i]=s[i]+$i; c=NF;}}END{for (i=1; i<=c; i++){str=str" "s[i];}print str;}'  >> $resFileBytes
 				let "loop++"
 				echo $delay $nProxy >> .tmp
-
 			done
 			
-		
-			# Merge results for plotting
+			# Merge results for plotting duration 
 			paste .tmp .tmpMore > $resFileK
 			rm .tmp .tmpMore
 		done
 		
 		# All good 
-		echo "[PERF] All good -- check logs $log"_browser_* in folder $browser_fold")!!"
+		echo "[PERF] All good -- check logs" $log"_browser_* in folder " $browser_fold ")!!"
 		;;
 
 	7)  
-		echo "[PERF] Number of connections (f[#slices]) -- FIXME: only work with 1 mbox at port 8423"
+		echo "[PERF] Number of connections (f[#slices]) [with more than 1 mbox it only parses log from the one at port 8423]"
 		opt=1
 		strategy="uni"
 		testDur=30      
 		pathOpenSSL="/usr/local/ssl/bin/openssl"
 		s=4
 		cipher="DHE-RSA-AES128-SHA256"
-		loadTime=10   # this enables logging of CPU time (in the future measure for that time?)
-		
+		loadTime=10     # this enables logging of CPU time (in the future measure for that time?)
 		prev_server=0;  # number of lines in server log from previous exp
 		prev_mbox=0;    # number of lines in mbox log from previous exp
 
@@ -645,6 +663,13 @@ case $expType in
 		# create folder if needed 
 		mkdir -p full_results
 
+		#######Run with 2 proxies####
+		pp=2
+		echo "[PERF] !!! Temporary running with $pp proxies!!!!"
+		cp $proxyFile"_"$pp $proxyFile 
+		readMboxes
+		#############################
+	
 		# Start the server 
 		start_server
 		
@@ -1007,6 +1032,7 @@ case $expType in
 		fi
 		;;
 
+	
 
 
 	*)	
