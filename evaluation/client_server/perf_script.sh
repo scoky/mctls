@@ -618,11 +618,11 @@ case $expType in
 		# cleanup 
 		if [ -f .resServer ] 
 		then 
-			rm .resServer
+			rm -v .resServer
 		fi
 		if [ -f .resMbox ] 
 		then 
-			rm .resMbox
+			rm -v .resMbox
 		fi
 		
 		# Update res file 

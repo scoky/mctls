@@ -565,9 +565,9 @@ static int http_serve_request_browser(SSL *ssl, int s, char *proto){
     char **s_Token2;
     long response_len = 0; 
     int count = TokenizeString(fn, &s_Token2, &size_alloc, '_');
+	int i;
     #ifdef DEBUG
 	printf("[DEBUG] Found %d tokens\n", count);
-	int i;
 	for (i=0; i <count; i++) {
 		printf("%s ", s_Token2[i]);
 	}

@@ -440,10 +440,6 @@ void sendRequestBrowser(char *filename){
 	// Copy padding with \0
 	memcpy(request+strlen(get_str), padding, strlen(padding)+1);
 
-	//sprintf(request, "%s %s\r\n\r\n", get_str, padding); 
-	//sprintf(request, "%s%s", get_str, padding); 
-	
-	
 	#ifdef DEBUG
 	printf ("[DEBUG] Padded GET request (size %d):\n", strlen(request)); 
 	#endif 	
@@ -539,13 +535,13 @@ void sendRequestBrowser(char *filename){
 	free(padding); 
 	free(request); 
 
-	for (j = 0; j <= entries ; j++){
+	for (j = 0; j < entries ; j++){
         free (s_Token[j]); 
     }    
-	for (j = 0; j <= countSlice ; j++){
+	for (j = 0; j < countSlice ; j++){
         free (s_Token1[j]); 
     }    
-	for (j = 0; j <= count ; j++){
+	for (j = 0; j < count ; j++){
         free (s_Token2[j]); 
     }    
     free(s_Token); 

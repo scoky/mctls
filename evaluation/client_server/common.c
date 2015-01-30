@@ -189,9 +189,11 @@ int TokenizeString(char *s_String, char ***s_Token, int *size, char c_Delimiter)
 	#endif
         count++;
     }
+	#ifdef DEBUG 
     for (j = 0; j < token_count; j++) {
-	printf("%s\n", deRef[j]);
-}
+		printf("%s\n", deRef[j]);
+	}
+	#endif
     return count;
 }
 
