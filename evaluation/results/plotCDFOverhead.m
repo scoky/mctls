@@ -20,19 +20,15 @@ line_style = ['-';';';':'];
 % Protocol  and protocol labels 
 protocol = [
 	'spp    '
-	%'spp_mod'
 	'fwd    '
 	'ssl    '
-	%'pln    '
 	]; 
 nProt = size(protocol, 1); 
 
 protoLabel = [
 	'SPP             '
-	%'SPP-no-NAGEL    '
 	'TLS (forwarding)'
 	'TLS (splitting) '
-	%'PLN             '
 	]; 
 
 ovLabel = [
@@ -42,20 +38,19 @@ ovLabel = [
 	'MAC      '
 	]; 
 
-%FIXME
-%res_ssl_four-slices_byteOverhead_browser
+%Parameters 
 suffix = 'four-slices_byteOverhead_browser'
-
 overheadTypes = 4	
 appData = 5
-counter = 1
 
 % create Figure handlers
 for jj = 1 : overheadTypes
 	fig(jj) = figure(); 
 end
+appdata = figure(); 
 
 % iterate over protocols 
+counter = 1
 for ii = 1 : nProt
 	currProt = strtrim(protocol(ii, :)) 
 	currProtLabel = strtrim(protoLabel(ii, :)); 
@@ -70,7 +65,7 @@ for ii = 1 : nProt
 		figure(fig(jj)); 
 		h = cdfplot(data(:, (appData + jj))./data(:, appData)); 
 		hold on; 
-		if (ii > 3) 
+		if (counter == 3)
 			set (h, 'color', kind_line(counter), 'LineWidth', 3, 'LineStyle', '--');
 		else 
 			set (h, 'color', kind_line(counter), 'LineWidth', 3);
@@ -81,7 +76,14 @@ for ii = 1 : nProt
 	else
 		leg = [leg, {sprintf('%s', currProtLabel)}];
 	end
-	counter = counter + 1; 
+	if (counter == 1) 
+		figure(appdata); 
+		h = cdfplot(data(:, appData)./1024); 
+		hold on; 
+		set (h, 'color', kind_line(counter), 'LineWidth', 3);
+		leg2 = {sprintf('Application Data')};
+	end
+	counter = counter + 1;
 end
 
 for jj = 1 : overheadTypes
@@ -98,3 +100,15 @@ for jj = 1 : overheadTypes
 	outFile = sprintf ('%s/overhead_%s.eps', figFolder, overheadLabel); 
 	saveas (fig(jj), outFile, 'psc2');
 end
+
+figure(appdata); 
+xlabel('App Data Size (KBytes)');
+ylabel('CDF (0-1)');
+legend(leg2, 'Location', 'NorthWest');
+grid on 
+set(0,'defaultaxesfontsize',18);
+set(gca, 'XScale','log');
+title('');
+outFile = sprintf ('%s/app_data_size.eps', figFolder);  
+saveas (appdata, outFile, 'psc2');
+
