@@ -461,8 +461,8 @@ case $expType in
 		rm $browser_fold"log_perf_"*
 		
 		# test with specif subset of files 
-		#expSlice[0]="one"
-		expSlice[0]="four"
+		expSlice[0]="one"
+		#expSlice[0]="four"
 		#expSlice[0]="all"
 		
 		# Cleaning 

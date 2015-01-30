@@ -14,7 +14,7 @@ usage(){
 	echo -e "\t(7) Number of connections per second"
 	echo -e "\t(8) Byte overhead -- X axis is a few discrete scenarios"
 	echo -e "\t(9) Time to first byte f(scenarios) -- scenarios from file <<scenarios>>, 10 reps"
-	echo -e "remote       = {(0) local experiments (1) Amazon experiments}"
+	echo -e "remote       = {(0) local exp (1) remote exp (Amazon EC2)}"
 	echo -e "run          = {(1) run experiment, (0) no run just plot"
 	echo -e "resFolder    = folder where to store results (../results ; ../results/tmp ; ../results/final)"
 	echo -e "----------------------------------OPTIONAL-----------------------------------------------"
@@ -56,11 +56,11 @@ debug=0                   # no debugging by default
 plotCommand="none"        # Usere selection for plotting 
 key="amazon.pem"          # amazon key 
 user="ubuntu"             # amazon user 
-protoList[1]="ssl"       # array for protocol types currently supported
-protoList[2]="fwd"
-protoList[3]="spp"
-protoList[4]="pln"     
-protoList[5]="spp_mod"     
+#protoList[1]="ssl"       # array for protocol types currently supported
+#protoList[2]="fwd"
+protoList[1]="spp"
+#protoList[4]="pln"     
+#protoList[5]="spp_mod"     
 # ---- Nagel OFF for ALL
 #protoList[1]="ssl_mod"       
 #protoList[2]="fwd_mod"
