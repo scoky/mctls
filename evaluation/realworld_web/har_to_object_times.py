@@ -27,9 +27,11 @@ def slice_sizes_headers_content(obj, dummy1, dummy2):
     return request_sizes, response_sizes
     
 
+max_slices = 0
 # How much data should go in each slice if each HTTP header gets its own slice?
 def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
-    total_slices = num_req_slices + num_resp_slices + 1  # +1 for GET
+    global max_slices
+    total_slices = num_req_slices + num_resp_slices + 3  # +1 for GET, +2 bodies
     # get request header sizes
     request_sizes = ''
     total_req_hdr_size = 2  # final \n\r
@@ -78,7 +80,9 @@ def slice_sizes_slice_per_header(obj, num_req_slices, num_resp_slices):
         print 'WRONG', len(request_sizes.split('_')), len(response_sizes.split('_'))
 
     
+    max_slices = max(total_slices, max_slices)
     return request_sizes, response_sizes
+
 
 
 
@@ -186,6 +190,7 @@ def main():
         save_action_list_for_har(harpath, slice_sizes_one_slice, 'one-slice')
         save_action_list_for_har(harpath, slice_sizes_headers_content, 'four-slices')
         save_action_list_for_har(harpath, slice_sizes_slice_per_header, 'slice-per-header')
+    print max_slices
 
 
 if __name__ == '__main__':
