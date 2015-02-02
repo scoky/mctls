@@ -112,7 +112,7 @@ MANUAL_ARGS['connections_slice_local_tid.system-ns.net.pdf'] = {
     'ylim':(0, 500),
 }
 MANUAL_ARGS['timeFirstByte_slice_local_local.pdf'] = {
-    'legend': 'upper left',
+    'legend_loc': 'upper left',
     'xlim': (0, 16),
 }
 MANUAL_ARGS['page_load_time_local_local_slicing-comparison.pdf'] = {
