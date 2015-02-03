@@ -49,22 +49,6 @@ EXPERIMENT_NAMES = {
     8: 'byteOverhead_scenarios',
     9: 'timeFirstByte_scenarios',
 }
-#SUFFIXES = {
-#    2: {0: 'timeFirstByte_slice', 1: 'remote_timeFirstByte_slice'},
-#    3: {0: 'timeFirstByte_latency', 1: 'remote_timeFirstByte_latency'},
-#    4: {0: 'timeFirstByte_proxy', 1: 'remote_timeFirstByte_proxy'},
-#    5: {0: 'downloadTime', 1: 'remote_downloadTime'},
-#    6: {0: 'downloadTime_browser', 1: 'remote_downloadTime_browser'},
-#    7: {0: 'connections_slice', 1: 'remote_connections_slice'},
-#}
-#PLOT_FILENAME = {
-#    2: {0: 'time_1st_byte_slice.pdf', 1: 'time_1st_byte_slice_remote.pdf'},
-#    3: {0: 'time_1st_byte_latency.pdf', 1: 'time_1st_byte_latency_remote.pdf'},
-#    4: {0: 'time_1st_byte_proxy.pdf', 1: 'time_1st_byte_proxy_remote.pdf'},
-#    5: {0: 'download_time_fSize.pdf', 1: 'download_time_fSize_remote.pdf'},
-#    6: {0: 'download_time_browser-like.pdf', 1: 'download_time_browser-like_remote.pdf'},
-#    7: {0: 'connection_per_second.pdf', 1: 'connection_per_second_remote.pdf'},
-#}
 X_AXIS = {
     2: 'Number of Contexts',
     3: 'Link Latency (ms)',
@@ -265,6 +249,34 @@ def make_rtt_lines(endpoints, num=3):
     return lines
 
 
+#def dump_to_file_for_xkcd(xs, ys, labels, filepath):
+#    filepath += '.tsv'
+#    with open(filepath, 'w') as f:
+#        header_str = ''
+#        for label in labels:
+#            header_str += '%s_X\t%s\t' % (label, label)
+#        f.write('%s\n' % header_str)
+#        
+#        # FIXME: assumes all series have same num points
+#        for point in range(len(xs[0])):
+#            line = ''
+#            for series in range(len(xs)):
+#                line += '%s\t%s\t' % (xs[series][point], ys[series][point])
+#            f.write('%s\n' % line)
+
+def dump_to_file_for_xkcd(xs, ys, yerrs, labels, filepath):
+    filepath += '.tsv'
+    with open(filepath, 'w') as f:
+        f.write('protocol\tX\tY\tstddev\n')
+        
+        for series in range(len(xs)):
+            line = ''
+            for point in range(len(xs[0])):
+                line += '%s\t%d\t%f\t%f\n' % (labels[series], xs[series][point], ys[series][point], yerrs[series][point])
+            f.write(line)
+                
+
+
 
 
 
@@ -333,6 +345,8 @@ def plot_series(machine, remote, result_files):
         ylabel=Y_AXIS[args.opt], guide_lines=rtt_lines[1:],\
         #title=plot_title,\
         filename=out_filepath, **MANUAL_ARGS[out_filename])
+
+    dump_to_file_for_xkcd(xs, ys, yerrs, labels, out_filepath)
             
 
 # result_files is a dict: protocol -> result file path
