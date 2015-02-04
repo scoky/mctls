@@ -99,7 +99,7 @@ p +
   annotate("text", x=8.25, y=1500, label="mcTLS actually improves middlebox performance!", family="xkcd", size=5) +
   theme(legend.position="top") +
   # xlim(c(0, 16)) +
-  xkcdaxis(range(t$X), range(t$Y)) +
+  xkcdaxis(range(t$X), c(0, max(t$Y))) +
   ylab("Middlebox Connections per second") +
   xlab("Number of Contexts") +
   xkcdman(mapping, dataman)
@@ -108,17 +108,17 @@ dev.off()
 
 t <- read.table("connections_slice_local_server_54-76-148-166.pdf.tsv", header=T, sep="\t")
 
-ratioxy <- diff(range(t$X)) / diff(range(t$Y))
+ratioxy <- diff(range(t$X)) / diff(range(0:max(t$Y)))
 
 dataman <- data.frame(
   # x= c(7,12), y=c(450, 525),
-  x= c(8.25), y=c(470),
-  scale = 15.25,
+  x= c(8.25), y=c(150),
+  scale = 25.25,
   ratioxy = ratioxy,
   angleofspine =  -pi/2,
   anglerighthumerus = c(-pi/6),
   anglelefthumerus = c(-pi/2 - pi/6),
-  anglerightradius = c(-pi/5),
+  anglerightradius = c(pi/5),
   angleleftradius = c(-pi/5),
   angleleftleg = 3*pi/2  + pi / 12,
   anglerightleg = 3*pi/2  - pi / 12,
@@ -134,10 +134,10 @@ p +
   geom_errorbar(mapping=aes(x=X, ymin=Y-stddev, ymax=Y+stddev, color=protocol, width=0.2)) +
   #  geom_smooth(mapping=aes(x=X, y=Y, color=protocol), se=FALSE) +
   theme_xkcd() +
-  annotate("text", x=8.25, y=500, label="More contexts or middleboxes only degrades\nserver performance a little bit.", family="xkcd", size=5) +
+  annotate("text", x=8.25, y=220, label="More contexts or middleboxes only degrades\nserver performance a little bit.", family="xkcd", size=5) +
   theme(legend.position="top") +
   # xlim(c(0, 16)) +
-  xkcdaxis(range(t$X), range(t$Y)) +
+  xkcdaxis(range(t$X), c(0, max(t$Y))) +
   ylab("Server Connections per second") +
   xlab("Number of Contexts") +
   xkcdman(mapping, dataman)
