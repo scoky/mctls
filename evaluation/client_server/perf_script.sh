@@ -752,11 +752,11 @@ case $expType in
 	8) 
 		echo "[PERF] Byte overhead -- X axis is a few discrete scenarios"
 		opt=3
-		strategy="cs"
+		strategy="uni"
 
 		# Define scenarios to test (num slices, num middleboxes, file size)
 		declare -A scenarios
-		scenarios[1,"numSlices"]=2
+		scenarios[1,"numSlices"]=1
 		scenarios[1,"numMboxes"]=0
 		scenarios[1,"fileSize"]=$((10*1024))
 		

@@ -56,11 +56,11 @@ debug=0                   # no debugging by default
 plotCommand="none"        # Usere selection for plotting 
 key="amazon.pem"          # amazon key 
 user="ubuntu"             # amazon user 
-#protoList[1]="ssl"       # array for protocol types currently supported
-#protoList[2]="fwd"
-protoList[1]="spp"
-#protoList[4]="pln"     
-#protoList[5]="spp_mod"     
+protoList[1]="ssl"       # array for protocol types currently supported
+protoList[2]="fwd"
+protoList[3]="spp"
+protoList[4]="pln"     
+protoList[5]="spp_mod"     
 # ---- Nagel OFF for ALL
 #protoList[1]="ssl_mod"       
 #protoList[2]="fwd_mod"
@@ -386,12 +386,11 @@ then
 			echo -e "\t[MASTER] Working on protocol $proto ..."
 			
 			# run analysis
-			# TODO: use local/Amazon flag here once supported (instead of 0)
 			if [ $debug -eq 1 ] 
 			then
-				echo "./perf_script.sh $S_max $R $proto $opt 0 $resFolder >> $log 2>/dev/null"
+				echo "./perf_script.sh $S_max $R $proto $opt $remote $resFolder >> $log 2>/dev/null"
 			else
-				./perf_script.sh $S_max $R $proto $opt 0 $resFolder >> $log 2>/dev/null
+				./perf_script.sh $S_max $R $proto $opt $remote $resFolder >> $log 2>/dev/null
 			fi
 		done
 		;;
