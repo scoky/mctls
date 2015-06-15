@@ -168,3 +168,36 @@ def plot_byte_scenarios(machine, remote, result_files):
         stackbar_colors_denote='segments',\
         colors=colors, width_scale=1.4, grid='y',\
         filename=out_filepath, **plot.MANUAL_ARGS[out_filename])
+    
+    
+    
+    ##
+    ## PLOT 4: handshake only, colors for protocols
+    ##
+    out_filename, out_filepath = plot.outfile(OPT, remote, machine, extra_tag='_handshake')
+    xs = []
+    ys = []  # array of arrays: each protocol has an array with handshake sizes for each scenario
+    labels = []
+    colors = []
+    
+    protocols = ('spp', 'ssl', 'fwd')
+
+    # hack to chop off file siz3
+    scenario_mod = []
+    for scenario in scenarios:
+        scenario_mod.append('\n'.join(scenario.split('\n')[0:2]))
+
+    for protocol in protocols:
+        xs.append(scenario_mod) 
+        #val_arrays = []  # one per byte type
+        handshake_sizes = []
+        for scenario in scenarios[0:-1]:
+            handshake_sizes.append(data[scenario][protocol]['Handshake'])
+        ys.append(handshake_sizes)
+        labels.append(plot.LEGEND_STRINGS[protocol])
+
+    print '[OUT]', out_filepath
+    myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
+        xtick_label_horizontal_alignment='center', ylabel=plot.Y_AXIS[OPT],\
+        height_scale=0.9, width_scale=1.2, grid='y',\
+        filename=out_filepath, **plot.MANUAL_ARGS[out_filename])

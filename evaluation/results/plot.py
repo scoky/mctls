@@ -13,6 +13,7 @@ sys.path.append('./myplot')
 import myplot
 import plot_byte_overhead
 import plot_time_scenarios
+import browser_byte_overhead
 
 # configuration
 FIG_DIR = './fig/myplot'
@@ -48,6 +49,7 @@ EXPERIMENT_NAMES = {
     7: 'connections_slice',
     8: 'byteOverhead_scenarios',
     9: 'timeFirstByte_scenarios',
+    60: 'byteOverhead_browser',
 }
 X_AXIS = {
     2: 'Number of Contexts',
@@ -64,7 +66,7 @@ Y_AXIS = {
     5: 'Download Time (s)',
     6: 'CDF',
     7: 'Connections per Second',
-    8: 'Data Transmitted (kB)',
+    8: 'Size (kB)',
     9: 'Download Time (s)',
 }
 DATA_TRANSFORMS = {
@@ -76,6 +78,7 @@ DATA_TRANSFORMS = {
     7: lambda x: x,
     8: lambda x: float(x)/1024.,
     9: lambda x: float(x),
+    60: lambda x: float(x)/1024.,
 }
 SHOW_RTTS = {
     2: 4,
@@ -482,7 +485,7 @@ def main():
 
                     
                 else:
-                    print 'WARNING: unexpeted file name: %s' % result_file
+                    print 'WARNING: unexpected file name: %s' % result_file
                     continue
 
             if remote:
@@ -491,7 +494,7 @@ def main():
                 local_files[machine][protocol] = result_file
 
         else:
-            print 'WARNING: unexpeted file name: %s' % result_file
+            print 'WARNING: unexpected file name: %s' % result_file
             continue
 
     if args.opt in (1, 2, 3, 4, 5, 7):
@@ -521,6 +524,14 @@ def main():
 
         for machine, result_files in local_files.iteritems():
             plot_time_scenarios.plot_time_scenarios(machine, False, result_files)
+
+    elif args.opt == 60:
+        for machine, result_files in remote_files.iteritems():
+            browser_byte_overhead.analyze_browser_bytes(machine, True, result_files)
+
+        for machine, result_files in local_files.iteritems():
+            browser_byte_overhead.analyze_browser_bytes(machine, False, result_files)
+        
         
     
 
@@ -529,7 +540,7 @@ def main():
 if __name__ == '__main__':
     # set up command line args
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
-                                     description='Manage all the stages of site crawling for HTTPS Dashboard.')
+                                     description='Plot mcTLS experiment results.')
     parser.add_argument('opt', type=int, help='Experiment type')
     args = parser.parse_args()
 
