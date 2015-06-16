@@ -23,7 +23,8 @@ PROTOCOLS = {
     3: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
     4: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
     5: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
-    6: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    #6: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    6: ('spp', 'ssl_mod', 'fwd_mod', 'pln_mod', 'spp_mod'),
     7: ('spp', 'ssl', 'fwd', 'spp_mod', 'spp_2', 'spp_4'),
     8: ('spp', 'ssl', 'fwd', 'pln'),
     9: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
@@ -112,7 +113,7 @@ MANUAL_ARGS['page_load_time_local_local_proto-comparison.pdf'] = {
     'xlim':(0, 12),
 }
 MANUAL_ARGS['page_load_time_remote_local_proto-comparison.pdf'] = {
-    'xlim':(0, 30),
+    'xlim':(0, 25),
 }
 MANUAL_ARGS['timeFirstByte_scenarios_local_local.pdf'] = {
     'width_scale':3,
