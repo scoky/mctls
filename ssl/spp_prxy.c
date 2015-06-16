@@ -853,6 +853,7 @@ int spp_proxy_accept(SSL *s) {
                 if (ret <= 0) goto end;
 
                 s->state=SSL3_ST_CR_KEY_EXCH_A;
+                //SSL3_ST_CR_SRVR_DONE_A; //SSL3_ST_CR_KEY_EXCH_A; Sent in DH, not RSA ciphersuites
                 s->init_num=next_st->init_num=0;
                 break;
 

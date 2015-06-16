@@ -22,8 +22,15 @@ def records(filepath):
             if line[0] != '#':
                 fields = line.strip().split()
 
-                scenario = '%s Mbps\n%0.1f kB' %\
-                    (fields[1], size_transform(fields[0]))
+                if fields[1] == 'FIBER':
+                    bw = 'Fiber'
+                elif fields[1] == '3G':
+                    bw = '3G'
+                else:
+                    bw = '%s Mbps' % fields[1]
+
+                scenario = '%s\n%0.1f kB' %\
+                    (bw, size_transform(fields[0]))
                 amazon = fields[2] == '1'
                 scenario += '\nWide Area' if amazon else '\nControlled'
 
@@ -51,7 +58,7 @@ def plot_time_scenarios(machine, remote, result_files):
     scenarios = None
     
     protocols = []
-    for protocol in plot.PROTOCOLS:
+    for protocol in plot.PROTOCOLS[OPT]:
         if protocol not in result_files: continue
         protocols.append(protocol)
         filepath = result_files[protocol]
@@ -61,7 +68,9 @@ def plot_time_scenarios(machine, remote, result_files):
 
 
     # filter scenarios (by index)
-    use_indices = (0, 1, 2, 3, 5, 9, 13, 17)
+    #use_indices = (0, 1, 2, 3, 5, 9, 13, 17)  # 5kb files
+    use_indices = (0, 1, 2, 3, 6, 10, 14, 18)  # 185kb files
+    #use_indices = (0, 1, 2, 3, 7, 11, 15, 19)  # 10mb files
     new_scenarios = [scenarios[i] for i in use_indices]
     scenarios = new_scenarios
 

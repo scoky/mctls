@@ -13,19 +13,32 @@ sys.path.append('./myplot')
 import myplot
 import plot_byte_overhead
 import plot_time_scenarios
+import browser_byte_overhead
 
 # configuration
 FIG_DIR = './fig/myplot'
 RESULT_DIR = './final'
-PROTOCOLS = ('spp', 'ssl', 'fwd', 'pln', 'spp_mod')#, 'spp_one-slice',\
-    #'ssl_one-slice', 'fwd_one-slice', 'spp_four-slices', 'ssl_four-slices',\
-    #'fwd_four-slices')
+PROTOCOLS = {
+    2: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    3: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    4: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    5: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    6: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+    7: ('spp', 'ssl', 'fwd', 'spp_mod', 'spp_2', 'spp_4'),
+    8: ('spp', 'ssl', 'fwd', 'pln'),
+    9: ('spp', 'ssl', 'fwd', 'pln', 'spp_mod'),
+}
 LEGEND_STRINGS = {
     'pln': 'NoEncrypt',
     'fwd': 'E2E-TLS',
     'ssl': 'SplitTLS',
-    'spp': 'TruMP',
-    'spp_mod': 'TruMP (Nagle off)',
+    'spp': 'mcTLS',
+    'spp_mod': 'mcTLS (Nagle off)',
+    'ssl_mod': 'SplitTLS (Nagle off)',
+    'fwd_mod': 'E2E-TLS (Nagle off)',
+    'pln_mod': 'NoEncrypt (Nagle off)',
+    'spp_2': 'mcTLS (2 mbox)',
+    'spp_4': 'mcTLS (4 mbox)',
 }
 EXPERIMENT_NAMES = {
     2: 'timeFirstByte_slice',
@@ -36,30 +49,15 @@ EXPERIMENT_NAMES = {
     7: 'connections_slice',
     8: 'byteOverhead_scenarios',
     9: 'timeFirstByte_scenarios',
+    60: 'byteOverhead_browser',
 }
-#SUFFIXES = {
-#    2: {0: 'timeFirstByte_slice', 1: 'remote_timeFirstByte_slice'},
-#    3: {0: 'timeFirstByte_latency', 1: 'remote_timeFirstByte_latency'},
-#    4: {0: 'timeFirstByte_proxy', 1: 'remote_timeFirstByte_proxy'},
-#    5: {0: 'downloadTime', 1: 'remote_downloadTime'},
-#    6: {0: 'downloadTime_browser', 1: 'remote_downloadTime_browser'},
-#    7: {0: 'connections_slice', 1: 'remote_connections_slice'},
-#}
-#PLOT_FILENAME = {
-#    2: {0: 'time_1st_byte_slice.pdf', 1: 'time_1st_byte_slice_remote.pdf'},
-#    3: {0: 'time_1st_byte_latency.pdf', 1: 'time_1st_byte_latency_remote.pdf'},
-#    4: {0: 'time_1st_byte_proxy.pdf', 1: 'time_1st_byte_proxy_remote.pdf'},
-#    5: {0: 'download_time_fSize.pdf', 1: 'download_time_fSize_remote.pdf'},
-#    6: {0: 'download_time_browser-like.pdf', 1: 'download_time_browser-like_remote.pdf'},
-#    7: {0: 'connection_per_second.pdf', 1: 'connection_per_second_remote.pdf'},
-#}
 X_AXIS = {
-    2: 'Number of Slices',
+    2: 'Number of Contexts',
     3: 'Link Latency (ms)',
     4: 'Number of Middleboxes',
     5: 'File Size (kB)',
     6: 'Load Time (s)',
-    7: 'Number of Slices',
+    7: 'Number of Contexts',
 }
 Y_AXIS = {
     2: 'Time to First Byte (ms)',
@@ -68,7 +66,7 @@ Y_AXIS = {
     5: 'Download Time (s)',
     6: 'CDF',
     7: 'Connections per Second',
-    8: 'Data Transmitted (kB)',
+    8: 'Size (kB)',
     9: 'Download Time (s)',
 }
 DATA_TRANSFORMS = {
@@ -80,6 +78,7 @@ DATA_TRANSFORMS = {
     7: lambda x: x,
     8: lambda x: float(x)/1024.,
     9: lambda x: float(x),
+    60: lambda x: float(x)/1024.,
 }
 SHOW_RTTS = {
     2: 4,
@@ -100,17 +99,30 @@ MANUAL_ARGS['connections_slice_local_tid.system-ns.net.pdf'] = {
     'ylim':(0, 500),
 }
 MANUAL_ARGS['timeFirstByte_slice_local_local.pdf'] = {
-    'legend': 'upper left',
+    'legend_loc': 'upper left',
+    'xlim': (0, 16),
 }
 MANUAL_ARGS['page_load_time_local_local_slicing-comparison.pdf'] = {
     'xlim':(0, 12),
 }
+MANUAL_ARGS['page_load_time_remote_local_slicing-comparison.pdf'] = {
+    'legend_text_size':17,
+}
 MANUAL_ARGS['page_load_time_local_local_proto-comparison.pdf'] = {
     'xlim':(0, 12),
+}
+MANUAL_ARGS['page_load_time_remote_local_proto-comparison.pdf'] = {
+    'xlim':(0, 30),
 }
 MANUAL_ARGS['timeFirstByte_scenarios_local_local.pdf'] = {
     'width_scale':3,
     'yscale':'log',
+}
+MANUAL_ARGS['connections_slice_local_server_54-67-37-251.pdf'] = {
+    'ylim':(0, 600),
+}
+MANUAL_ARGS['connections_slice_local_server_54-76-148-166.pdf'] = {
+    'ylim':(0, 600),
 }
 
 
@@ -240,6 +252,34 @@ def make_rtt_lines(endpoints, num=3):
     return lines
 
 
+#def dump_to_file_for_xkcd(xs, ys, labels, filepath):
+#    filepath += '.tsv'
+#    with open(filepath, 'w') as f:
+#        header_str = ''
+#        for label in labels:
+#            header_str += '%s_X\t%s\t' % (label, label)
+#        f.write('%s\n' % header_str)
+#        
+#        # FIXME: assumes all series have same num points
+#        for point in range(len(xs[0])):
+#            line = ''
+#            for series in range(len(xs)):
+#                line += '%s\t%s\t' % (xs[series][point], ys[series][point])
+#            f.write('%s\n' % line)
+
+def dump_to_file_for_xkcd(xs, ys, yerrs, labels, filepath):
+    filepath += '.tsv'
+    with open(filepath, 'w') as f:
+        f.write('protocol\tX\tY\tstddev\n')
+        
+        for series in range(len(xs)):
+            line = ''
+            for point in range(len(xs[0])):
+                line += '%s\t%d\t%f\t%f\n' % (labels[series], xs[series][point], ys[series][point], yerrs[series][point])
+            f.write(line)
+                
+
+
 
 
 
@@ -260,7 +300,7 @@ def plot_series(machine, remote, result_files):
     # calculated RTTs for that value (sometimes RTT depends on X, e.g., #mbox)
     x_to_rtts = defaultdict(list)
 
-    for protocol in PROTOCOLS:
+    for protocol in PROTOCOLS[args.opt]:
         if protocol not in result_files: continue
         filepath = result_files[protocol]
         print '[IN]', protocol, filepath
@@ -308,6 +348,8 @@ def plot_series(machine, remote, result_files):
         ylabel=Y_AXIS[args.opt], guide_lines=rtt_lines[1:],\
         #title=plot_title,\
         filename=out_filepath, **MANUAL_ARGS[out_filename])
+
+    dump_to_file_for_xkcd(xs, ys, yerrs, labels, out_filepath)
             
 
 # result_files is a dict: protocol -> result file path
@@ -327,16 +369,22 @@ def plot_browser(machine, remote, result_files):
         temp_result_files['spp_mod'] = result_files['spp_mod_four-slices']
     if 'ssl_four-slices' in result_files:
         temp_result_files['ssl'] = result_files['ssl_four-slices']
+    if 'ssl_mod_four-slices' in result_files:
+        temp_result_files['ssl_mod'] = result_files['ssl_mod_four-slices']
     if 'fwd_four-slices' in result_files:
         temp_result_files['fwd'] = result_files['fwd_four-slices']
+    if 'fwd_mod_four-slices' in result_files:
+        temp_result_files['fwd_mod'] = result_files['fwd_mod_four-slices']
     if 'pln_four-slices' in result_files:
         temp_result_files['pln'] = result_files['pln_four-slices']
+    if 'pln_mod_four-slices' in result_files:
+        temp_result_files['pln_mod'] = result_files['pln_mod_four-slices']
         
     ys = []  # holds arrays of y values, 1 per series
     labels = []
     plot_title = ''
 
-    for protocol in PROTOCOLS:
+    for protocol in PROTOCOLS[args.opt]:
         if protocol not in temp_result_files: continue
         filepath = temp_result_files[protocol]
         print '[IN]', protocol, filepath
@@ -349,11 +397,12 @@ def plot_browser(machine, remote, result_files):
         
         transform = numpy.vectorize(DATA_TRANSFORMS[args.opt])
 
+        print protocol, max(transform(data[:,2]))
         ys.append(transform(data[:,2]))
         if protocol == 'spp':
-            labels.append(LEGEND_STRINGS[protocol] + ' (4 Slices)')
+            labels.append(LEGEND_STRINGS[protocol] + ' (4 Ctx)')
         elif protocol == 'spp_mod':
-            labels.append('TruMP (4 Slices, Nagle Off)')
+            labels.append('mcTLS (4 Ctx, Nagle Off)')
         else:
             labels.append(LEGEND_STRINGS[protocol])
         plot_title = title(args.opt, remote, data)
@@ -375,13 +424,15 @@ def plot_browser(machine, remote, result_files):
     plot_title = ''
 
     SLICE_LEGEND = {
-        'spp_one-slice': 'TruMP (1 Slice)',
-        'spp_four-slices': 'TruMP (4 Slices)',
-        'spp_mod_four-slices': 'TruMP (4 Slices, Nagle Off)',
-        'spp_all': 'TruMP (Slice per Header)',
+        'spp_one-slice': 'mcTLS (1 Ctx)',
+        'spp_mod_one-slice': 'mcTLS (1 Ctx, Nagle Off)',
+        'spp_four-slices': 'mcTLS (4 Ctx)',
+        'spp_mod_four-slices': 'mcTLS (4 Ctx, Nagle Off)',
+        'spp_slice-per-header': 'mcTLS (Ctx per Hdr)',
+        'spp_mod_slice-per-header': 'mcTLS (Ctx per Hdr, Nagle Off)',
     }
 
-    for protocol in ('spp_one-slice', 'spp_four-slices', 'spp_mod_four-slices', 'spp_all'):
+    for protocol in ('spp_one-slice', 'spp_mod_one-slice', 'spp_four-slices', 'spp_mod_four-slices', 'spp_slice-per-header', 'spp_mod_slice-per-header'):
         if protocol not in result_files: continue
         filepath = result_files[protocol]
         print '[IN]', protocol, filepath
@@ -417,21 +468,24 @@ def main():
     remote_files = defaultdict(lambda:defaultdict(list))  
     local_files = defaultdict(lambda:defaultdict(list))
     for result_file in glob.glob(RESULT_DIR + '/*%s*' % EXPERIMENT_NAMES[args.opt]):
-        m = re.match(r'.*res_((.{3}|spp_mod)(_one-slice|_four-slices)?)_(remote_)?%s(_(.*))?' %\
+        m = re.match(r'.*res_((.{3}(_mod)?)(_one-slice|_four-slices|_slice-per-header|_[0-9])?)_(remote_)?%s(_(.*))?' %\
             EXPERIMENT_NAMES[args.opt], result_file)
         if m:
             protocol = m.group(1)
-            remote = (m.group(4) is not None)
-            remainder = m.group(6)
+            remote = (m.group(5) is not None)
+            remainder = m.group(7)
             machine = None
 
             if remainder:  # decide if it's garbage or machine name
-                if remainder == 'tid.system-ns.net' or \
-                   remainder == 'localhost' or \
-                   re.match('[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}', remainder):
+                if re.match('(server|mbox|client)?_tid.system-ns.net', remainder) or \
+                   re.match('(server|mbox|client)?_localhost', remainder) or \
+                   re.match('(server|mbox|client)?_[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}', remainder):
                     machine = remainder
+                    machine = machine.replace('.', '-')
+
+                    
                 else:
-                    print 'WARNING: unexpeted file name: %s' % result_file
+                    print 'WARNING: unexpected file name: %s' % result_file
                     continue
 
             if remote:
@@ -440,7 +494,7 @@ def main():
                 local_files[machine][protocol] = result_file
 
         else:
-            print 'WARNING: unexpeted file name: %s' % result_file
+            print 'WARNING: unexpected file name: %s' % result_file
             continue
 
     if args.opt in (1, 2, 3, 4, 5, 7):
@@ -470,6 +524,14 @@ def main():
 
         for machine, result_files in local_files.iteritems():
             plot_time_scenarios.plot_time_scenarios(machine, False, result_files)
+
+    elif args.opt == 60:
+        for machine, result_files in remote_files.iteritems():
+            browser_byte_overhead.analyze_browser_bytes(machine, True, result_files)
+
+        for machine, result_files in local_files.iteritems():
+            browser_byte_overhead.analyze_browser_bytes(machine, False, result_files)
+        
         
     
 
@@ -478,7 +540,7 @@ def main():
 if __name__ == '__main__':
     # set up command line args
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,\
-                                     description='Manage all the stages of site crawling for HTTPS Dashboard.')
+                                     description='Plot mcTLS experiment results.')
     parser.add_argument('opt', type=int, help='Experiment type')
     args = parser.parse_args()
 

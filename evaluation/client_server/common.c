@@ -85,6 +85,7 @@ SSL_CTX *initialize_ctx(char *keyfile, char *password, char *proto){
     /* Specify the cipher suites that may be used. */
 	
     if (!SSL_CTX_set_cipher_list(ctx, "DHE-RSA-AES128-SHA256")) {
+//    if (!SSL_CTX_set_cipher_list(ctx, "AES128-SHA256")) {
 	printf("Failed seting cipher list.\n");
     }
 	
