@@ -348,6 +348,8 @@ def plot_series(machine, remote, result_files):
     myplot.plot(xs, ys, yerrs=yerrs, labels=labels, xlabel=X_AXIS[args.opt],\
         ylabel=Y_AXIS[args.opt], guide_lines=rtt_lines[1:],\
         #title=plot_title,\
+        #builds = [[], [3], [3, 1, 2], [3, 1, 2, 0], [3, 1, 2, 0, 4]],\
+        #builds = [[], [1, 2], [0, 1, 2], [0, 1, 2, 3, 4]],\
         filename=out_filepath, **MANUAL_ARGS[out_filename])
 
     dump_to_file_for_xkcd(xs, ys, yerrs, labels, out_filepath)
@@ -411,6 +413,7 @@ def plot_browser(machine, remote, result_files):
     print '[OUT]', out_filepath
     myplot.cdf(ys, labels=labels, xlabel=X_AXIS[args.opt],\
         #title=plot_title,\
+        #builds = [[], [3], [3, 1, 2], [3, 1, 2, 0], [3, 1, 2, 0, 4]],\
         filename=out_filepath, **MANUAL_ARGS[out_filename])
     
     
