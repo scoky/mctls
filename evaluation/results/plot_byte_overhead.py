@@ -200,4 +200,5 @@ def plot_byte_scenarios(machine, remote, result_files):
     myplot.bar(xs, ys, labels=labels, xtick_label_rotation=0,\
         xtick_label_horizontal_alignment='center', ylabel=plot.Y_AXIS[OPT],\
         height_scale=0.9, width_scale=1.2, grid='y',\
+        #builds = [[], [1, 2], [0, 1, 2]],\
         filename=out_filepath, **plot.MANUAL_ARGS[out_filename])
